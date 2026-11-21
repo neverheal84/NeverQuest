@@ -27,6 +27,7 @@ local OBJECTS = {
 	{ "NeverQuestFontSmallGray", "GameFontDisableSmall" },
 	{ "NeverQuestFontNormalSmall", "GameFontNormalSmall" },
 	{ "NeverQuestFontNumber", "NumberFontNormal" },
+	{ "NeverQuestFontTiny", "GameFontNormalSmall", 0.8 },   -- small captions (third field: size factor)
 }
 local FALLBACK_FILE = "Fonts\\FRIZQT__.TTF"
 St.base, St.objects = {}, {}
@@ -41,8 +42,12 @@ for _, def in ipairs(OBJECTS) do
 		obj:CopyFontObject(src)
 		file, size, flags = src:GetFont()
 	end
-	St.base[name] = { file = file or FALLBACK_FILE, size = size or 12, flags = flags or "" }
-	if not src then pcall(obj.SetFont, obj, FALLBACK_FILE, 12, "") end
+	St.base[name] = { file = file or FALLBACK_FILE, size = (size or 12) * (def[3] or 1), flags = flags or "" }
+	if not src then
+		pcall(obj.SetFont, obj, FALLBACK_FILE, 12 * (def[3] or 1), "")
+	elseif def[3] then
+		pcall(obj.SetFont, obj, file or FALLBACK_FILE, (size or 12) * def[3], flags or "")
+	end
 end
 
 local function Cfg() return ns.db.style end

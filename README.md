@@ -61,8 +61,8 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 - **Blizzard's quest list:** by default it's emptied while the NeverQuest tracker shows (your quests are untracked, so Blizzard's objective tracker keeps only its other sections, like bonus objectives). Or choose "Sort by priority" to keep Blizzard's list in NeverQuest's order, or "Leave it alone". Turning the hide option off gives your tracked quests back. NeverQuest only changes which quests are tracked, out of combat, and never edits Blizzard's frames.
 
 **Buttons**
-- **Quest item bar:** usable quest items for your next steps, with cooldowns. Keybindable.
-- **Target button:** targets the NPC or mob for your next step. NPC names are learned from your own quest conversations and shared by all your characters, so alts get smarter over time. Keybindable.
+- **Quest item bar:** a slim bar with the NeverQuest logo as its drag handle, holding usable quest items for your next steps (rounded buttons with cooldowns and key labels). Keybindable.
+- **Target button:** the "TARGET" pill on the same bar shows who it targets and targets the NPC or mob for your next step. NPC names are learned from your own quest conversations and shared by all your characters, so alts get smarter over time. Bind it under Esc > Options > Keybindings > AddOns > NeverQuest ("Target next NPC or mob"). `/nq buttons` hides the bar; its size is under Scale & Text.
 
 **Tracking**
 - **XP panel:** XP/hour, time to level, quests or kills to level, rested XP. Right-click it to open the main window.

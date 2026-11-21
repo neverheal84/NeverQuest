@@ -7,7 +7,7 @@ local B = {}
 ns.Buttons = B
 
 local NUM_ITEMS = 4
-local SIZE = 34
+local SIZE = 28
 
 BINDING_HEADER_NEVERQUEST = "NeverQuest"
 _G["BINDING_NAME_CLICK NeverQuestItemButton1:LeftButton"] = "Use quest item 1"
@@ -55,29 +55,68 @@ function B:TargetName()
 end
 
 ---------------------------------------------------------------------------
--- Frames
+-- Frames: a slim rounded bar with the logo as its handle, rounded item buttons, and a
+-- "Target" pill that says who it targets.
 ---------------------------------------------------------------------------
+local PAD, GAP, LOGO = 5, 4, 16
+local PILL_MIN, PILL_MAX = 74, 168
+
+local function HasAtlas(name)
+	return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) ~= nil
+end
+
+local PILL_BACKDROP = {
+	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	tile = true, tileSize = 16, edgeSize = 10,
+	insets = { left = 2, right = 2, top = 2, bottom = 2 },
+}
+
 local function StyleButton(btn)
 	btn:SetSize(SIZE, SIZE)
 	btn:RegisterForClicks("AnyUp", "AnyDown")
 	btn.icon = btn:CreateTexture(nil, "ARTWORK")
-	btn.icon:SetPoint("TOPLEFT", 2, -2)
-	btn.icon:SetPoint("BOTTOMRIGHT", -2, 2)
+	btn.icon:SetAllPoints()
 	btn.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	local bg = btn:CreateTexture(nil, "BACKGROUND")
-	bg:SetAllPoints()
-	bg:SetColorTexture(0, 0, 0, 0.7)
-	local hl = btn:CreateTexture(nil, "HIGHLIGHT")
-	hl:SetAllPoints()
-	hl:SetColorTexture(1, 1, 1, 0.2)
-	local pushed = btn:CreateTexture(nil, "OVERLAY")
-	pushed:SetAllPoints()
-	pushed:SetColorTexture(0, 0, 0, 0.35)
-	btn:SetPushedTexture(pushed)
+	if HasAtlas("UI-HUD-ActionBar-IconFrame") then
+		-- The game's own rounded action button look.
+		local mask = btn:CreateMaskTexture()
+		mask:SetAtlas("UI-HUD-ActionBar-IconFrame-Mask", false)
+		mask:SetPoint("TOPLEFT", -1, 1)
+		mask:SetPoint("BOTTOMRIGHT", 1, -1)
+		btn.icon:AddMaskTexture(mask)
+		btn.mask = mask
+		local border = btn:CreateTexture(nil, "OVERLAY")
+		border:SetAtlas("UI-HUD-ActionBar-IconFrame", false)
+		border:SetPoint("TOPLEFT", -2, 2)
+		border:SetPoint("BOTTOMRIGHT", 2, -2)
+		btn.border = border
+		local hl = btn:CreateTexture(nil, "HIGHLIGHT")
+		hl:SetAtlas("UI-HUD-ActionBar-IconFrame-Mouseover", false)
+		hl:SetPoint("TOPLEFT", -2, 2)
+		hl:SetPoint("BOTTOMRIGHT", 2, -2)
+		local pushed = btn:CreateTexture(nil, "OVERLAY", nil, 2)
+		pushed:SetAtlas("UI-HUD-ActionBar-IconFrame-Down", false)
+		pushed:SetPoint("TOPLEFT", -2, 2)
+		pushed:SetPoint("BOTTOMRIGHT", 2, -2)
+		btn:SetPushedTexture(pushed)
+	else
+		local bg = btn:CreateTexture(nil, "BACKGROUND")
+		bg:SetPoint("TOPLEFT", -1, 1)
+		bg:SetPoint("BOTTOMRIGHT", 1, -1)
+		bg:SetColorTexture(0, 0, 0, 0.8)
+		local hl = btn:CreateTexture(nil, "HIGHLIGHT")
+		hl:SetAllPoints()
+		hl:SetColorTexture(1, 1, 1, 0.18)
+		local pushed = btn:CreateTexture(nil, "OVERLAY")
+		pushed:SetAllPoints()
+		pushed:SetColorTexture(0, 0, 0, 0.35)
+		btn:SetPushedTexture(pushed)
+	end
 	btn.count = btn:CreateFontString(nil, "OVERLAY", "NeverQuestFontNumber")
-	btn.count:SetPoint("BOTTOMRIGHT", -2, 2)
-	btn.hotkey = btn:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmall")
-	btn.hotkey:SetPoint("TOPRIGHT", -2, -2)
+	btn.count:SetPoint("BOTTOMRIGHT", -1, 1)
+	btn.hotkey = btn:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmallGray")
+	btn.hotkey:SetPoint("TOPRIGHT", -1, -2)
 end
 
 local function HotkeyText(binding)
@@ -86,32 +125,45 @@ local function HotkeyText(binding)
 	return GetBindingText and GetBindingText(key, true) or key
 end
 
+local function BarTooltip(owner)
+	GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+	GameTooltip:AddLine("NeverQuest buttons")
+	GameTooltip:AddLine("Quest items for your next steps, and a Target button for the next NPC or mob.", 1, 1, 1, true)
+	GameTooltip:AddLine("Drag the logo to move the bar. Keys: Esc > Options > Keybindings > AddOns > NeverQuest. /nq buttons hides it.", 0.7, 0.7, 0.7, true)
+	GameTooltip:Show()
+end
+
 local function CreateBar()
 	local bar = CreateFrame("Frame", "NeverQuestButtonBar", UIParent, "BackdropTemplate")
-	bar:SetSize(16 + (SIZE + 4) * (NUM_ITEMS + 1) + 4, SIZE + 10)
+	bar:SetSize(PAD * 2 + LOGO + 6 + SIZE, SIZE + PAD * 2)
 	bar:SetFrameStrata("MEDIUM")
-	ns.ApplyBackdrop(bar, 0.6)
+	bar:SetBackdrop(PILL_BACKDROP)
+	bar:SetBackdropColor(0.04, 0.05, 0.08, 0.72)
+	bar:SetBackdropBorderColor(0.55, 0.45, 0.2, 0.8)
 	ns.MakeMovable(bar, "buttons", function() return ns.db.buttons.locked or InCombatLockdown() end,
 		{ "BOTTOM", UIParent, "BOTTOM", 0, 190 })
 
-	local grip = bar:CreateTexture(nil, "ARTWORK")
-	grip:SetAtlas("QuestNormal", false)
-	grip:SetSize(12, 18)
-	grip:SetPoint("LEFT", 4, 0)
-	bar:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_TOP")
-		GameTooltip:AddLine("NeverQuest buttons")
-		GameTooltip:AddLine("Quest items for your next steps, plus a button that targets the next NPC or mob.", 1, 1, 1, true)
-		GameTooltip:AddLine("Drag the edge to move. Set keys in Options > Keybindings > AddOns.", 0.7, 0.7, 0.7, true)
-		GameTooltip:Show()
-	end)
-	bar:SetScript("OnLeave", GameTooltip_Hide)
+	-- The logo is the handle.
+	local logo = bar:CreateTexture(nil, "ARTWORK")
+	logo:SetTexture(ns.ICON)
+	logo:SetTexCoord(0.06, 0.94, 0.06, 0.94)
+	logo:SetSize(LOGO, LOGO)
+	logo:SetPoint("LEFT", PAD, 0)
+	logo:SetAlpha(0.85)
+	bar.logo = logo
+	local div = bar:CreateTexture(nil, "ARTWORK")
+	div:SetColorTexture(1, 1, 1, 0.12)
+	div:SetSize(1, SIZE - 6)
+	div:SetPoint("LEFT", logo, "RIGHT", 4, 0)
+	bar:SetScript("OnEnter", function(self) logo:SetAlpha(1) BarTooltip(self) end)
+	bar:SetScript("OnLeave", function() logo:SetAlpha(0.85) GameTooltip_Hide() end)
+	bar.first = PAD + LOGO + 6
 
 	bar.items = {}
 	for i = 1, NUM_ITEMS do
 		local btn = CreateFrame("Button", "NeverQuestItemButton" .. i, bar, "SecureActionButtonTemplate")
 		StyleButton(btn)
-		btn:SetPoint("LEFT", 18 + (i - 1) * (SIZE + 4), 0)
+		btn:SetPoint("LEFT", bar.first + (i - 1) * (SIZE + GAP), 0)
 		btn:SetAttribute("type", "item")
 		btn.cooldown = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
 		btn.cooldown:SetAllPoints(btn.icon)
@@ -131,19 +183,38 @@ local function CreateBar()
 		bar.items[i] = btn
 	end
 
-	local t = CreateFrame("Button", "NeverQuestTargetButton", bar, "SecureActionButtonTemplate")
-	StyleButton(t)
+	-- Target pill: magnifying glass, a small "Target" caption and the name.
+	local t = CreateFrame("Button", "NeverQuestTargetButton", bar, "SecureActionButtonTemplate, BackdropTemplate")
+	t:SetSize(PILL_MIN, SIZE)
+	t:RegisterForClicks("AnyUp", "AnyDown")
 	t:SetAttribute("type", "macro")
+	t:SetBackdrop(PILL_BACKDROP)
+	t:SetBackdropColor(0.12, 0.13, 0.18, 0.95)
+	t:SetBackdropBorderColor(0.4, 0.4, 0.45, 0.9)
+	t.icon = t:CreateTexture(nil, "ARTWORK")
 	t.icon:SetAtlas("common-search-magnifyingglass", false)
-	t.icon:SetTexCoord(0, 1, 0, 1)
-	t.label = t:CreateFontString(nil, "OVERLAY", "NeverQuestFontNormalSmall")
-	t.label:SetPoint("BOTTOM", t, "TOP", 0, 6)
-	t.label:SetWidth(160)
+	t.icon:SetSize(14, 14)
+	t.icon:SetPoint("LEFT", 8, 0)
+	t.caption = t:CreateFontString(nil, "OVERLAY", "NeverQuestFontTiny")
+	t.caption:SetPoint("TOPLEFT", t.icon, "TOPRIGHT", 6, 5)
+	t.caption:SetText("TARGET")
+	t.label = t:CreateFontString(nil, "OVERLAY", "NeverQuestFontHighlight")
+	t.label:SetPoint("BOTTOMLEFT", t.icon, "BOTTOMRIGHT", 6, -4)
+	t.label:SetJustifyH("LEFT")
 	t.label:SetWordWrap(false)
+	t.hotkey = t:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmallGray")
+	t.hotkey:SetPoint("TOPRIGHT", -5, -4)
+	local hl = t:CreateTexture(nil, "HIGHLIGHT")
+	hl:SetPoint("TOPLEFT", 3, -3)
+	hl:SetPoint("BOTTOMRIGHT", -3, 3)
+	hl:SetColorTexture(1, 1, 1, 0.08)
 	t:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
 		GameTooltip:AddLine("Target: " .. (self.targetName or "nothing yet"))
-		if self.forStep then GameTooltip:AddLine(self.forStep, 1, 1, 1, true) end
+		if self.forStep then GameTooltip:AddLine("For: " .. self.forStep, 0.5, 0.8, 1, true) end
+		local key = HotkeyText("CLICK NeverQuestTargetButton:LeftButton")
+		GameTooltip:AddLine(key ~= "" and ("Click or press " .. key .. " to target it.") or
+			"Click to target it. Bind a key: Esc > Options > Keybindings > AddOns > NeverQuest.", 0.7, 0.7, 0.7, true)
 		GameTooltip:Show()
 	end)
 	t:SetScript("OnLeave", GameTooltip_Hide)
@@ -151,6 +222,16 @@ local function CreateBar()
 	bar.target = t
 	return bar
 end
+
+-- The pill grows with the name, within limits; long names are cut.
+local function SizePill(t)
+	local w = t.label.GetStringWidth and ns.Num(t.label:GetStringWidth()) or 0
+	local width = math.max(PILL_MIN, math.min(PILL_MAX, 8 + 14 + 6 + (w or 0) + 12 + (t.hotkey:GetText() ~= "" and 14 or 0)))
+	t:SetWidth(width)
+	t.label:SetWidth(width - 8 - 14 - 6 - 8)
+	return width
+end
+B.SizePill = SizePill
 
 ---------------------------------------------------------------------------
 -- Updating (secure attributes only out of combat)
@@ -188,6 +269,7 @@ function B:Update()
 	end
 
 	local t = bar.target
+	local width
 	local name, step = nil, nil
 	if cfg.target then name, step = self:TargetName() end
 	if name and not name:find("[\r\n]") then
@@ -196,9 +278,11 @@ function B:Update()
 		t:SetAttribute("macrotext", "/targetexact " .. name)
 		t.label:SetText(name)
 		t.hotkey:SetText(HotkeyText("CLICK NeverQuestTargetButton:LeftButton"))
+		local pill = SizePill(t)
 		t:ClearAllPoints()
-		t:SetPoint("LEFT", 18 + shown * (SIZE + 4), 0)
+		t:SetPoint("LEFT", bar.first + shown * (SIZE + GAP), 0)
 		t:Show()
+		width = bar.first + shown * (SIZE + GAP) + pill + PAD
 		shown = shown + 1
 	else
 		t.targetName = nil
@@ -206,7 +290,7 @@ function B:Update()
 		t:Hide()
 	end
 
-	bar:SetWidth(22 + shown * (SIZE + 4))
+	bar:SetWidth(width or (bar.first + math.max(1, shown) * (SIZE + GAP) - GAP + PAD))
 	bar:SetShown(shown > 0)
 	self:UpdateCooldowns()
 end
