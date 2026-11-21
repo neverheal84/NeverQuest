@@ -121,7 +121,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 
 **Sharing as you go:** with "Share quests with my party as I pick them up" on (Options > NeverQuest > Party, off by default), each quest you take from an NPC is offered to your party. A quest that was shared to you isn't shared back, and nothing is sent in a raid.
 
-**Finished quests are never left behind:** a quest you've completed is earned XP, so it's never filed under "later". When NeverQuest hasn't learned where one is handed in it can't put it on the route, but it lists it at the top of the guide instead, with a count of how many are waiting in the zone you're standing in, so the route never sends you out of a town past three turn-ins.
+**Finished quests are never left behind:** a quest you've completed is earned XP, so it's never filed under "later". When NeverQuest hasn't learned where one is handed in it can't put it on the route, but a notice at the top of the guide counts how many are waiting in the zone you're standing in, and they're listed above anything that takes you out of the zone, so the route never sends you out of a town past three turn-ins. They stay below work that's in front of you, and because the only spot they carry is usually the middle of a zone, the arrow never follows one on its own; clicking the row still points it there.
 
 **Profession nearly capped:** a reminder when a profession is within ten points of its current rank, read from the cap the game reports rather than a table of thresholds. In a town it says to train the next rank there; out in the world it says to do it on your next trip in.
 

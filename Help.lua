@@ -255,6 +255,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.16.1" .. E,
+		"  Fixes 1.16.0: finished quests whose hand-in is only known as a zone were put above everything, so they outranked work at your feet and the arrow followed one to the middle of a zone. They now sit above travel but below what is in front of you, and never steer the arrow on their own.",
+		"",
 		Y .. "1.16.0" .. E,
 		"  Finished quests are never left behind. One NeverQuest has no hand-in spot for used to drop to the bottom of the guide under \"later\", so the route would send you out of the zone past it. They now sit at the top, with a count of the ones waiting where you are standing.",
 		"  A reminder when a profession is within ten points of its current rank, so you train the next rank on your next trip to a town instead of grinding into the ceiling.",

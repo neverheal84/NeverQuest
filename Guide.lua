@@ -214,11 +214,11 @@ function G:BuildPlanned(steps, plan)
 	-- A finished quest is the exception. It is already earned, so it is never filed under
 	-- "later" just because NeverQuest has not learned where it is handed in: those go above
 	-- the route, with the zone the game says to go to, so you are not flown out past them.
-	local hereZone
+	local hereZone, hereMap
 	do
 		local m = ns.SafeCall(C_Map.GetBestMapForUnit, "player")
-		m = m and ns.Nav.GetZoneMap(m)
-		hereZone = m and ns.Nav.MapName(m) or nil
+		hereMap = m and ns.Nav.GetZoneMap(m) or nil
+		hereZone = hereMap and ns.Nav.MapName(hereMap) or nil
 	end
 	local waiting = {}
 	for _, e in ipairs(ns.Quests.log) do
@@ -227,7 +227,11 @@ function G:BuildPlanned(steps, plan)
 			if e.complete then
 				-- MakeStep already explains what is known (who to hand it to, which zone), so
 				-- that is left alone; all this does is stop it being buried under "later".
+				-- The spot these carry is usually just the middle of a zone, which is no use to
+				-- the arrow: it would point at open countryside instead of at real work. So the
+				-- arrow never picks one on its own. Clicking the row still points it there.
 				s.color = { 0.4, 1, 0.5 }
+				s.noAuto = true
 				table.insert(waiting, { step = s, here = hereZone ~= nil and ns.Quests:ZoneOf(e) == hereZone })
 			else
 				s.later = true
@@ -244,7 +248,19 @@ function G:BuildPlanned(steps, plan)
 	end)
 	local hereCount = 0
 	for _, w in ipairs(waiting) do if w.here then hereCount = hereCount + 1 end end
-	for i = #waiting, 1, -1 do table.insert(steps, 1, waiting[i].step) end
+	-- They go above the first step that takes you out of this zone, and below everything still
+	-- in it. Handing them in before you travel is free XP; dropping what you are standing next
+	-- to for one is not.
+	local at = #steps + 1
+	if hereMap then
+		for i, st in ipairs(steps) do
+			if st.m and ns.Nav.GetZoneMap(st.m) ~= hereMap then at = i break end
+		end
+	end
+	for i = #waiting, 1, -1 do table.insert(steps, at, waiting[i].step) end
+	-- The notice goes to the top so you can't travel without seeing it, but the quests
+	-- themselves stay below the route: they are worth knowing about, not worth dropping
+	-- whatever you are standing next to for. It carries no spot, so the arrow ignores it.
 	if hereCount > 0 then
 		table.insert(steps, 1, { kind = "tip", key = "tip:handin",
 			title = hereCount == 1 and "1 finished quest waiting in this zone"
@@ -764,7 +780,7 @@ function G:AutoTrack()
 		end
 		if not pick then
 			for _, s in ipairs(self.steps) do
-				if s.m then pick = s break end
+				if s.m and not s.noAuto then pick = s break end
 			end
 		end
 	end
