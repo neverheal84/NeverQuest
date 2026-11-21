@@ -5,7 +5,7 @@ local ADDON, ns = ...
 local Help = {}
 ns.Help = Help
 
-local W, H, LIST_W = 680, 470, 170
+local W, H, LIST_W = 680, 520, 170
 local Y = "|cffffd100"   -- heading color
 local E = "|r"
 
@@ -129,7 +129,7 @@ Help.TOPICS = {
 		"Usable quest items for your next steps, with cooldowns. Keybindable.",
 		"",
 		Y .. "Target button" .. E,
-		"Targets the NPC or mob for your next step. NPC names are learned from your quest conversations.",
+		"Targets the NPC or mob for your next step. NPC names are learned from your quest conversations. The TARGET button on the quest item bar is off by default: turn it on under Options > Display & Maps > Buttons, or with " .. Y .. "/nq buttons target" .. E .. ". The key binding (Target next NPC or mob) works either way.",
 		"",
 		Y .. "XP panel" .. E,
 		"XP per hour, time to level, quests or kills to level and rested XP. Right-click it to open the main window. " .. Y .. "/nq xp" .. E .. " prints the numbers in chat.",
@@ -139,7 +139,10 @@ Help.TOPICS = {
 	end },
 	{ key = "automation", title = "Automation", text = function() return Lines(
 		Y .. "Quests" .. E,
-		"NeverQuest can accept quests and turn in finished ones for you, and pick quests in NPC dialog windows. Gray and repeatable quests are skipped by default. With several rewards it tells you which sells for the most, or takes it if you choose that under Options.",
+		"NeverQuest can accept quests and turn in finished ones for you, and pick quests in NPC dialog windows. Gray and repeatable quests are skipped by default.",
+		"",
+		Y .. "Quest rewards" .. E,
+		"With several rewards to choose from, NeverQuest checks each one against what you're wearing, using the stats your class cares about, and marks the best with a green arrow. Chat says why (for example \"+6 Agility, +2 Stamina over your old belt\"). With no upgrade it marks the one that sells for the most. Under Options you can let it take upgrades, or always take the highest vendor value.",
 		"",
 		Y .. "Auto loot" .. E,
 		"Takes everything from a loot window at once. Items waiting on a group roll are left alone, and bind-on-pickup items still ask you. " .. Y .. "/nq loot" .. E .. " turns it on or off.",
@@ -147,7 +150,49 @@ Help.TOPICS = {
 		Y .. "Sell junk" .. E,
 		"Gray items are sold when you open a vendor, and chat says what they brought in. Changed your mind? The vendor's Buyback tab has the most recent ones. " .. Y .. "/nq junk" .. E .. " sells them now at a vendor, or tells you what they're worth anywhere else.",
 		"",
+		Y .. "Repairs" .. E,
+		"Opening a vendor that can repair fixes all your gear and says what it cost. It can use guild funds first when your rank allows it (" .. Y .. "/nq repair guild" .. E .. "). " .. Y .. "/nq repair" .. E .. " repairs now at a vendor.",
+		"",
 		Y .. "Hold Shift" .. E .. " while talking to an NPC, looting, or opening a vendor to skip automation that time.")
+	end },
+	{ key = "upkeep", title = "Reminders and travel", text = function() return Lines(
+		Y .. "Quest log full" .. E,
+		"When your log is full the guide shows which quests to drop first: failed, gray, far away, or little XP for the walk. Quests ready to hand in and your attunement chain are never suggested. Talking to a quest giver with a full log says it in chat too.",
+		"",
+		Y .. "Supplies and bags" .. E,
+		"The guide reminds you when food and water run low, when a hunter's ammo runs low, and when your bags are nearly full. With full bags it lists quest items you can safely delete because their quest is already done.",
+		"",
+		Y .. "Rested XP" .. E,
+		"Logging out away from an inn or city gives you no rested XP. NeverQuest reminds you, and mentions your Cozy Sleeping Bag if you have one.",
+		"",
+		Y .. "Flight paths" .. E,
+		"A guide step points you to any flight master in your zone you haven't talked to yet. Close ones go right after your next step.",
+		"",
+		Y .. "Hearthstone" .. E,
+		"NeverQuest notes where you bind your hearthstone. When it's ready, nothing is left near you, and finished quests are handed in near your inn, the guide's first step says to hearth back, and the hearthstone appears on your quest item bar. At an inn far from your hearth spot it can suggest binding there.",
+		"",
+		Y .. "Session summary" .. E,
+		Y .. "/nq session" .. E .. " shows time played, XP and XP per hour, levels, quests, kills, gold and deaths since you logged in.",
+		"",
+		Y .. "Asking for a group" .. E,
+		"Ctrl-click an elite or group quest in the guide (or use its right-click menu in the tracker) to put a looking-for-group message with the quest link in your chat box. Nothing is sent until you press Enter. " .. Y .. "/nq lfg" .. E .. " does it for your next elite quest.")
+	end },
+	{ key = "database", title = "Quest database", text = function() return Lines(
+		Y .. "What it is" .. E,
+		"A list of every quest the game has shown any of your characters: name, level, zone, and where the quest giver stands. It's built only from the game itself. A slow background scan asks which quests each zone offers (one zone every couple of seconds, paused in combat), and quests you see or accept as you play are added too. Alts benefit from what your other characters have seen.",
+		"",
+		Y .. "Using it" .. E,
+		"  " .. Y .. "/nq db" .. E .. "  your zone: known quests, how many are done, in your log, available, or for later levels",
+		"  " .. Y .. "/nq db <name>" .. E .. "  find quests by name (or quest ID)",
+		"  " .. Y .. "/nq db zone <zone>" .. E .. "  the same list for another zone",
+		"  " .. Y .. "/nq db way <id>" .. E .. "  point the arrow at a quest's giver",
+		"  " .. Y .. "/nq db scan" .. E .. "  scan every zone again now",
+		"",
+		Y .. "On the world map" .. E,
+		"Quests you know about that aren't on offer to you right now show as faded markers with their level: ones that open in a few levels, or ones after an earlier quest. Click one for a waypoint. " .. Y .. "/nq db map" .. E .. " turns them off.",
+		"",
+		Y .. "Questie" .. E,
+		"If you also run Questie, NeverQuest leaves quest givers and spawn spots on the maps to it, so they aren't drawn twice. Your guide, route and arrow keep working. " .. Y .. "/nq questie" .. E .. " switches this.")
 	end },
 	{ key = "commands", title = "All commands", text = function()
 		local out = { Y .. "All commands" .. E, "", "Type these in chat. " .. Y .. "/neverquest" .. E .. " works in place of " .. Y .. "/nq" .. E .. ".", "" }

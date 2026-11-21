@@ -77,6 +77,7 @@ function B:Menu(owner)
 		root:CreateButton("Raid attunements", function() ns.UI.frame:Show() ns.UI:SetTab("raids") end)
 		root:CreateButton("Help", function() ns.Help:Open() end)
 		root:CreateButton("Setup wizard", function() ns.Setup:Open() end)
+		root:CreateButton("Session summary", function() ns.Upkeep:PrintSession() end)
 		root:CreateDivider()
 		root:CreateCheckbox("Quest tracker", function() return db.tracker.shown end, function()
 			db.tracker.shown = not db.tracker.shown
@@ -87,6 +88,10 @@ function B:Menu(owner)
 		root:CreateCheckbox("Waypoint arrow", function() return db.arrow.shown end, function() db.arrow.shown = not db.arrow.shown ns.Nav:Update() end)
 		root:CreateCheckbox("Party announcements", function() return db.announce.enabled end, function()
 			db.announce.enabled = not db.announce.enabled
+		end)
+		root:CreateCheckbox("Known quests on the world map", function() return db.questdb.worldmap end, function()
+			db.questdb.worldmap = not db.questdb.worldmap
+			ns:SendMessage("MAP_OFFERS_UPDATED")
 		end)
 		root:CreateCheckbox("Party catch-up", function() return db.party.catchUp end, function()
 			db.party.catchUp = not db.party.catchUp

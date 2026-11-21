@@ -86,13 +86,14 @@ local mm = { pins = {}, points = {} }
 
 function P:MinimapPoints()
 	local cfg, pts = ns.db.pins, {}
+	local questie = ns.QuestieOverlap()
 	-- Known spawns and marks near you go in first so quest pins draw over them.
-	if ns.db.spawns.minimap and ns.Spawns then
+	if ns.db.spawns.minimap and ns.Spawns and not questie then
 		for _, sp in ipairs(ns.Spawns:NearbyPoints(450, 60)) do
 			table.insert(pts, { kind = sp.kind, m = sp.m, x = sp.x, y = sp.y, spawn = sp })
 		end
 	end
-	if cfg.mmGivers then
+	if cfg.mmGivers and not questie then
 		for _, o in ipairs(ns.Quests.offers) do
 			if ns.Quests:OfferShown(o) then
 				table.insert(pts, { kind = "giver", m = o.m, x = o.x, y = o.y, questID = o.questID, offer = o,
@@ -318,7 +319,9 @@ function PinMethods:OnMouseEnter()
 	end
 	GameTooltip:AddLine(info.title or "", 1, 0.82, 0, true)
 	if info.sub and info.sub ~= "" then GameTooltip:AddLine(info.sub, 1, 1, 1, true) end
-	if info.user then
+	if info.known then
+		GameTooltip:AddLine("From your quest database.  Click: set a waypoint.", 0.5, 0.8, 1)
+	elseif info.user then
 		GameTooltip:AddLine("Click: make active.  Shift+click: remove.", 0.5, 0.8, 1)
 	elseif info.legPin then
 		GameTooltip:AddLine("Next stop on the way. The arrow goes here first.", 0.5, 0.8, 1)
@@ -342,6 +345,8 @@ function PinMethods:OnClick(button)
 		else
 			ns.Nav:AddUser(info.m, info.wx, info.wy, info.title)
 		end
+	elseif info.known then
+		ns.Nav:AddUser(info.m, info.wx, info.wy, info.title)
 	elseif info.user then
 		if IsShiftKeyDown() then
 			ns.Nav:Remove(info.index)
@@ -460,9 +465,13 @@ function provider:RefreshAllData()
 	local mapInfo = C_Map.GetMapInfo(mapID)
 	local zoomedIn = mapInfo and mapInfo.mapType and mapInfo.mapType >= Enum.UIMapType.Zone
 	local givers = ns.db.givers
-	if givers.worldmap and zoomedIn then
-		local here = ns.Quests.offerMap
-		local list = (givers.otherZones or mapID == here or ns.Nav.GetZoneMap(mapID) == here) and ns.Quests:OffersForMap(mapID) or {}
+	local questie = ns.QuestieOverlap()
+	local offered = {}
+	local here = ns.Quests.offerMap
+	local thisZone = givers.otherZones or mapID == here or ns.Nav.GetZoneMap(mapID) == here
+	if givers.worldmap and zoomedIn and not questie then
+		local list = thisZone and ns.Quests:OffersForMap(mapID) or {}
+		for _, o in ipairs(list) do offered[o.questID] = true end
 		for _, o in ipairs(list) do
 			if ns.Quests:OfferShown(o) then
 				local x, y = ns.Nav.TranslatePoint(o.m, o.x, o.y, mapID)
@@ -476,6 +485,17 @@ function provider:RefreshAllData()
 					})
 				end
 			end
+		end
+	end
+	-- Known quests from the quest database that the game isn't offering you right now.
+	if givers.worldmap and zoomedIn and thisZone and not questie and ns.QuestDB then
+		for _, k in ipairs(ns.QuestDB:MapPoints(mapID, offered)) do
+			map:AcquirePin("NeverQuestMapPinTemplate", {
+				x = k.x, y = k.y, m = k.q.m, wx = k.q.x, wy = k.q.y, known = true, questID = k.qid,
+				atlas = ATLAS.giver, size = 15, alpha = 0.45,
+				label = (givers.levels and k.q.l) and tostring(k.q.l) or "", labelColor = { 0.75, 0.75, 0.75 },
+				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t, sub = k.sub,
+			})
 		end
 	end
 	-- Where to hand in finished quests.
@@ -494,7 +514,7 @@ function provider:RefreshAllData()
 	end
 
 	-- Known spawns, objective spots, your marks and rares (under the quest and route pins).
-	if ns.db.spawns.worldmap and ns.Spawns then
+	if ns.db.spawns.worldmap and ns.Spawns and not questie then
 		for _, p in ipairs(ns.Spawns:MapPoints(mapID)) do
 			map:AcquirePin("NeverQuestSpawnPinTemplate", p)
 		end

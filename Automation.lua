@@ -73,17 +73,36 @@ local function HandleReward(attempt)
 		return
 	end
 	if cfg.reward == "off" then return end
+	ns.Rewards:ClearMark()
 
-	local index, link, value = BestVendorChoice(count)
-	if not index then
+	-- Vendor value only, or an upgrade for your class first (Rewards.lua).
+	local best
+	if cfg.reward == "value" then
+		local index, link, value = BestVendorChoice(count)
+		best = index and { index = index, link = link, value = value } or nil
+	else
+		best = ns.Rewards:Best(count)
+	end
+	if not best then
 		if attempt < 6 then ns.After(0.3, function() HandleReward(attempt + 1) end) end
 		return
 	end
-	if cfg.reward == "value" and cfg.turnin and money == 0 then
-		ns.Print("took highest vendor value: " .. link .. " (" .. ns.Money(value) .. ")")
-		GetQuestReward(index)
+	local what
+	if best.upgrade then
+		local up = best.upgrade
+		what = best.link .. " is an upgrade" .. (up.against and (" over " .. up.against) or " (that slot is empty)")
+		local d = ns.Rewards.DiffText(up.diff)
+		if d ~= "" then what = what .. " (" .. d .. ")" end
 	else
-		ns.Print("highest vendor value: " .. link .. " (" .. ns.Money(value) .. "). Check it against any upgrade before choosing.")
+		what = "no upgrade here; highest vendor value: " .. best.link .. " (" .. ns.Money(best.value or 0) .. ")"
+	end
+	ns.Rewards:MarkButton(best.index)
+	local take = (cfg.reward == "value" or cfg.reward == "upgrade") and cfg.turnin and money == 0
+	if take then
+		ns.Print("took " .. what .. ".")
+		GetQuestReward(best.index)
+	else
+		ns.Print(what .. ". It's marked with a green arrow.")
 	end
 end
 
@@ -255,12 +274,59 @@ function A:SellJunk(fromCommand)
 	return true
 end
 
+---------------------------------------------------------------------------
+-- Auto repair: everything, from guild funds first if you allow it and the guild pays.
+---------------------------------------------------------------------------
+A.repairLog = {}
+function A:Repair(manual)
+	if not (CanMerchantRepair and ns.SafeCall(CanMerchantRepair)) then
+		if manual then ns.Print("this vendor can't repair.") end
+		return false
+	end
+	local ok, cost, needed = pcall(GetRepairAllCost)
+	cost = ok and ns.Num(cost) or 0
+	if not ok or not needed or cost <= 0 then
+		if manual then ns.Print("nothing needs repairing.") end
+		return false
+	end
+	local guild = ns.db.loot.repairGuild and CanGuildBankRepair and ns.SafeCall(CanGuildBankRepair)
+	if guild then
+		local limit = GetGuildBankWithdrawMoney and ns.Num(ns.SafeCall(GetGuildBankWithdrawMoney))
+		if limit and limit >= 0 and limit < cost then guild = false end
+	end
+	if not guild and GetMoney() < cost then
+		ns.Print("repairs cost " .. ns.Money(cost) .. ", more than you have.")
+		return false
+	end
+	if not pcall(RepairAllItems, guild and true or nil) then return false end
+	table.insert(self.repairLog, { cost = cost, guild = guild and true or false })
+	ns.Print("repaired everything for " .. ns.Money(cost) .. (guild and " (guild funds)." or "."))
+	return true
+end
+
 ns:RegisterEvent("MERCHANT_SHOW", function()
 	merchantOpen = true
-	if ns.db.loot.junk and not IsShiftKeyDown() then
+	if IsShiftKeyDown() then return end
+	if ns.db.loot.repair then A:Repair() end
+	if ns.db.loot.junk then
 		C_Timer.After(0.3, function() if merchantOpen then A:SellJunk() end end)
 	end
 end)
+
+ns:AddSlash("repair", function(arg)
+	arg = (arg or ""):lower()
+	if arg == "on" or arg == "off" then
+		ns.db.loot.repair = arg == "on"
+		ns.Print("auto repair " .. (ns.db.loot.repair and "on." or "off."))
+	elseif arg == "guild" then
+		ns.db.loot.repairGuild = not ns.db.loot.repairGuild
+		ns.Print("guild-funded repairs " .. (ns.db.loot.repairGuild and "on (used when your guild allows it)." or "off."))
+	elseif merchantOpen then
+		A:Repair(true)
+	else
+		ns.Print("auto repair is " .. (ns.db.loot.repair and "on" or "off") .. ". /nq repair on|off|guild")
+	end
+end, "/nq repair [on|off|guild] - repair at vendors automatically (guild funds optional)")
 ns:RegisterEvent("MERCHANT_CLOSED", function() merchantOpen = false end)
 function A:MerchantOpen() return merchantOpen end
 

@@ -141,6 +141,23 @@ function D:Check()
 	Line(out, (LootSlot and GetNumLootItems) and "OK" or "WARN", "Auto loot", ns.db.loot.auto and "on (hold Shift to look first)" or "off")
 	local canSell = (C_MerchantFrame and C_MerchantFrame.SellAllJunkItems) and "the game's sell-all-junk" or (C_Container and C_Container.UseContainerItem) and "one item at a time" or nil
 	Line(out, (canSell or not ns.db.loot.junk) and "OK" or "WARN", "Sell junk", ns.db.loot.junk and ("on, using " .. (canSell or "nothing: this client can't sell from addons")) or "off")
+	Line(out, (CanMerchantRepair and RepairAllItems) and "OK" or "WARN", "Auto repair",
+		ns.db.loot.repair and ("on" .. (ns.db.loot.repairGuild and ", guild funds first" or "")) or "off")
+	local rewardModes = { suggest = "marks the best reward", upgrade = "takes upgrades, else highest value", value = "takes highest vendor value", off = "off" }
+	Line(out, (QuestInfo_GetRewardButton and C_Item.GetItemStats) and "OK" or "WARN", "Quest rewards",
+		(rewardModes[ns.db.auto.reward] or ns.db.auto.reward) .. ((QuestInfo_GetRewardButton and C_Item.GetItemStats) and "" or " (can't read item stats or mark rewards on this client)"))
+	local qdb = ns.QuestDB
+	Line(out, (C_QuestLine and C_QuestLine.RequestQuestLinesForMap) and "OK" or "WARN", "Quest database",
+		string.format("%d quests known%s%s", qdb:Count(), qdb.scanning and string.format(", scanning (%d zones to go)", #qdb.queue) or "",
+			ns.db.questdb.scan and "" or ", background scan off"))
+	local hs = ns.Travel:HearthSpot()
+	Line(out, "OK", "Hearthstone", (ns.Travel:BindName() or "not bound") .. (hs and " (spot known)" or " (spot learned next time you bind)"))
+	Line(out, (C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap) and "OK" or "WARN", "Flight paths",
+		ns.db.travel.flightPaths and (#ns.Travel:MissingFlightPaths() .. " in this zone you don't have") or "off")
+	local n, max = ns.Upkeep:LogCount()
+	Line(out, "OK", "Quest log", string.format("%d of %d", n, max))
+	Line(out, "OK", "Questie", ((C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded)("Questie") and "running" or "not running") ..
+		(ns.QuestieOverlap() and ", NeverQuest's giver and spawn pins hidden" or ""))
 	Line(out, "OK", "Setup wizard", ns.db.setupDone and "done (/nq setup runs it again)" or "not run yet (/nq setup)")
 	Line(out, "OK", "Raid attunements", ns.Attune:StatusText() .. (ns.db.guide.attunements and "" or ", guide steps off"))
 	local mb = ns.MinimapButton.button

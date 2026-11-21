@@ -89,6 +89,7 @@ function G:MakeStep(kind, e)
 	if e.trivial then table.insert(parts, "|cff999999gray: low XP|r") end
 	if e.elite then table.insert(parts, "|cffff8040elite|r") end
 	if e.group then table.insert(parts, "|cffff8040group " .. e.group .. "|r") end
+	if (e.elite or e.group) and not e.complete and not IsInGroup() then table.insert(parts, "|cff999999Ctrl-click: ask for a group|r") end
 	s.sub = table.concat(parts, "  ·  ")
 	s.right = e.dist and ns.Yards(e.dist) or (s.m and "" or "|cff888888no map pin|r")
 	return s
@@ -275,10 +276,22 @@ function G:BuildLive()
 		for _, z in ipairs(self:SuggestZones(3)) do table.insert(steps, z) end
 	end
 
+	-- Hearthstone (first: it replaces a long walk) and a flight path here you don't have yet
+	-- (right after your next step when it's close, otherwise with the tips).
+	local hearth, flight = nil, nil
+	if ns.Travel then hearth, flight = ns.Travel:GuideRows() end
+	if hearth then table.insert(steps, 1, hearth) end
+	if flight and flight.near then table.insert(steps, math.min(#steps + 1, hearth and 3 or 2), flight) end
+
 	-- Where the 1-60 plan has you now, and dungeons worth running at this level.
 	for _, row in ipairs(self:PlanInfoSteps(level)) do table.insert(steps, row) end
 	local attuneTip = ns.Attune and ns.Attune:GuideTip(level)
 	if attuneTip then table.insert(steps, attuneTip) end
+	if flight and not flight.near then table.insert(steps, flight) end
+	-- Full quest log, supplies, bag space.
+	if ns.Upkeep then
+		for _, row in ipairs(ns.Upkeep:Tips(level)) do table.insert(steps, row) end
+	end
 
 	-- Rested reminder.
 	local rested = ns.Num(GetXPExhaustion())

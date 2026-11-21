@@ -21,8 +21,13 @@ local DEFAULTS = {
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
 	            showObjectives = true, hideDoneObjectives = false, finishedFirst = true, showNumbers = true,
 	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 25 },
-	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest" },
-	loot   = { auto = true, junk = true, junkReport = true },   -- auto loot everything; sell gray items at vendors
+	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest" },  -- reward: suggest | upgrade | value | off
+	loot   = { auto = true, junk = true, junkReport = true, repair = true, repairGuild = false },  -- auto loot; sell grays; repair at vendors
+	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
+	           rested = true, sessionAtLogout = false },
+	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
+	questdb = { scan = true, worldmap = true, ahead = 3, grayBelow = 6 },
+	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
 	alerts = { complete = true, sound = true, trackTurnin = false },
 	announce = { enabled = true, objectives = true, quests = true, turnins = false, attunements = true,
 	             raid = false, sharedOnly = false, links = true, tag = true },
@@ -34,13 +39,14 @@ local DEFAULTS = {
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
 	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 1, wmScale = 1 },
-	buttons = { items = true, target = true, locked = false, scale = 1 },
+	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
 	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true },
 	minimapButton = { shown = true, locked = false, angle = 210 },
 	givers = { worldmap = true, otherZones = true, gray = false, red = false, dailies = true, levels = true, turnins = false },
 	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = false, dotSize = 1,
 	           showAll = false, aim = true, markClick = true },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
+	questDB = { q = {}, scan = {}, chars = {} },  -- quests the game has shown any of your characters (QuestDB.lua)
 	guides = {},       -- recorded or imported guides, shared by all characters
 	setupDone = false, setupHinted = false,  -- setup wizard finished or skipped; one-time hint about it shown
 	positions = {},    -- saved frame positions
@@ -66,6 +72,7 @@ local CHAR_DEFAULTS = {
 	trackerZones = {},                       -- [zone] = true collapsed / false expanded
 	trackerUntracked = {},                   -- quests NeverQuest untracked in Blizzard's list, to give back
 	attune = {},                             -- [attunement] = { follow, turned, ticks, unticks }
+	hearth = false,                          -- { name, m, x, y, zone } where you bound your hearthstone
 }
 
 local function Merge(dst, src)
@@ -307,12 +314,25 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 	if not ns.db.quietLogin then
 		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything.")
 	end
+	if ns.QuestieOverlap() and not ns.db.compat.questieNoted then
+		ns.db.compat.questieNoted = true
+		ns.Print("Questie is running, so NeverQuest leaves quest givers and spawn spots on the maps to it. Your guide, route and arrow stay. /nq questie switches this.")
+	end
 end)
+
 
 ---------------------------------------------------------------------------
 -- Helpers
 ---------------------------------------------------------------------------
 local issecret = _G.issecretvalue
+
+-- Questie draws its own quest givers and objective spots on the maps. While it runs, ours
+-- step aside (setting: compat.questie); the route, arrow and guide stay.
+function ns.QuestieOverlap()
+	if not (ns.db and ns.db.compat and ns.db.compat.questie) then return false end
+	local f = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+	return f and f("Questie") and true or false
+end
 
 function ns.IsSecret(v)
 	return issecret ~= nil and issecret(v) or false
@@ -503,6 +523,13 @@ SlashCmdList["NEVERQUEST"] = function(msg)
 		end
 	end
 end
+
+ns:AddSlash("questie", function()
+	ns.db.compat.questie = not ns.db.compat.questie
+	ns.Print(ns.db.compat.questie and "with Questie running, NeverQuest's quest giver and spawn pins stay hidden."
+		or "NeverQuest shows its quest giver and spawn pins even with Questie running.")
+	ns:SendMessage("MAP_OFFERS_UPDATED")
+end, "/nq questie - with Questie running, hide or show NeverQuest's own quest giver and spawn pins")
 
 ns:AddSlash("help", function()
 	ns.Print("commands:")

@@ -86,12 +86,32 @@ Setup.PAGES = {
 			U.Check(p, 0, row(), "Turn in finished quests automatically", function() return au.turnin end, function(v) au.turnin = v end)
 			U.Check(p, 0, row(), "Pick quests in NPC dialog windows", function() return au.gossip end, function(v) au.gossip = v end)
 			U.Check(p, 0, row(), "Skip gray quests", function() return au.skipGray end, function(v) au.skipGray = v end)
-			U.Cycle(p, 0, row(30), "Reward choice:", { { "suggest", "Suggest in chat" }, { "value", "Highest vendor value" }, { "off", "Do nothing" } },
+			U.Cycle(p, 0, row(30), "Reward choice:", { { "suggest", "Mark the best one" }, { "upgrade", "Take upgrades, else value" },
+				{ "value", "Take highest vendor value" }, { "off", "Do nothing" } },
 				function() return au.reward end, function(v) au.reward = v end)
 			local lt = Cfg().loot
 			U.Check(p, 0, row(), "Auto loot everything (hold Shift to look first)", function() return lt.auto end, function(v) lt.auto = v end)
 			U.Check(p, 0, row(), "Sell junk (gray items) at vendors", function() return lt.junk end, function(v) lt.junk = v end,
 				"You can buy them back from the vendor's Buyback tab.")
+			U.Check(p, 0, row(), "Repair at vendors", function() return lt.repair end, function(v) lt.repair = v end)
+		end,
+	},
+	{
+		key = "helpers", title = "Reminders, travel and the quest database",
+		text = "Small things that cost leveling time. Reminders show up as rows in the guide.",
+		build = function(p, U, row)
+			local db = Cfg()
+			local function Re() if ns.Guide then ns.Guide:Refresh() end end
+			U.Check(p, 0, row(), "Quest log full: say what to drop", function() return db.upkeep.logFull end, function(v) db.upkeep.logFull = v Re() end)
+			U.Check(p, 0, row(), "Low on food, water, ammo or bag space", function() return db.upkeep.supplies and db.upkeep.bags end,
+				function(v) db.upkeep.supplies, db.upkeep.bags = v, v Re() end)
+			U.Check(p, 0, row(), "Logging out with no rested XP", function() return db.upkeep.rested end, function(v) db.upkeep.rested = v end)
+			U.Check(p, 0, row(), "Flight paths you don't have yet", function() return db.travel.flightPaths end, function(v) db.travel.flightPaths = v Re() end)
+			U.Check(p, 0, row(), "Say when to hearth back to hand in quests", function() return db.travel.hearth end, function(v) db.travel.hearth = v Re() end)
+			U.Check(p, 0, row(), "Quest database: scan zones in the background", function() return db.questdb.scan end,
+				function(v) db.questdb.scan = v if not v and ns.QuestDB then ns.QuestDB:StopScan() end end,
+				"Built from what the game itself shows your characters. /nq db searches it.")
+			U.Check(p, 0, row(), "Known quests on the world map", function() return db.questdb.worldmap end, function(v) db.questdb.worldmap = v end)
 		end,
 	},
 	{
@@ -126,6 +146,8 @@ Setup.PAGES = {
 			"  |cffffd100/nq setup|r  this setup again\n" ..
 			"  |cffffd100/nq options|r  every setting\n" ..
 			"  |cffffd100/nq raids|r  raid attunement guides\n" ..
+			"  |cffffd100/nq db <name>|r  find a quest in the quest database\n" ..
+			"  |cffffd100/nq session|r  what this play session brought in\n" ..
 			"  |cffffd100/way 45 63|r  a waypoint in your zone\n\n" ..
 			"Hover almost anything in NeverQuest for a tooltip. Right-click the minimap button for quick settings.",
 	},

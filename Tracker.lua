@@ -155,6 +155,9 @@ function T:QuestMenu(owner, e)
 		if IsInGroup() and ns.SafeCall(C_QuestLog.IsPushableQuest, qid) == true then
 			root:CreateButton("Share with party", function() ns.Catchup:Share(qid) end)
 		end
+		if (e.elite or e.group) and not e.complete and ns.Upkeep then
+			root:CreateButton("Ask for a group (LFG message)", function() ns.Upkeep:AskForGroup(e) end)
+		end
 		root:CreateButton("Hide from the tracker", function()
 			ns.char.trackerHidden[qid] = true
 			T:Refresh()

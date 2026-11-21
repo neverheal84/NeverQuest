@@ -36,6 +36,11 @@ function B:ItemQuests()
 	end
 	table.sort(rest, function(a, b) return (a.dist or 1e9) < (b.dist or 1e9) end)
 	for _, e in ipairs(rest) do table.insert(list, e) end
+	-- Your hearthstone, first, while the guide says hearthing is the way back.
+	if ns.db.travel.hearthButton and ns.Travel and ns.Travel:HearthPlan() then
+		table.insert(list, 1, { questID = 0, hearth = true, title = "Hearth back to hand in quests",
+			item = { id = 6948, link = "item:6948" } })
+	end
 	return list
 end
 
@@ -268,22 +273,29 @@ function B:Update()
 		end
 	end
 
+	-- The TARGET pill. With it hidden, its key binding (if you set one) still targets the
+	-- next NPC or mob.
 	local t = bar.target
 	local width
 	local name, step = nil, nil
-	if cfg.target then name, step = self:TargetName() end
+	local bound = GetBindingKey and GetBindingKey("CLICK NeverQuestTargetButton:LeftButton") ~= nil
+	if cfg.target or bound then name, step = self:TargetName() end
 	if name and not name:find("[\r\n]") then
 		t.targetName = name
 		t.forStep = step and step.title or nil
 		t:SetAttribute("macrotext", "/targetexact " .. name)
 		t.label:SetText(name)
 		t.hotkey:SetText(HotkeyText("CLICK NeverQuestTargetButton:LeftButton"))
-		local pill = SizePill(t)
-		t:ClearAllPoints()
-		t:SetPoint("LEFT", bar.first + shown * (SIZE + GAP), 0)
-		t:Show()
-		width = bar.first + shown * (SIZE + GAP) + pill + PAD
-		shown = shown + 1
+		if cfg.target then
+			local pill = SizePill(t)
+			t:ClearAllPoints()
+			t:SetPoint("LEFT", bar.first + shown * (SIZE + GAP), 0)
+			t:Show()
+			width = bar.first + shown * (SIZE + GAP) + pill + PAD
+			shown = shown + 1
+		else
+			t:Hide()
+		end
 	else
 		t.targetName = nil
 		t:SetAttribute("macrotext", nil)
@@ -299,7 +311,12 @@ function B:UpdateCooldowns()
 	if not self.bar then return end
 	for _, btn in ipairs(self.bar.items) do
 		local e = btn.quest
-		if e and e.logIndex and btn:IsShown() then
+		if e and e.hearth and btn:IsShown() then
+			local fn = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+			local ok, start, duration = pcall(fn, 6948)
+			start, duration = ok and ns.Num(start), ok and ns.Num(duration)
+			if start and duration and duration > 0 then btn.cooldown:SetCooldown(start, duration) else btn.cooldown:Clear() end
+		elseif e and e.logIndex and btn:IsShown() then
 			local start, duration, enable = GetQuestLogSpecialItemCooldown(e.logIndex)
 			start, duration = ns.Num(start), ns.Num(duration)
 			if start and duration and duration > 0 and enable ~= 0 then
@@ -327,10 +344,26 @@ ns:RegisterMessage("POSITIONS_RESET", function()
 	if B.bar and not InCombatLockdown() then B.bar:RestorePosition() end
 end)
 
-ns:AddSlash("buttons", function()
+ns:AddSlash("buttons", function(arg)
 	local cfg = ns.db.buttons
-	local on = not (cfg.items or cfg.target)
-	cfg.items, cfg.target = on, on
+	arg = (arg or ""):lower():gsub("%s+", "")
+	if arg == "target" then
+		cfg.target = not cfg.target
+		B:Update()
+		ns.Print(cfg.target and "TARGET button shown on the quest item bar." or "TARGET button hidden (its key binding still works if you set one).")
+		return
+	end
+	local on = not cfg.items
+	cfg.items = on
 	B:Update()
-	ns.Print(on and "quest item and target buttons on." or "quest item and target buttons off.")
-end, "/nq buttons - turn the quest item and target buttons on or off")
+	ns.Print(on and "quest item buttons on." or "quest item buttons off.")
+end, "/nq buttons [target] - turn the quest item bar on or off, or show/hide its TARGET button")
+
+-- 1.12.1: the TARGET button is off by default; switch it off once for saved settings too.
+ns:OnInit(function()
+	local done = ns.db.migrated
+	if not done.targetButtonOff then
+		done.targetButtonOff = true
+		ns.db.buttons.target = false
+	end
+end)

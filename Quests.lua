@@ -268,6 +268,7 @@ local function CollectOffers(m)
 	for _, qid in ipairs(C_QuestLine.GetForceVisibleQuests(m) or {}) do
 		Add(C_QuestLine.GetQuestLineInfo(qid, m))
 	end
+	if ns.QuestDB then ns.Call("questdb record", function() ns.QuestDB:Record(m, out) end) end
 	return out
 end
 
@@ -297,6 +298,7 @@ function Q:RequestOffers()
 end
 
 local foreignRequest = 0   -- when another map's quest givers were last asked for
+function Q:NoteForeignRequest() foreignRequest = GetTime() end
 
 function Q:BuildOffers()
 	local m = self.offerMap

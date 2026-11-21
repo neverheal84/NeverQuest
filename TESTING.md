@@ -20,7 +20,7 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 9. **Minimap pins.** Quest givers and turn-ins appear at the right spots. If you use a rotating minimap (Blizzard setting), check that the pins rotate with it.
 10. **World map.** You see numbered guide steps joined by a line from where you stand. Turn off "Lines joining the route steps" (Display & Maps > World map): the line goes, the numbers stay.
 11. **Quest item button.** On a quest with a usable item, a button appears and works. Bind it under Options > Keybindings > AddOns > NeverQuest.
-12. **Target button.** On a kill quest it shows the mob's name; clicking it targets one nearby.
+12. **Target button.** It's off by default now: the quest item bar shows no TARGET pill. Turn it on with `/nq buttons target`; on a kill quest it shows the mob's name and clicking it targets one nearby. With the pill off, the "Target next NPC or mob" key binding still targets.
 13. **Combat.** Fight with the item button showing: no errors, and the buttons update after the fight. If you die, release: the arrow should point to your corpse, and switch back to your route after you resurrect.
 14. **Recorder.** `/nq record Test`, do two or three quests, visit a vendor, `/nq note hello`, then `/nq stop`. The Guides tab lists it and Export shows text.
 15. **Journal.** Turn-ins show under Journal > History. After a level-up, Splits shows the level time.
@@ -52,6 +52,18 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 35. **Hand-ins in another zone.** Finish a quest that's handed in somewhere other than where you got it (like the Stonetalon/Barrens one in your screenshot). The world map's numbered "?" and the guide step should point at the real hand-in, or say "somewhere in <zone>" / "where they are isn't known yet"; never back at the pickup spot. If one still points at the pickup spot, send the quest name and what its quest log text says.
 
 36. **Shared and remote quests.** Accept a quest a party member shares, and hand in a quest through a pop-up (if you find one): neither should leave a "?" at the spot where you were standing. Click a finished quest in the tracker: the arrow goes to its hand-in, with the NPC's name when NeverQuest knows it.
+
+37. **Reward upgrades.** Hand in a quest with a choice of rewards. A green arrow marks one and chat says why ("... is an upgrade over [your item] (+3 Agility, ...)" or "no upgrade here; highest vendor value: ..."). Check the pick makes sense for your class; send the quest name and rewards if it doesn't. Under Options > NeverQuest, "Take upgrades, else value" should take it for you.
+
+38. **Repairs.** With damaged gear, open a vendor that repairs (a blacksmith or armorer): chat says "repaired everything for ...". Open one holding Shift: nothing happens. In a guild that pays repairs, `/nq repair guild` and repair again: chat says "(guild funds)".
+
+39. **Reminders.** Fill your quest log to the limit: a guide row says it's full and names quests to drop, and talking to a quest giver says it in chat. Drop to under 10 food and water: a row says so. With 3 or fewer free bag slots: a row says so and names quest items you can delete. Start a logout in the open world: chat reminds you about rested XP.
+
+40. **Flight paths and hearth.** In a zone with a flight master you haven't met, a "Get the flight path" step appears (near the top when you're close); click it and the arrow points there. Bind your hearthstone at an inn, quest somewhere far away, and finish a quest handed in near that inn: once nothing is left near you and your hearthstone is ready, the guide's first step says to hearth back and the hearthstone shows on the quest item bar.
+
+41. **Quest database.** About a minute after logging in, `/nq check` shows "Quest database: N quests known" (and "scanning" while it works). `/nq db` lists your zone; `/nq db <part of a quest name>` finds it; `/nq db way <id>` points the arrow. Open the world map on a zone a few levels above you: faded "!" markers with levels show quests that open later. On an alt, quests your main has seen show up there too.
+
+42. **Session and group.** `/nq session` shows this session's XP, quests and gold. Ctrl-click an elite quest in the guide: an LFG message with the quest link appears in your chat box (nothing is sent until you press Enter).
 
 ## Afterwards, send
 

@@ -464,6 +464,10 @@ function UI:OnItemClick(item, button)
 		end
 		return
 	end
+	if IsControlKeyDown() and item.questID and ns.Upkeep and ns.Quests.byID[item.questID] then
+		ns.Upkeep:AskForGroup(ns.Quests.byID[item.questID])
+		return
+	end
 	if IsShiftKeyDown() and item.questID and GetQuestLink then
 		local link = GetQuestLink(item.questID)
 		if link then
@@ -966,13 +970,48 @@ function UI:CreateOptions()
 		"Gray (low level) quests give little XP.")
 	Check(p, L.x, L:Next(), "Don't automate repeatable quests", function() return db.auto.skipRepeatable end, function(v) db.auto.skipRepeatable = v end,
 		"Avoids handing in stacks of items to repeatable quests without asking.")
-	Cycle(p, L.x, L:Next(30), "Reward choice:", { { "suggest", "Suggest in chat" }, { "value", "Highest vendor value" }, { "off", "Do nothing" } },
+	Cycle(p, L.x, L:Next(30), "Reward choice:", { { "suggest", "Mark the best one" }, { "upgrade", "Take upgrades, else value" },
+		{ "value", "Take highest vendor value" }, { "off", "Do nothing" } },
 		function() return db.auto.reward end, function(v) db.auto.reward = v end)
+	local rewardNote = p:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	rewardNote:SetPoint("TOPLEFT", L.x + 4, L:Next(30))
+	rewardNote:SetWidth(290)
+	rewardNote:SetJustifyH("LEFT")
+	rewardNote:SetText("Upgrades are judged by the stats your class uses against what you wear. Without one, the highest vendor value is picked.")
 	Check(p, L.x, L:Next(), "Auto loot everything", function() return db.loot.auto end, function(v) db.loot.auto = v end,
 		"Takes everything from a loot window at once. Hold Shift (the game's auto-loot key) to look first. Items waiting on a group roll are left alone.")
 	Check(p, L.x, L:Next(), "Sell junk at vendors", function() return db.loot.junk end, function(v) db.loot.junk = v end,
 		"Gray items are sold when you open a vendor. Hold Shift while opening the vendor to skip it. You can buy them back from the vendor's Buyback tab.")
 	Check(p, L.x + 16, L:Next(), "Say what the junk sold for", function() return db.loot.junkReport end, function(v) db.loot.junkReport = v end)
+	Check(p, L.x, L:Next(), "Repair at vendors", function() return db.loot.repair end, function(v) db.loot.repair = v end,
+		"Repairs everything when you open a vendor that can repair. Hold Shift while opening the vendor to skip it.")
+	Check(p, L.x + 16, L:Next(), "Use guild funds when allowed", function() return db.loot.repairGuild end, function(v) db.loot.repairGuild = v end,
+		"Uses your guild's repair money first if your rank allows it and the daily limit covers the cost.")
+
+	L:Next(10)
+	Heading(p, L.x, L:Next(), "Reminders")
+	local up = db.upkeep
+	local function Re() ns.Guide:Refresh() end
+	Check(p, L.x, L:Next(), "Quest log full: say what to drop", function() return up.logFull end, function(v) up.logFull = v Re() end,
+		"Suggests quests to drop (failed, gray, far away, little XP for the walk). Never ones ready to hand in or your attunement.")
+	Check(p, L.x, L:Next(), "Low on food, water or ammo", function() return up.supplies end, function(v) up.supplies = v Re() end)
+	Check(p, L.x, L:Next(), "Bags almost full (and leftover quest items)", function() return up.bags end, function(v) up.bags = v Re() end,
+		"Lists quest items you can safely delete because their quest is done.")
+	Check(p, L.x, L:Next(), "Logging out with no rested XP", function() return up.rested end, function(v) up.rested = v end,
+		"Reminds you to use an inn, a city or your Cozy Sleeping Bag before you log out.")
+	Check(p, L.x, L:Next(), "Session summary when logging out", function() return up.sessionAtLogout end, function(v) up.sessionAtLogout = v end,
+		"XP, levels, quests, gold and time for this session. /nq session shows it any time.")
+
+	L:Next(10)
+	Heading(p, L.x, L:Next(), "Travel")
+	local tr = db.travel
+	Check(p, L.x, L:Next(), "Flight paths you don't have yet", function() return tr.flightPaths end, function(v) tr.flightPaths = v Re() end,
+		"A guide step for the nearest flight master in your zone you haven't talked to.")
+	Check(p, L.x, L:Next(), "Hearthstone: say when to hearth back", function() return tr.hearth end, function(v) tr.hearth = v Re() end,
+		"When your hearthstone is ready, nothing's left nearby, and finished quests are handed in near your inn.")
+	Check(p, L.x + 16, L:Next(), "Put it on the quest item bar", function() return tr.hearthButton end, function(v) tr.hearthButton = v ns.Buttons:Update() end)
+	Check(p, L.x, L:Next(), "Suggest a new home inn", function() return tr.setHearth end, function(v) tr.setHearth = v end,
+		"At an inn far from your hearth spot with quests around, says once that you could bind here.")
 
 	L:Next(10)
 	Heading(p, L.x, L:Next(), "Alerts")
@@ -1009,6 +1048,19 @@ function UI:CreateOptions()
 	Check(p, R.x + 16, R:Next(), "Also in raid groups", function() return an.raid end, function(v) an.raid = v end)
 	Check(p, R.x + 16, R:Next(), "Clickable quest links", function() return an.links end, function(v) an.links = v end)
 	Check(p, R.x + 16, R:Next(), "Start messages with \"NeverQuest:\"", function() return an.tag end, function(v) an.tag = v end)
+
+	R:Next(10)
+	Heading(p, R.x, R:Next(), "Quest database")
+	local qd = db.questdb
+	Check(p, R.x, R:Next(), "Scan zones for quests in the background", function() return qd.scan end,
+		function(v) qd.scan = v if not v then ns.QuestDB:StopScan() end end,
+		"Asks the game which quests each zone offers, one zone every couple of seconds, paused in combat. Every character adds to one shared database. /nq db searches it.")
+	Check(p, R.x, R:Next(), "Show known quests on the world map", function() return qd.worldmap end,
+		function(v) qd.worldmap = v ns:SendMessage("MAP_OFFERS_UPDATED") end,
+		"Faded markers for quests you know about that aren't on offer to you yet, with the level they open at.")
+	Check(p, R.x, R:Next(), "Hide NeverQuest's quest pins while Questie runs", function() return db.compat.questie end,
+		function(v) db.compat.questie = v ns:SendMessage("MAP_OFFERS_UPDATED") end,
+		"Questie draws quest givers and objectives itself. Your guide, route and arrow stay either way.")
 
 	R:Next(10)
 	Heading(p, R.x, R:Next(), "Chat")
@@ -1171,7 +1223,7 @@ function UI:CreateOptions()
 	Check(d, L2.x, L2:Next(), "Quest item buttons", function() return db.buttons.items end, function(v) db.buttons.items = v ns.Buttons:Update() end,
 		"Usable quest items for your next steps. Keys: Options > Keybindings > AddOns.")
 	Check(d, L2.x, L2:Next(), "Target button", function() return db.buttons.target end, function(v) db.buttons.target = v ns.Buttons:Update() end,
-		"Targets the NPC or mob for your next step, using names learned from your quests.")
+		"A TARGET button on the quest item bar that targets the NPC or mob for your next step, using names learned from your quests. Off by default; its key binding (Target next NPC or mob) works even while it's hidden.")
 	Check(d, L2.x, L2:Next(), "Lock the button bar", function() return db.buttons.locked end, function(v) db.buttons.locked = v end)
 
 	Heading(d, R2.x, R2:Next(), "Minimap")

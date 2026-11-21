@@ -14,7 +14,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 ## What you get
 
 **Getting started**
-- **Setup wizard (`/nq setup`):** a few short pages that pick the main settings: leveling style, maps and arrow, the quest tracker, automation, group play, and text size. It opens by itself the first time you log in with NeverQuest; "Use recommended" keeps the defaults and finishes in one click.
+- **Setup wizard (`/nq setup`):** a few short pages that pick the main settings: leveling style, maps and arrow, the quest tracker, automation, reminders, travel and the quest database, group play, and text size. It opens by itself the first time you log in with NeverQuest; "Use recommended" keeps the defaults and finishes in one click.
 - **Help (`/nq help`, or the Help button in the main window):** an in-game guide to every feature, a full command list, key bindings and troubleshooting. `/nq help raids`, `/nq help tracker` and so on jump straight to a topic, and `/nq commands` lists every command in chat.
 
 **Guiding**
@@ -68,7 +68,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 
 **Buttons**
 - **Quest item bar:** a slim bar with the NeverQuest logo as its drag handle, holding usable quest items for your next steps (rounded buttons with cooldowns and key labels). Keybindable.
-- **Target button:** the "TARGET" pill on the same bar shows who it targets and targets the NPC or mob for your next step. NPC names are learned from your own quest conversations and shared by all your characters, so alts get smarter over time. Bind it under Esc > Options > Keybindings > AddOns > NeverQuest ("Target next NPC or mob"). `/nq buttons` hides the bar; its size is under Scale & Text.
+- **Target button (off by default):** targets the NPC or mob for your next step. NPC names are learned from your own quest conversations and shared by all your characters, so alts get smarter over time. Bind it under Esc > Options > Keybindings > AddOns > NeverQuest ("Target next NPC or mob"); the key works even with the button hidden. To show the "TARGET" pill on the quest item bar, turn it on under Options > Display & Maps > Buttons or type `/nq buttons target`. `/nq buttons` hides the quest item bar; its size is under Scale & Text.
 
 **Tracking**
 - **XP panel:** XP/hour, time to level, quests or kills to level, rested XP. Right-click it to open the main window.
@@ -78,13 +78,29 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 - **Party announcements (toggle):** when you finish something, your group hears about it in party chat (instance chat in a dungeon finder group): "NeverQuest: [Quest] objective done: Boar Meat: 4/4", "NeverQuest: [Quest] complete, ready to turn in.", and raid attunement progress. Turn-ins (with the XP) can be added. Each kind has its own switch, and you can limit it to quests someone else in the group is also on, allow raid groups, drop the clickable links or the "NeverQuest:" tag. Repeats within 30 seconds are skipped, a burst of completions goes out a second apart, and nothing is sent while the game locks chat for addons. `/nq announce off` turns it all off; `/nq announce test` sends a test line. Settings: Options > NeverQuest > Party announcements.
 - **Party catch-up (toggle):** in a party, the guide and route adapt so everyone keeps up. Quests you share count for more. If you've finished a quest a party member hasn't, the turn-in waits and the route takes you back to its objective spot to help ("Help Anna: ..."), then you hand it in together. Quest givers for quests a party member is on count for more, and the guide suggests quests to share (click to share) or to ask them for. Zones are picked for the lowest level in the party, and a "Regroup" step points the arrow at anyone more than 300 yards away. Levels and positions work for everyone in the party; quest lists come from members running NeverQuest. Settings: Options > NeverQuest > Party.
 
-**Minimap button:** a round NeverQuest button on the edge of the minimap. Click to open NeverQuest, Shift+click to show or hide the tracker, right-click for quick settings (raid attunements, help, setup wizard, tracker, XP panel, arrow, party announcements, party catch-up, leveling style, options), and drag it anywhere around the minimap. Hide or lock it under Options > Display & Maps > Minimap, or with `/nq minimap`.
+**Minimap button:** a round NeverQuest button on the edge of the minimap. Click to open NeverQuest, Shift+click to show or hide the tracker, right-click for quick settings (raid attunements, help, setup wizard, session summary, tracker, known quests on the world map, XP panel, arrow, party announcements, party catch-up, leveling style, options), and drag it anywhere around the minimap. Hide or lock it under Options > Display & Maps > Minimap, or with `/nq minimap`.
 
-**Automation:** auto accept and turn in. **Hold Shift** when talking to an NPC to skip it. With several rewards it tells you the highest vendor value (or takes it, if you set that in Options).
+**Automation:** auto accept and turn in. **Hold Shift** when talking to an NPC to skip it.
+
+**Reward upgrades:** with several quest rewards to choose from, each is compared with what you're wearing, using the stats your class cares about (and the armor and weapons it can use at your level). The best one gets a green arrow in the quest window and chat says why ("+4 Strength, +3 Stamina over [Old Belt]"). With no upgrade, the highest vendor value is marked. Options can take upgrades for you, or always take the highest vendor value.
+
+**Auto repair (on by default):** opening a vendor that can repair fixes all your gear and says what it cost. It can use guild funds first when your rank allows it and the daily limit covers it. Hold Shift while opening the vendor to skip it. `/nq repair` repairs now, `/nq repair guild` switches guild funds.
 
 **Auto loot (on by default):** takes everything from a loot window at once. Hold Shift (the game's auto-loot key) to look first. Items waiting on a group roll are left alone, and bind-on-pickup items still ask you. `/nq loot` turns it on or off.
 
 **Sell junk (on by default):** gray items are sold when you open a vendor, and chat says what they brought in (the vendor's Buyback tab has the most recent ones if you change your mind). Hold Shift while opening the vendor to skip it. It uses the game's own sell-all-junk when the client has it, otherwise one item at a time and only while the vendor is open. `/nq junk` sells now at a vendor, or tells you what your junk is worth anywhere else.
+
+**Quest database (`/nq db`):** every quest the game has shown any of your characters, with its level, zone and where the quest giver stands. It's built only from the game itself: a slow background scan asks the game which quests each zone offers (one zone every couple of seconds, paused in combat, again after you level), and quests you see or accept are added as you play. Alts benefit from what your other characters have seen. `/nq db` lists your zone (done, in your log, available, for later levels), `/nq db <name>` searches by name or quest ID, `/nq db zone <zone>` lists another zone, and `/nq db way <id>` points the arrow at the giver. The world map shows known quests that aren't on offer to you yet as faded markers with the level they open at.
+
+**Questie:** if you also run Questie, NeverQuest leaves quest givers and spawn spots on the maps to it so nothing is drawn twice. Your guide, route and arrow keep working. `/nq questie` switches this.
+
+**Reminders (guide rows):** a full quest log, with which quests to drop first (failed, gray, far away or little XP for the walk; never ones ready to hand in or your attunement chain); low food and water, or a hunter's ammo; nearly full bags, with quest items you can safely delete because their quest is done. Logging out away from an inn or city reminds you there's no rested XP there (and mentions your Cozy Sleeping Bag if you carry one).
+
+**Flight paths and hearthstone:** a guide step points to any flight master in your zone you haven't talked to yet. NeverQuest notes where you bind your hearthstone; when it's ready, nothing is left near you, and finished quests are handed in near your inn, the guide's first step says to hearth back and the hearthstone appears on the quest item bar. At an inn far from your hearth spot with quests around, it says once that you could bind there.
+
+**Session summary (`/nq session`):** time played, XP and XP per hour, levels, quests, kills, gold and deaths since you logged in. Optionally shown when you log out.
+
+**Asking for a group:** Ctrl-click an elite or group quest in the guide, or pick "Ask for a group" in its tracker menu, to put an LFG message with the quest link in your chat box. Nothing is sent until you press Enter. `/nq lfg` does it for your next elite quest.
 
 ## Commands
 
@@ -92,10 +108,15 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 |---|---|
 | `/nq` | Open or close the window |
 | `/nq setup` | The setup wizard |
-| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, commands, keys, trouble) |
+| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, upkeep, database, commands, keys, trouble) |
 | `/nq commands` | List every command in chat |
 | `/nq loot [on \| off]` | Auto loot on or off |
 | `/nq junk` | Sell gray items now (at a vendor), or see what they're worth |
+| `/nq repair [on \| off \| guild]` | Repair now at a vendor, switch auto repair, or switch guild-funded repairs |
+| `/nq db [name \| zone <zone> \| way <id> \| scan \| map]` | The quest database: your zone's quests, search, another zone, point the arrow, scan again, world map markers |
+| `/nq session` | What this play session brought in |
+| `/nq lfg` | Put an LFG message for your next elite quest in the chat box |
+| `/nq questie` | With Questie running, hide or show NeverQuest's quest giver and spawn pins |
 | `/nq guide`, `quests`, `nearby`, `journal`, `guides` | Open a tab |
 | `/nq raids [follow \| unfollow]` | Raid attunement guides and your progress; follow your faction's chain in the guide |
 | `/nq announce [on \| off \| test]` | Party announcements on or off, or send a test line; `objectives`, `quests`, `turnins`, `attunements`, `raid`, `shared` switch one part |
@@ -115,7 +136,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 | `/nq spawns` | Spawn memory summary; `export`, `import`, `all` (show every known spawn), `forget <mob>`, `clear learned/marks/rares/all` |
 | `/nq grind [note]` | While recording: you ground here up to your current XP |
 | `/nq load <name>`, `/nq live` | Load a saved guide, or go back to the live guide |
-| `/nq hud`, `arrow`, `buttons`, `lock`, `reset` | Show/hide, lock, or reset panels |
+| `/nq hud`, `arrow`, `buttons`, `lock`, `reset` | Show/hide, lock, or reset panels (`/nq buttons target` shows or hides the TARGET button) |
 | `/nq xp` | XP stats in chat |
 | `/nq check` | Self-test on your client, in a copyable window |
 | `/nq report` | Copyable bug report with recent errors |
@@ -131,7 +152,7 @@ Arrow: right-click clears the current waypoint, Shift+right-click clears all, dr
 
 Esc > Options > AddOns > NeverQuest has six pages, and almost everything can be switched on or off:
 
-- **NeverQuest:** automation (quests, auto loot, sell junk), alerts, party sharing, party announcements (objectives, quests, turn-ins, attunements, shared quests only, raids, links, tag) and party catch-up (group level, regroup, share suggestions), chat messages.
+- **NeverQuest:** automation (quests, reward choice, auto loot, sell junk, repairs and guild funds), reminders (full quest log, supplies, bags, rested XP, session summary), travel (flight paths, hearthstone, home inn), the quest database (background scan, world map markers, Questie), alerts, party sharing, party announcements (objectives, quests, turn-ins, attunements, shared quests only, raids, links, tag) and party catch-up (group level, regroup, share suggestions), chat messages.
 - **Guide & Routes:** leveling style (optimized 1-60 or zone by zone), raid attunement steps and reminder level, following your 1-60 plan, move-on reminders, route planning, quest chains, pickups along the way, "then turn in" steps, the route summary, zone and plan advice, rested and outleveled tips, what each step shows (XP, directions, party), paths and flights.
 - **Tracker:** show it, what happens to Blizzard's list, sort order, group by zone, current zone first, collapse other zones, finished quests first, gray quests, each line it shows (objectives, finished objectives, numbers, level, distance, chain, party), how many quests, width, height, background and size.
 - **Display & Maps:** the minimap button, each XP panel line, the arrow's lines (coordinates, ETA, "then:"), arrival sound and distance, quest buttons, minimap and world map pins, and quest givers (world map, other zones, minimap, levels, gray, red, dailies, turn-in spots).
@@ -159,6 +180,9 @@ The live guide works for any race from level 1. For a curated route:
 - Turn-in spots for quests you're still doing are guesses until one of your characters has handed that quest in; the first time through, the pickup spot stands in.
 - Raid attunement steps follow Blizzard's raid overview (November 2026); NPCs and places come from published guides, and some quest IDs come from original Classic. Raid details may change before or after the raids open on December 9. If a step ticks off wrongly, right-click it.
 - Party announcements use the game's normal chat (party or instance chat); addons can't post there while the game locks chat for them, so those messages are skipped rather than sent late.
+- Reward upgrades use simple stat weights per class (the main stats, armor and weapon damage). They're good at spotting a clear upgrade, not a replacement for a gear planner, and the weights don't know your talents.
+- The quest database only knows what the game has shown one of your characters, so it fills in as you and your alts play. It contains nothing copied from other addons or websites. Class and race quests seen by another character can show on the map until this character's scan of that zone confirms they aren't for it.
+- Text matching for reminders (food and drink detection by spell name, the Cozy Sleeping Bag) is in English.
 - Saved settings: `NeverQuestDB` (account) and `NeverQuestCharDB` (per character).
 - If a feature hits repeated errors, NeverQuest pauses just that feature and tells you; `/reload` brings it back. `/nq report` collects the details.
 - Testing a new build? Follow TESTING.md.
