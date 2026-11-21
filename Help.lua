@@ -108,7 +108,7 @@ Help.TOPICS = {
 		"",
 		Y .. "Blizzard's quest list" .. E,
 		"By default it's emptied while NeverQuest's tracker shows. You can keep it in NeverQuest's order or leave it alone instead (Options > Tracker). " .. Y .. "/nq tracker" .. E .. " shows or hides the tracker.",
-		"While it's emptied, NeverQuest also turns off the game's automatic quest watching, so Blizzard's tracker doesn't flash up each time you accept or finish a quest. Your own setting is remembered and handed straight back the moment you stop hiding the list.")
+		"While it's emptied, NeverQuest also turns off the game's automatic quest watching and parks Blizzard's tracker frame out of sight, because emptying the list alone doesn't stop the game showing that frame again each time you accept or finish a quest. Both are undone the moment you stop hiding the list, and neither is ever changed during combat. If you want Blizzard's bonus objectives or scenario text visible, turn off \"Also keep Blizzard's tracker frame out of sight\" under Options > Tracker.")
 	end },
 	{ key = "drops", title = "Drops window", text = function() return Lines(
 		Y .. "Drops window" .. E,

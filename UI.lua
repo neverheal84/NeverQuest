@@ -1304,7 +1304,10 @@ function UI:CreateOptions()
 		function(v) tc.shown = v Track() ns.Tracker:ControlBlizzard() end)
 	Cycle(t, Lt.x, Lt:Next(30), "Blizzard's quest list:", { { "hide", "Hide it" }, { "sort", "Sort by priority" }, { "leave", "Leave it alone" } },
 		function() return tc.blizzard end, function(v) tc.blizzard = v ns.Tracker:ControlBlizzard() end,
-		"Hide: while the NeverQuest tracker shows, your quests are untracked so Blizzard's quest list is empty (bonus objectives and the rest stay). Sort: Blizzard's list stays, in NeverQuest's priority order. NeverQuest only changes which quests are tracked.")
+		"Hide: while the NeverQuest tracker shows, your quests are untracked so Blizzard's quest list is empty. Sort: Blizzard's list stays, in NeverQuest's priority order.")
+	Check(t, Lt.x + 14, Lt:Next(), "Also keep Blizzard's tracker frame out of sight", function() return tc.hideFrame end,
+		function(v) tc.hideFrame = v if not v then ns.Tracker:UnparkBlizzardFrame() end ns.Tracker:ControlBlizzard() end,
+		"Without this, emptying the list isn't enough: the game shows its tracker again whenever you accept or finish a quest, so it flashes up. With it, the frame is parked out of sight while \"Hide it\" is on, and handed straight back when it isn't. Never changed during combat. Turn this off if you want Blizzard's bonus objectives or scenario text visible.")
 	Cycle(t, Lt.x, Lt:Next(30), "Sort by:", { { "priority", "Priority" }, { "distance", "Distance" }, { "level", "Level" } },
 		function() return tc.sort end, function(v) tc.sort = v Track() end,
 		"Priority is the order the guide (and route planner) will do things in.")

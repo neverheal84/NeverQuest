@@ -467,6 +467,60 @@ local function SetCVarValue(name, value)
 	return false
 end
 
+-- Keeping Blizzard's tracker out of sight.
+--
+-- Emptying its list and stopping the auto-watch removes the reasons it appears, but neither
+-- stops the game showing the frame itself, so anything we miss still flashes up. Parking it
+-- on a hidden parent does: a child of a hidden frame never draws, however many times the game
+-- calls Show on it.
+--
+-- Only ever out of combat. That frame holds secure quest item buttons, and reparenting it
+-- mid-fight would block them. Anything deferred is picked up again when combat ends.
+local parked, parkedTo, parkedShown
+
+local function Holder()
+	if not T.parkHolder then
+		T.parkHolder = CreateFrame("Frame", nil, UIParent)
+		T.parkHolder:Hide()
+	end
+	return T.parkHolder
+end
+
+-- Whichever one this client has. Named outright rather than guessed at, and nil is fine:
+-- a client without any of them simply gets the watch-list handling on its own.
+local function TrackerFrame()
+	local f = ObjectiveTrackerFrame or QuestWatchFrame or WatchFrame
+	if type(f) == "table" and f.SetParent and f.GetParent and f.IsShown then return f end
+	return nil
+end
+
+function T:ParkBlizzardFrame()
+	if not Cfg().hideFrame or parked then return end
+	if InCombatLockdown and InCombatLockdown() then return end
+	local f = TrackerFrame()
+	if not f then return end
+	local parent = ns.SafeCall(f.GetParent, f)
+	if not parent then return end
+	parkedShown = ns.SafeCall(f.IsShown, f) and true or false
+	parkedTo = parent
+	if ns.SafeCall(f.SetParent, f, Holder()) == nil and not pcall(f.SetParent, f, Holder()) then
+		parkedTo, parkedShown = nil, nil
+		return
+	end
+	parked = f
+	ns.Debug("tracker: Blizzard's tracker parked out of sight")
+end
+
+function T:UnparkBlizzardFrame()
+	if not parked then return end
+	if InCombatLockdown and InCombatLockdown() then return end
+	local f = parked
+	pcall(f.SetParent, f, parkedTo or UIParent)
+	if parkedShown then pcall(f.Show, f) end
+	parked, parkedTo, parkedShown = nil, nil, nil
+	ns.Debug("tracker: Blizzard's tracker given back")
+end
+
 function T:SuppressAutoWatch()
 	local backup = ns.char.cvarBackup
 	for _, name in ipairs(AUTO_CVARS) do
@@ -515,6 +569,7 @@ function T:ControlBlizzard()
 	local mode = self:BlizzardMode()
 	if mode == "hide" then
 		self:SuppressAutoWatch()
+		self:ParkBlizzardFrame()
 		local watched = Watched()
 		for _, id in ipairs(watched) do
 			ns.char.trackerUntracked[id] = true
@@ -523,6 +578,7 @@ function T:ControlBlizzard()
 		if #watched > 0 then ns.Debug("tracker: untracked " .. #watched .. " quests in Blizzard's list") end
 	elseif mode == "sort" then
 		self:RestoreAutoWatch()
+		self:UnparkBlizzardFrame()
 		GiveBack()
 		local want = {}
 		for _, e in ipairs(self:Entries("priority")) do
@@ -547,6 +603,7 @@ function T:ControlBlizzard()
 		ns.Debug("tracker: Blizzard's list sorted by NeverQuest priority")
 	else
 		self:RestoreAutoWatch()
+		self:UnparkBlizzardFrame()
 		GiveBack()
 	end
 end

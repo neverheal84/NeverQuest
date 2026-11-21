@@ -18,7 +18,7 @@ local DEFAULTS = {
 	           size = 54, showETA = true, showThen = true, sound = true, corpse = true },
 	window = { tab = "guide", journalView = "history", classView = "class", scale = 1 },
 	style  = { font = "default", textScale = 1, outline = "", shadow = true },
-	tracker = { shown = true, blizzard = "hide", locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
+	tracker = { shown = true, blizzard = "hide", hideFrame = true, locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
 	            showObjectives = true, hideDoneObjectives = false, finishedFirst = true, showNumbers = true,
 	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 25 },
