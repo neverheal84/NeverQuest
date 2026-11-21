@@ -29,7 +29,7 @@ local DEFAULTS = {
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
 	           rested = true, sessionAtLogout = false, upgrades = true, training = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
-	questdb = { scan = true, worldmap = true, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true },
+	questdb = { scan = true, worldmap = true, minimap = true, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true },
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
 	alerts = { complete = true, sound = true, trackTurnin = false },
 	announce = { enabled = true, objectives = true, quests = true, turnins = false, attunements = true,

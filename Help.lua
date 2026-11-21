@@ -239,6 +239,8 @@ Help.TOPICS = {
 		"  " .. Y .. "/nq db export" .. E .. "  the quest starts you know, as text to share",
 		"  " .. Y .. "/nq db import" .. E .. "  take in quest starts from someone else",
 		"  " .. Y .. "/nq db ask" .. E .. "  ask your guild for the quest starts they know",
+		"  " .. Y .. "/nq db map" .. E .. "  known quest starts on the world map, on or off",
+		"  " .. Y .. "/nq db minimap" .. E .. "  known quest starts on the minimap, on or off",
 		"  " .. Y .. "/nq db ready" .. E .. "  whether anything is still running, and how much is known",
 		"",
 		Y .. "On the world map" .. E,

@@ -45,7 +45,25 @@ local function CharKey() return (UnitName("player") or "?") .. "-" .. (GetRealmN
 -- is (2 yours, 1 theirs) and q.n counts how many others have agreed on a shared place.
 local AGREE = 0.02      -- map fractions: reports this close are about the same spot
 
-function D:Add(qid, title, level, m, x, y, origin)
+-- Who has told us about a quest in this session. Not saved: it exists to stop one client
+-- resending the same record from reading as a second opinion, which is a within-session
+-- problem. Names are dropped when you log out.
+local voices = {}
+
+function D:NewVoice(qid, from)
+	if not from or from == "" then return true end
+	local seen = voices[qid]
+	if not seen then seen = {} voices[qid] = seen end
+	if seen[from] then return false end
+	seen[from] = true
+	return true
+end
+
+function D:ResetVoices(qid, from)
+	voices[qid] = from and { [from] = true } or nil
+end
+
+function D:Add(qid, title, level, m, x, y, origin, from)
 	qid = ns.Num(qid)
 	if not qid or qid <= 0 then return nil end
 	local s = Store()
@@ -66,12 +84,16 @@ function D:Add(qid, title, level, m, x, y, origin)
 			q.m, q.x, q.y, q.o, q.n = m, x, y, 2, nil
 		elseif not q.m then
 			q.m, q.x, q.y, q.o, q.n = m, x, y, 1, 1
+			self:ResetVoices(qid, from)
 		elseif q.o ~= 2 then
 			-- Theirs against theirs: agreement counts, disagreement defers to the better backed.
+			-- Only a sender we haven't already heard from about this quest counts, or one person
+			-- repeating themselves would look exactly like a second person agreeing.
 			if q.m == m and math.abs(q.x - x) <= AGREE and math.abs(q.y - y) <= AGREE then
-				q.n = (q.n or 1) + 1
+				if self:NewVoice(qid, from) then q.n = (q.n or 1) + 1 end
 			elseif (q.n or 1) <= 1 then
 				q.m, q.x, q.y, q.n = m, x, y, 1
+				self:ResetVoices(qid, from)
 			end
 		end
 	end
@@ -85,6 +107,7 @@ function D:Add(qid, title, level, m, x, y, origin)
 		if not q.c then q.c = "," .. c .. "," elseif not q.c:find("," .. c .. ",", 1, true) then q.c = q.c .. c .. "," end
 	end
 	q.s = time()
+	D:ClearNearby()
 	return q
 end
 
@@ -460,7 +483,11 @@ function D:MapPoints(mapID, offered)
 	for qid, q in self:Each() do
 		if q.m and q.t and not offered[qid] and (q.m == mapID or Zone(q.m) == shown) and (not q.f or q.f:find(mine, 1, true)) then
 			local lv = q.l
-			local okLevel = not lv or (lv <= level + (cfg.ahead or 3) and (ns.db.givers.gray or lv >= level - (cfg.grayBelow or 6)))
+			-- Both ceilings answer to the same two checkboxes the live offers use, so ticking
+			-- "include red (too high)" actually reveals what your guild has sent you from ahead.
+			local okLevel = not lv
+				or ((ns.db.givers.red or lv <= level + (cfg.ahead or 3))
+					and (ns.db.givers.gray or lv >= level - (cfg.grayBelow or 6)))
 			if okLevel then
 				local x, y = ns.Nav.TranslatePoint(q.m, q.x, q.y, mapID)
 				if x and y and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
@@ -488,6 +515,46 @@ function D:MapPoints(mapID, offered)
 			end
 		end
 	end
+	return out
+end
+
+-- Quest starts near you, for the minimap.
+--
+-- The minimap redraws several times a second, and walking the whole database that often would
+-- be wasteful, so the zone's points are worked out once and reused for a few seconds. Anything
+-- that changes what belongs on the map (learning something, levelling, a setting) clears it.
+local near = { key = nil, at = 0, points = nil }
+local NEAR_TTL = 8
+
+function D:ClearNearby()
+	near.key, near.points = nil, nil
+end
+
+function D:NearbyPoints(yards, cap)
+	if not ns.db.questdb.minimap then return {} end
+	local m = ns.SafeCall(C_Map.GetBestMapForUnit, "player")
+	local zone = m and ns.Nav.GetZoneMap(m)
+	if not zone then return {} end
+	local key = table.concat({ zone, UnitLevel("player") or 0,
+		ns.db.givers.gray and 1 or 0, ns.db.givers.red and 1 or 0 }, ":")
+	local now = GetTime()
+	if near.key ~= key or not near.points or now - near.at > NEAR_TTL then
+		local offered = {}
+		for _, o in ipairs(ns.Quests.offers or {}) do
+			if o.questID then offered[o.questID] = true end
+		end
+		near.points, near.key, near.at = self:MapPoints(zone, offered), key, now
+	end
+	local out = {}
+	for _, k in ipairs(near.points) do
+		local d = ns.Nav.Distance(k.q.m, k.q.x, k.q.y)
+		if d and d <= yards then
+			out[#out + 1] = { dist = d, qid = k.qid, q = k.q, m = k.q.m, x = k.q.x, y = k.q.y,
+				status = k.status, sub = k.sub, src = k.src }
+		end
+	end
+	table.sort(out, function(a, b) return a.dist < b.dist end)
+	for i = #out, (cap or 12) + 1, -1 do out[i] = nil end
 	return out
 end
 
@@ -610,7 +677,7 @@ function D:FromParty(sender, body, via)
 	local qid, m, x, y = tonumber(f[1]), tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
 	if not qid or f[2] == "" or not m or not x or not y then return end
 	if x <= 0 or x > 1 or y <= 0 or y > 1 then return end
-	if self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them") then
+	if self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them", sender) then
 		self.fromOthers = (self.fromOthers or 0) + 1
 		ns.Debounce("questdb:partydraw", 2, function()
 			ns:SendMessage("MAP_OFFERS_UPDATED")
@@ -639,7 +706,7 @@ function D:Ask()
 		return false, string.format("already asked. Try again in %d seconds.", math.ceil(ASK_COOLDOWN - (now - self.askedAt)))
 	end
 	self.askedAt = now
-	self.fromOthers = 0
+	self.fromAsk = 0
 	ns.Party:SendRaw("R", "guild")
 	return true
 end
@@ -697,18 +764,20 @@ function D:FromBatch(sender, body)
 		local f = Split(record)
 		local qid, m, x, y = tonumber(f[1]), tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
 		if qid and f[2] ~= "" and m and x and y and x > 0 and x <= 1 and y > 0 and y <= 1 then
-			if self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them") then got = got + 1 end
+			if self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them", sender) then got = got + 1 end
 		end
 	end
 	if got > 0 then
-		self.fromOthers = (self.fromOthers or 0) + got
+		-- Counted apart from the ones that drift in passively, so an answer to /nq db ask
+		-- reports what the ask actually brought and not everything since you logged in.
+		self.fromAsk = (self.fromAsk or 0) + got
 		ns.Debounce("questdb:guilddraw", 3, function()
 			ns:SendMessage("MAP_OFFERS_UPDATED")
 			ns:SendMessage("QUESTDB_UPDATED")
-			if (D.fromOthers or 0) > 0 then
+			if (D.fromAsk or 0) > 0 then
 				ns.Print(string.format("%d quest starts from your guild. %d quests known in all.",
-					D.fromOthers, D:Count()))
-				D.fromOthers = 0
+					D.fromAsk, D:Count()))
+				D.fromAsk = 0
 			end
 		end)
 	end
@@ -771,6 +840,12 @@ ns:AddSlash("db", function(arg)
 	elseif cmd == "map" then
 		ns.db.questdb.worldmap = not ns.db.questdb.worldmap
 		ns.Print("known quests on the world map " .. (ns.db.questdb.worldmap and "on." or "off."))
+		D:ClearNearby()
+		ns:SendMessage("MAP_OFFERS_UPDATED")
+	elseif cmd == "minimap" then
+		ns.db.questdb.minimap = not ns.db.questdb.minimap
+		ns.Print("known quests on the minimap " .. (ns.db.questdb.minimap and "on." or "off."))
+		D:ClearNearby()
 		ns:SendMessage("MAP_OFFERS_UPDATED")
 	elseif cmd == "export" then
 		local text, n = D:Export()
@@ -827,7 +902,7 @@ ns:AddSlash("db", function(arg)
 			DEFAULT_CHAT_FRAME:AddMessage("   /nq db way " .. found[1].qid .. " points the arrow there.")
 		end
 	end
-end, "/nq db [name|zone <zone>|way <id>|scan|ready|ask|guild|share|map|export|import] - the quest database: search it, list a zone, point the arrow, check whether it's finished, ask your guild for theirs")
+end, "/nq db [name|zone <zone>|way <id>|scan|ready|ask|guild|share|map|minimap|export|import] - the quest database: search it, list a zone, point the arrow, check whether it's finished, ask your guild for theirs")
 
 ---------------------------------------------------------------------------
 -- Events

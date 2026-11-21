@@ -1165,9 +1165,12 @@ function UI:CreateOptions()
 	Check(p, R.x, R:Next(), "Scan zones for quests in the background", function() return qd.scan end,
 		function(v) qd.scan = v if not v then ns.QuestDB:StopScan() end end,
 		"Asks the game which quests each zone offers, one zone every couple of seconds, paused in combat. Every character adds to one shared database. /nq db searches it.")
-	Check(p, R.x, R:Next(), "Show known quests on the world map", function() return qd.worldmap end,
-		function(v) qd.worldmap = v ns:SendMessage("MAP_OFFERS_UPDATED") end,
-		"Faded markers for quests you know about that aren't on offer to you yet, with the level they open at.")
+	Check(p, R.x, R:Next(), "Known quest starts on the world map", function() return qd.worldmap end,
+		function(v) qd.worldmap = v ns.QuestDB:ClearNearby() ns:SendMessage("MAP_OFFERS_UPDATED") end,
+		"Faded markers for quests you know about that aren't on offer to you yet, with the level they open at. This is where everything your alts, your party, your guild and the shipped data know shows up.")
+	Check(p, R.x, R:Next(), "Known quest starts on the minimap", function() return qd.minimap end,
+		function(v) qd.minimap = v ns.QuestDB:ClearNearby() ns:SendMessage("MAP_OFFERS_UPDATED") end,
+		"The same, on the minimap, for starts within sight of you. Keeps you from walking past a quest giver your guild already told you about.")
 	Check(p, R.x, R:Next(), "Also learn quests I can't take yet", function() return qd.deep end,
 		function(v) qd.deep = v if not v then ns.QuestDB:StopScan() end end,
 		"A quest you can see tells the game which chain it belongs to, so NeverQuest can ask for the names and levels of the rest of that chain, including quests above your level. This is what fills the database in before you have played the zone.")

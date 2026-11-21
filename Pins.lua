@@ -102,6 +102,17 @@ function P:MinimapPoints()
 			end
 		end
 	end
+	-- Quest starts from the database: your alts, your party, your guild, and the data shipped
+	-- with the addon. These draw faded and only within sight, since unlike the world map the
+	-- minimap has no room to show a whole zone's worth.
+	if ns.db.questdb.minimap and not questie and ns.QuestDB then
+		for _, k in ipairs(ns.QuestDB:NearbyPoints(400, 10)) do
+			table.insert(pts, { kind = "giver", m = k.m, x = k.x, y = k.y, questID = k.qid,
+				key = "known:" .. k.qid, faded = true, known = true, src = k.src,
+				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t,
+				sub = k.sub })
+		end
+	end
 	if cfg.mmQuests then
 		for _, e in ipairs(ns.Quests.log) do
 			if e.pos and not e.pos.waypoint then
