@@ -1083,6 +1083,9 @@ function UI:CreateOptions()
 	L:Next(10)
 	Heading(p, L.x, L:Next(), "Reminders")
 	local up = db.upkeep
+	Check(p, L.x, L:Next(), "Profession nearly capped", function() return up.training end,
+		function(v) up.training = v ns.Guide:Refresh() end,
+		"A reminder when a profession is within ten points of its current rank, so you train the next rank on your next trip to a town instead of grinding into the ceiling.")
 	Check(p, L.x, L:Next(), "Upgrades sitting in my bags", function() return up.upgrades end,
 		function(v) up.upgrades = v ns.Upkeep.bagCache = nil ns.Guide:Refresh() end,
 		"A guide row when something in your bags beats what you're wearing, judged the same way as quest rewards.")

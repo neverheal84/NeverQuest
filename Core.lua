@@ -27,7 +27,7 @@ local DEFAULTS = {
 	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest" },  -- reward: suggest | upgrade | value | off
 	loot   = { auto = true, junk = true, junkReport = true, repair = true, repairGuild = false },  -- auto loot; sell grays; repair at vendors
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
-	           rested = true, sessionAtLogout = false, upgrades = true },
+	           rested = true, sessionAtLogout = false, upgrades = true, training = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
 	questdb = { scan = true, worldmap = true, ahead = 3, grayBelow = 6 },
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs

@@ -211,13 +211,46 @@ function G:BuildPlanned(steps, plan)
 			color = { 0.6, 0.85, 1 } })
 	end
 	-- Quests the route leaves out: too far, another continent, or too little XP for the time.
+	-- A finished quest is the exception. It is already earned, so it is never filed under
+	-- "later" just because NeverQuest has not learned where it is handed in: those go above
+	-- the route, with the zone the game says to go to, so you are not flown out past them.
+	local hereZone
+	do
+		local m = ns.SafeCall(C_Map.GetBestMapForUnit, "player")
+		m = m and ns.Nav.GetZoneMap(m)
+		hereZone = m and ns.Nav.MapName(m) or nil
+	end
+	local waiting = {}
 	for _, e in ipairs(ns.Quests.log) do
 		if not onRoute[e] and not e.failed and (cfg.showGray or e.complete or not e.trivial) then
 			local s = self:MakeStep(e.complete and "turnin" or "objective", e)
-			s.later = true
-			s.sub = "|cff999999later:|r " .. (s.sub or "")
-			table.insert(steps, s)
+			if e.complete then
+				-- MakeStep already explains what is known (who to hand it to, which zone), so
+				-- that is left alone; all this does is stop it being buried under "later".
+				s.color = { 0.4, 1, 0.5 }
+				table.insert(waiting, { step = s, here = hereZone ~= nil and ns.Quests:ZoneOf(e) == hereZone })
+			else
+				s.later = true
+				s.sub = "|cff999999later:|r " .. (s.sub or "")
+				table.insert(steps, s)
+			end
 		end
+	end
+	-- Ones waiting in the zone you are standing in come first: handing those in before you
+	-- leave is free XP, and the route can't tell you to because it doesn't know the spot.
+	table.sort(waiting, function(a, b)
+		if a.here ~= b.here then return a.here end
+		return (a.step.title or "") < (b.step.title or "")
+	end)
+	local hereCount = 0
+	for _, w in ipairs(waiting) do if w.here then hereCount = hereCount + 1 end end
+	for i = #waiting, 1, -1 do table.insert(steps, 1, waiting[i].step) end
+	if hereCount > 0 then
+		table.insert(steps, 1, { kind = "tip", key = "tip:handin",
+			title = hereCount == 1 and "1 finished quest waiting in this zone"
+				or (hereCount .. " finished quests waiting in this zone"),
+			sub = "Hand these in before you travel: the XP is already earned. NeverQuest doesn't know the spot, so they aren't on the route.",
+			color = { 0.4, 1, 0.5 } })
 	end
 	-- A few more quest givers nearby that aren't on the route.
 	local offers = {}

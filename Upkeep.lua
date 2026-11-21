@@ -204,9 +204,49 @@ ns:RegisterEvent("BAG_UPDATE_DELAYED", function()
 end)
 
 -- Guide rows for the things above.
+-- Professions about to hit the ceiling of their current rank. The game gives the cap with the
+-- skill, so no table of thresholds is needed: when you are within a few points of it, the next
+-- rank has to be trained before the skill can move again.
+local RANK_NEAR = 10
+
+function U:SkillCaps()
+	local out = {}
+	if not ns.ClassQuests then return out end
+	local mine = ns.ClassQuests:MyProfessions()
+	local seen = {}
+	for _, rec in pairs(mine) do
+		if rec.name and not seen[rec.name] and rec.max and rec.max > 0 and rec.max < 300 then
+			seen[rec.name] = true
+			local left = rec.max - rec.skill
+			if left <= RANK_NEAR then
+				table.insert(out, { name = rec.name, skill = rec.skill, max = rec.max, left = left })
+			end
+		end
+	end
+	table.sort(out, function(a, b) return a.left < b.left end)
+	return out
+end
+
 function U:Tips(level)
 	local cfg = Cfg()
 	local rows = {}
+	if cfg.training then
+		local caps = self:SkillCaps()
+		if #caps > 0 then
+			local names, capped = {}, 0
+			for _, c in ipairs(caps) do
+				table.insert(names, string.format("%s %d/%d", c.name, c.skill, c.max))
+				if c.left == 0 then capped = capped + 1 end
+			end
+			local inTown = IsResting and ns.SafeCall(IsResting) == true
+			table.insert(rows, { kind = "train", key = "tip:skillcap:" .. table.concat(names, ","),
+				title = capped > 0 and ("Skill capped: " .. table.concat(names, ", "))
+					or ("Nearly capped: " .. table.concat(names, ", ")),
+				sub = inTown and "You're in a town: train the next rank here before you head out, or the skill stops going up."
+					or "Train the next rank at a trainer, or the skill stops going up. Worth doing on your next trip to a town.",
+				color = inTown and { 1, 0.8, 0.4 } or { 0.6, 0.85, 1 } })
+		end
+	end
 	if cfg.logFull then
 		local n, max = self:LogCount()
 		if n >= max then

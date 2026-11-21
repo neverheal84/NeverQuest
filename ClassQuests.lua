@@ -131,10 +131,10 @@ function C:MyProfessions()
 		if slots[1] then
 			for i = 2, 7 do
 				local index = slots[i]
-				local ok2, name, _, skill, _, _, _, line
-				if index then ok2, name, _, skill, _, _, _, line = pcall(GetProfessionInfo, index) end
+				local ok2, name, _, skill, maxSkill, _, _, line
+				if index then ok2, name, _, skill, maxSkill, _, _, line = pcall(GetProfessionInfo, index) end
 				if ok2 and name and not ns.IsSecret(name) then
-					local rec = { name = name, skill = ns.Num(skill) or 0 }
+					local rec = { name = name, skill = ns.Num(skill) or 0, max = ns.Num(maxSkill) or 0 }
 					if ns.Num(line) then mine[line] = rec end
 					mine[name:lower()] = rec
 					found = true
@@ -145,9 +145,9 @@ function C:MyProfessions()
 	if not found and GetNumSkillLines and GetSkillLineInfo then
 		local ok, n = pcall(GetNumSkillLines)
 		for i = 1, (ok and ns.Num(n)) or 0 do
-			local ok2, name, isHeader, _, rank = pcall(GetSkillLineInfo, i)
+			local ok2, name, isHeader, _, rank, _, _, maxRank = pcall(GetSkillLineInfo, i)
 			if ok2 and name and not isHeader and not ns.IsSecret(name) then
-				mine[name:lower()] = { name = name, skill = ns.Num(rank) or 0 }
+				mine[name:lower()] = { name = name, skill = ns.Num(rank) or 0, max = ns.Num(maxRank) or 0 }
 				found = true
 			end
 		end

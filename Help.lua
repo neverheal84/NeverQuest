@@ -255,6 +255,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.16.0" .. E,
+		"  Finished quests are never left behind. One NeverQuest has no hand-in spot for used to drop to the bottom of the guide under \"later\", so the route would send you out of the zone past it. They now sit at the top, with a count of the ones waiting where you are standing.",
+		"  A reminder when a profession is within ten points of its current rank, so you train the next rank on your next trip to a town instead of grinding into the ceiling.",
+		"",
 		Y .. "1.15.0" .. E,
 		"  New Class tab: the class quests in your log, and a checklist of what your class has coming at which level, what it gives you and where it starts. " .. Y .. "/nq class" .. E .. " opens it.",
 		"  Profession quests in the same tab: the quests your professions wait on, with the skill each needs against the skill you have. " .. Y .. "/nq professions" .. E .. ".",

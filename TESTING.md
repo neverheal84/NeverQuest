@@ -81,6 +81,9 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 51. **Profession quests and the options (1.15.0).** In the Class tab, the Professions button should list your own professions with your skill beside each, and rows should say "now" only when you have both the skill and the level. Under Options > Guide & Routes, turning "Profession quests section" off should leave the tab with class quests only; turning "Class quests section" off instead should rename the tab to Trades; turning both off should remove the tab and close the gap.
 
+52. **Finished quests and travel (1.16.0).** Complete a few quests whose hand-in spot NeverQuest hasn't learned (pick them up before installing, or use `/nq forget`), then stand in their zone with work waiting elsewhere. The guide should open with "N finished quests waiting in this zone" and list them above anything that takes you out of the zone, not under "later".
+53. **Profession cap (1.16.0).** Get a profession within ten points of its rank cap (75, 150 or 225). The guide should say "Nearly capped" with the numbers, and the wording should change to "You're in a town" when you're in one. A profession at 300 should never be mentioned.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.
