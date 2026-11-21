@@ -247,17 +247,25 @@ function UI:Create()
 	table.insert(UISpecialFrames, "NeverQuestFrame")
 	self.frame = f
 
+	local logo = f:CreateTexture(nil, "ARTWORK")
+	logo:SetTexture(ns.LOGO)
+	logo:SetSize(24, 24)
+	logo:SetPoint("TOPLEFT", 10, -7)
+	self.logo = logo
 	local title = f:CreateFontString(nil, "OVERLAY", "NeverQuestFontTitle")
-	title:SetPoint("TOPLEFT", 12, -10)
+	title:SetPoint("LEFT", logo, "RIGHT", 6, 0)
 	title:SetText("NeverQuest")
 	local ver = f:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmallGray")
 	ver:SetPoint("LEFT", title, "RIGHT", 6, -1)
-	ver:SetText("v" .. ns.version)
+	ver:SetText("v" .. ns.version .. "  ·  by " .. ns.AUTHOR)
 
 	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -2, -2)
 	local opts = Button(f, "Options", 70, function() UI:OpenOptions() end)
 	opts:SetPoint("TOPRIGHT", -32, -8)
+	local help = Button(f, "Help", 50, function() if ns.Help then ns.Help:Open() end end)
+	help:SetPoint("RIGHT", opts, "LEFT", -4, 0)
+	self.btnHelp = help
 
 	self.tabs = {}
 	for i, t in ipairs(TABS) do
@@ -889,6 +897,9 @@ local function Heading(parent, x, y, text)
 	fs:SetText(text)
 end
 
+-- The same widgets for other windows (setup wizard, help).
+UI.Check, UI.Cycle, UI.Heading, UI.Button = Check, Cycle, Heading, Button
+
 -- A settings page: title and description, then a scrolling area for the controls.
 -- Returns the page frame and the frame controls go in.
 local function NewPanel(name, titleText, subText)
@@ -942,7 +953,7 @@ function UI:CreateOptions()
 	local function Track() ns.Tracker:Refresh() end
 
 	---------------------------------------------------------------- NeverQuest (general)
-	local _, p = Page("general", "NeverQuest", "NeverQuest " .. ns.version,
+	local _, p = Page("general", "NeverQuest", "NeverQuest " .. ns.version .. "  by " .. ns.AUTHOR,
 		"Hold Shift while talking to an NPC to skip auto accept and turn-in for that conversation.")
 	local L, R = Column(16), Column(330)
 
@@ -1007,6 +1018,14 @@ function UI:CreateOptions()
 	more:SetWidth(290)
 	more:SetJustifyH("LEFT")
 	more:SetText("The pages under NeverQuest in this list: Guide & Routes, Tracker, Display & Maps, Spawns & Objectives, and Scale & Text.")
+	local runSetup = Button(p, "Setup wizard", 120, function()
+		ns.Setup:Open()
+	end)
+	runSetup:SetPoint("TOPLEFT", R.x + 4, R:Next(30))
+	local openHelp = Button(p, "Help", 90, function()
+		ns.Help:Open()
+	end)
+	openHelp:SetPoint("LEFT", runSetup, "RIGHT", 8, 0)
 	FitContent(p, L, R)
 	self.options = p
 

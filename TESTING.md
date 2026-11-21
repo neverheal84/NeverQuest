@@ -5,12 +5,12 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 ## Before you start
 
 1. Install **BugSack** and **BugGrabber** (they catch and show errors).
-2. Put the `NeverQuest` folder in `Interface\AddOns`, leaving your old `QuestMax` folder there for the first login (see "Moving from QuestMax" in README.md), then log in.
+2. Replace your `NeverQuest` folder with the new one, then log in.
 
 ## The checklist
 
-1. **Login.** Chat says "NeverQuest 1.9.0 loaded". Stand somewhere outdoors and run `/nq check`. Copy the window text (Ctrl+C) and save it to send later.
-2. **Panels.** `/nq` opens the window and all five tabs switch. The XP panel and arrow show up. Drag them where you like, then `/nq lock`.
+1. **Login.** Chat says "NeverQuest 1.10.0 by NeverHeal84 loaded". Stand somewhere outdoors and run `/nq check`. Copy the window text (Ctrl+C) and save it to send later.
+2. **Panels.** `/nq` opens the window and all six tabs switch. The XP panel and arrow show up. Drag them where you like, then `/nq lock`.
 3. **Options.** Esc > Options > AddOns > NeverQuest. All six pages open (NeverQuest, Guide & Routes, Tracker, Display & Maps, Spawns & Objectives, Scale & Text) and scroll if they're long. Flip a couple of settings and back. On Scale & Text, try a bigger text size and a different font: the main window, tracker, XP panel and arrow should all change.
 4. **Quests and Nearby tabs.** Your quest log shows XP and distances. Nearby lists quests to pick up (open the world map once if it's empty).
 5. **Guide and arrow.** The Guide tab's top step matches where the arrow points. Walk toward it: the distance drops and the arrow turns green when you face it. **Check the arrow isn't mirrored** (it should point left when the target is on your left).
@@ -39,7 +39,8 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 27. **Party announcements.** In a party, `/nq announce test` posts "NeverQuest: announcements are working." in party chat. Finish one objective of a quest with two or more objectives (party chat shows "objective done"), then finish the quest ("complete, ready to turn in"). Turn on "Quests turned in" under Options > NeverQuest > Party announcements and hand something in. `/nq announce off` should stop all of it. In `/nq check`, the "Party announcements" line says where messages go.
 
 28. **Map route.** With a few unfinished quests, open the world map: the numbered route and its line go to quest objectives (and finished turn-ins and pickups), not to the NPCs where unfinished quests get handed in. Turn on "Include turn-ins for unfinished quests" under Display & Maps > World map and the "Then turn in" stops join the line. If a step says "the map only marks the quest NPC", tell me which quest.
-29. **Rename.** If you still had QuestMax installed, the first login shows the "QuestMax is now NeverQuest" box; Reload now leaves only NeverQuest running, with your old settings. `/nq` and `/qmax` both open the window.
+29. **Setup wizard.** `/nq setup` opens the wizard with the NeverQuest logo and "by NeverHeal84" at the top. Step through every page with Next and Back, change a setting or two (they should take effect straight away), and Finish. "Use recommended" on the first page jumps to the last page. On a fresh install (no NeverQuest settings saved yet) it opens by itself a few seconds after login; an existing install just gets a one-time chat note about it.
+30. **Help.** `/nq help` opens the help window; click through the topics on the left and scroll a long one. `/nq help raids` opens the raid topic, `/nq commands` lists commands in chat, and the Help button in the main window and the minimap menu open it too. The main window title and the minimap button show the logo.
 
 ## Afterwards, send
 

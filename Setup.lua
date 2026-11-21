@@ -1,0 +1,285 @@
+-- NeverQuest setup wizard: a few short pages that pick the main settings, opened on a fresh
+-- install and any time with /nq setup. Everything it sets is also under Options.
+
+local ADDON, ns = ...
+local Setup = {}
+ns.Setup = Setup
+
+local W, H = 540, 430
+
+local function Cfg() return ns.db end
+
+-- Refresh helpers shared by several pages.
+local function Pins() if ns.Pins then ns.Pins:Refresh(true) end end
+local function Guide()
+	if ns.Planner then ns.Planner.dirty = true end
+	if ns.Guide then ns.Guide.focusKey = nil ns.Guide:Refresh() end
+end
+
+---------------------------------------------------------------------------
+-- Pages: title, text, and a builder that adds controls at (x, y) rows.
+---------------------------------------------------------------------------
+Setup.PAGES = {
+	{
+		key = "welcome", title = "Welcome to NeverQuest",
+		text = "NeverQuest plans your leveling route, points the way, tracks your quests and learns where quest mobs are as you play.\n\n" ..
+			"This setup takes a minute and picks the basics. Everything here can be changed later under Options, and |cffffd100/nq setup|r brings this back.\n\n" ..
+			"What you'll see:\n" ..
+			"  |cffffd100Main window|r (|cffffd100/nq|r or the minimap button): your next steps, quest log, nearby quests, raid attunements and journal.\n" ..
+			"  |cffffd100Arrow|r: points at the guide's top step, a waypoint, or your corpse.\n" ..
+			"  |cffffd100Tracker|r on the right: your quests in the order the guide will do them.\n" ..
+			"  |cffffd100XP panel|r: XP per hour and time to level.\n\n" ..
+			"Happy with the defaults? Click |cffffd100Use recommended|r and you're done.",
+	},
+	{
+		key = "leveling", title = "Leveling",
+		text = "|cffffd100Optimized 1-60|r hops between zones at the right levels, the way current leveling guides do. |cffffd100Zone by zone|r stays in a zone until its quests run out.",
+		build = function(p, U, row)
+			local db = Cfg()
+			U.Cycle(p, 0, row(30), "Leveling style:", ns.Profiles.STYLES, function() return ns.Profiles:Style() end,
+				function(v) db.guide.style = v Guide() end)
+			U.Check(p, 0, row(), "Follow my race's 1-60 plan", function() return db.guide.profile end, function(v) db.guide.profile = v Guide() end,
+				"Quests in the zones your plan wants you in count for more, and the guide says when to move on.")
+			U.Check(p, 0, row(), "Plan one short route through my quests", function() return db.guide.planner end, function(v) db.guide.planner = v Guide() end,
+				"Orders objectives, turn-ins and pickups to save walking back and forth.")
+			U.Check(p, 0, row(), "Guide steers the arrow", function() return db.guide.autoTrack end, function(v) db.guide.autoTrack = v Guide() end)
+			U.Check(p, 0, row(), "Include gray (low level) quests", function() return db.guide.showGray end, function(v) db.guide.showGray = v Guide() end)
+			U.Check(p, 0, row(), "Raid attunement reminders from level 50", function() return db.guide.attunements end, function(v) db.guide.attunements = v Guide() end)
+		end,
+	},
+	{
+		key = "maps", title = "Maps and navigation",
+		text = "Spawn spots are learned from your own play: where quest mobs died, what dropped quest items, and spots you mark yourself.",
+		build = function(p, U, row)
+			local db = Cfg()
+			U.Check(p, 0, row(), "Waypoint arrow", function() return db.arrow.shown end, function(v) db.arrow.shown = v ns.Nav:Update() end)
+			U.Check(p, 0, row(), "Route lines on the world map", function() return db.pins.routeLine end, function(v) db.pins.routeLine = v Pins() end,
+				"Joins the guide's next steps on the world map. The numbered pins stay either way.")
+			U.Check(p, 0, row(), "Quest givers on the world map", function() return db.givers.worldmap end, function(v) db.givers.worldmap = v Pins() Guide() end,
+				"Quests you can pick up, with their level in the quest's difficulty color.")
+			U.Check(p, 0, row(), "Learn spawn spots as I play", function() return db.spawns.learn end, function(v) db.spawns.learn = v end)
+			U.Check(p, 0, row(), "Spawn dots on the minimap too", function() return db.spawns.minimap end, function(v) db.spawns.minimap = v Pins() end)
+			U.Check(p, 0, row(), "NeverQuest button on the minimap", function() return db.minimapButton.shown end,
+				function(v) db.minimapButton.shown = v if ns.MinimapButton then ns.MinimapButton:Refresh() end end)
+		end,
+	},
+	{
+		key = "tracker", title = "Quest tracker and XP panel",
+		text = "The NeverQuest tracker lists your quests on the right side of the screen, grouped by zone and numbered in the order the guide will do them.",
+		build = function(p, U, row)
+			local tc = Cfg().tracker
+			U.Check(p, 0, row(), "Show the NeverQuest tracker", function() return tc.shown end,
+				function(v) tc.shown = v ns.Tracker:Refresh() ns.Tracker:ControlBlizzard() end)
+			U.Cycle(p, 0, row(30), "Blizzard's quest list:", { { "hide", "Hide it" }, { "sort", "Sort by priority" }, { "leave", "Leave it alone" } },
+				function() return tc.blizzard end, function(v) tc.blizzard = v ns.Tracker:ControlBlizzard() end,
+				"Hide: Blizzard's list is emptied while NeverQuest's tracker shows. Sort: it stays, in NeverQuest's order.")
+			U.Check(p, 0, row(), "XP panel", function() return Cfg().hud.shown end, function(v) Cfg().hud.shown = v ns.XP:Refresh() end,
+				"XP per hour, time to level, quests or kills to level, rested XP.")
+		end,
+	},
+	{
+		key = "automation", title = "Automation",
+		text = "Hold |cffffd100Shift|r while talking to an NPC to skip automation for that conversation.",
+		build = function(p, U, row)
+			local au = Cfg().auto
+			U.Check(p, 0, row(), "Accept quests automatically", function() return au.accept end, function(v) au.accept = v end)
+			U.Check(p, 0, row(), "Turn in finished quests automatically", function() return au.turnin end, function(v) au.turnin = v end)
+			U.Check(p, 0, row(), "Pick quests in NPC dialog windows", function() return au.gossip end, function(v) au.gossip = v end)
+			U.Check(p, 0, row(), "Skip gray quests", function() return au.skipGray end, function(v) au.skipGray = v end)
+			U.Cycle(p, 0, row(30), "Reward choice:", { { "suggest", "Suggest in chat" }, { "value", "Highest vendor value" }, { "off", "Do nothing" } },
+				function() return au.reward end, function(v) au.reward = v end)
+		end,
+	},
+	{
+		key = "party", title = "Playing in a group",
+		text = "Party members who also run NeverQuest see each other's progress and learned spots. Catch-up and announcements only do anything while you're in a party.",
+		build = function(p, U, row)
+			local db = Cfg()
+			U.Check(p, 0, row(), "Share quest progress with my party", function() return db.party.enabled end,
+				function(v) db.party.enabled = v if v and ns.Party then ns.Party:SendSnapshot() end end)
+			U.Check(p, 0, row(), "Party catch-up", function() return db.party.catchUp end, function(v) db.party.catchUp = v Guide() end,
+				"The guide and route adapt so everyone keeps up: shared quests first, turn-ins wait for whoever still needs them.")
+			U.Check(p, 0, row(), "Announce completions in party chat", function() return db.announce.enabled end, function(v) db.announce.enabled = v end,
+				"Finished objectives, quests ready to turn in and raid attunement steps. Each type can be switched off under Options.")
+		end,
+	},
+	{
+		key = "look", title = "Size and text",
+		text = "More choices (fonts, outlines, sizes for each panel) are under Options > Scale & Text.",
+		build = function(p, U, row)
+			local db = Cfg()
+			local St = ns.Style
+			U.Cycle(p, 0, row(30), "Text size:", St.TEXT_SIZES, function() return db.style.textScale end, function(v) db.style.textScale = v St:Apply() end)
+			U.Cycle(p, 0, row(30), "Main window size:", St.SCALES, function() return db.window.scale end, function(v) db.window.scale = v ns.UI:ApplyScale() end)
+			U.Check(p, 0, row(), "Login message in chat", function() return not db.quietLogin end, function(v) db.quietLogin = not v end)
+		end,
+	},
+	{
+		key = "done", title = "You're set",
+		text = "Handy commands:\n" ..
+			"  |cffffd100/nq|r  open or close NeverQuest\n" ..
+			"  |cffffd100/nq help|r  how everything works, and every command\n" ..
+			"  |cffffd100/nq setup|r  this setup again\n" ..
+			"  |cffffd100/nq options|r  every setting\n" ..
+			"  |cffffd100/nq raids|r  raid attunement guides\n" ..
+			"  |cffffd100/way 45 63|r  a waypoint in your zone\n\n" ..
+			"Hover almost anything in NeverQuest for a tooltip. Right-click the minimap button for quick settings.",
+	},
+}
+
+---------------------------------------------------------------------------
+-- Window
+---------------------------------------------------------------------------
+function Setup:Create()
+	if self.frame then return self.frame end
+	local U = ns.UI
+	local f = CreateFrame("Frame", "NeverQuestSetup", UIParent, "BackdropTemplate")
+	f:SetSize(W, H)
+	f:SetPoint("CENTER", 0, 60)
+	f:SetFrameStrata("DIALOG")
+	f:SetToplevel(true)
+	ns.ApplyBackdrop(f, 0.97)
+	f:SetMovable(true)
+	f:EnableMouse(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	f:Hide()
+	table.insert(UISpecialFrames, "NeverQuestSetup")
+	self.frame = f
+
+	f.step = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	f.step:SetPoint("TOPRIGHT", -36, -16)
+	f.logo = f:CreateTexture(nil, "ARTWORK")
+	f.logo:SetTexture(ns.LOGO)
+	f.logo:SetSize(40, 40)
+	f.logo:SetPoint("TOPLEFT", 16, -12)
+	f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	f.title:SetPoint("TOPLEFT", f.logo, "TOPRIGHT", 10, -4)
+	f.by = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	f.by:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -4)
+	f.by:SetText("NeverQuest " .. ns.version .. "  ·  by " .. ns.AUTHOR)
+	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", -2, -2)
+
+	f.text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	f.text:SetPoint("TOPLEFT", 20, -66)
+	f.text:SetWidth(W - 40)
+	f.text:SetJustifyH("LEFT")
+	f.text:SetJustifyV("TOP")
+	f.text:SetSpacing(2)
+
+	-- One frame of controls per page, shown with its page.
+	self.pageFrames = {}
+	for i, page in ipairs(self.PAGES) do
+		local p = CreateFrame("Frame", nil, f)
+		p:SetPoint("TOPLEFT", f.text, "BOTTOMLEFT", 0, -18)
+		p:SetPoint("BOTTOMRIGHT", -20, 50)
+		p:Hide()
+		if page.build then
+			local y = 0
+			local function Row(gap)
+				local at = y
+				y = y - (gap or 28)
+				return at
+			end
+			page.build(p, U, Row)
+		end
+		self.pageFrames[i] = p
+	end
+
+	f.back = U.Button(f, "Back", 90, function() Setup:Go(Setup.index - 1) end)
+	f.back:SetPoint("BOTTOMLEFT", 16, 14)
+	f.next = U.Button(f, "Next", 110, function()
+		if Setup.index >= #Setup.PAGES then Setup:Finish() else Setup:Go(Setup.index + 1) end
+	end)
+	f.next:SetPoint("BOTTOMRIGHT", -16, 14)
+	f.quick = U.Button(f, "Use recommended", 140, function() Setup:UseRecommended() end)
+	f.quick:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
+	f.skip = U.Button(f, "Skip setup", 100, function() Setup:Finish(true) end)
+	f.skip:SetPoint("LEFT", f.back, "RIGHT", 8, 0)
+	f.guide = U.Button(f, "Open the guide", 130, function()
+		Setup:Finish()
+		if ns.UI.frame then ns.UI.frame:Show() ns.UI:SetTab("guide") end
+	end)
+	f.guide:SetPoint("RIGHT", f.next, "LEFT", -8, 0)
+	f.help = U.Button(f, "Open help", 100, function()
+		Setup:Finish()
+		if ns.Help then ns.Help:Open() end
+	end)
+	f.help:SetPoint("RIGHT", f.guide, "LEFT", -8, 0)
+	return f
+end
+
+function Setup:Go(i)
+	local f = self:Create()
+	i = math.max(1, math.min(#self.PAGES, i))
+	self.index = i
+	local page = self.PAGES[i]
+	for n, p in ipairs(self.pageFrames) do p:SetShown(n == i) end
+	f.title:SetText(page.title)
+	f.text:SetText(page.text or "")
+	f.step:SetFormattedText("Step %d of %d", i, #self.PAGES)
+	local last = i == #self.PAGES
+	f.back:SetShown(i > 1)
+	f.skip:SetShown(i == 1)
+	f.quick:SetShown(i == 1)
+	f.next:SetText(last and "Finish" or (i == 1 and "Let's go" or "Next"))
+	f.guide:SetShown(last)
+	f.help:SetShown(last)
+end
+
+function Setup:Open(pageKey)
+	local f = self:Create()
+	local start = 1
+	for i, page in ipairs(self.PAGES) do if page.key == pageKey then start = i end end
+	self:Go(start)
+	f:Show()
+end
+
+-- Recommended means NeverQuest's defaults: nothing to change, so go straight to the summary.
+function Setup:UseRecommended()
+	self:Go(#self.PAGES)
+end
+
+function Setup:Finish(skipped)
+	Cfg().setupDone = true
+	if self.frame then self.frame:Hide() end
+	if skipped then ns.Print("setup skipped. |cffffd100/nq setup|r runs it any time, |cffffd100/nq help|r explains everything.") end
+end
+
+-- First run: open the wizard once you're in the world and out of combat. Characters that
+-- already had NeverQuest get a one-time chat note instead.
+local function FirstRun()
+	local db = Cfg()
+	if db.setupDone then return end
+	if ns.freshInstall then
+		if InCombatLockdown() then
+			Setup.waitCombat = true
+			return
+		end
+		Setup:Open()
+	elseif not db.setupHinted then
+		db.setupHinted = true
+		ns.Print("new: |cffffd100/nq setup|r walks through the main settings, and |cffffd100/nq help|r explains every feature and command.")
+	end
+end
+Setup.FirstRun = FirstRun
+
+ns:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
+	if not ns.ready or Setup.checked then return end
+	Setup.checked = true
+	ns.After(4, function() ns.Call("setup wizard", FirstRun) end)
+end)
+
+ns:RegisterEvent("PLAYER_REGEN_ENABLED", function()
+	if Setup.waitCombat then
+		Setup.waitCombat = nil
+		ns.Call("setup wizard", FirstRun)
+	end
+end)
+
+ns:AddSlash("setup", function(arg)
+	Setup:Open((arg or ""):lower())
+end, "/nq setup - the setup wizard (main settings in a few steps)")
+ns:AddSlash("wizard", function(arg) Setup:Open((arg or ""):lower()) end)

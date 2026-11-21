@@ -5,7 +5,7 @@ local ADDON, ns = ...
 local B = {}
 ns.MinimapButton = B
 
-local ICON = "Interface\\Icons\\INV_Misc_Map_01"
+local ICON = ns.ICON   -- the NeverQuest logo
 local CIRCLE_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 
 local function Cfg() return ns.db.minimapButton end
@@ -75,6 +75,8 @@ function B:Menu(owner)
 		root:CreateButton("Open NeverQuest", function() ns.UI.frame:Show() ns.UI:SetTab("guide") end)
 		root:CreateButton("1-60 plan", function() ns.UI.frame:Show() ns.UI:SetTab("guide") ns.UI:TogglePlan(true) end)
 		root:CreateButton("Raid attunements", function() ns.UI.frame:Show() ns.UI:SetTab("raids") end)
+		root:CreateButton("Help", function() ns.Help:Open() end)
+		root:CreateButton("Setup wizard", function() ns.Setup:Open() end)
 		root:CreateDivider()
 		root:CreateCheckbox("Quest tracker", function() return db.tracker.shown end, function()
 			db.tracker.shown = not db.tracker.shown
@@ -122,6 +124,7 @@ function B:Create()
 	b.bg:SetPoint("TOPLEFT", 2, -4)
 	b.icon = b:CreateTexture(nil, "ARTWORK")
 	b.icon:SetTexture(ICON)
+	b.icon:SetTexCoord(0.06, 0.94, 0.06, 0.94)
 	b.icon:SetSize(20, 20)
 	b.icon:SetPoint("TOPLEFT", 7, -6)
 	local mask = b:CreateMaskTexture()

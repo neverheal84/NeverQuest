@@ -138,6 +138,7 @@ function D:Check()
 	local sendFn = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
 	Line(out, (not ns.db.announce.enabled or sendFn) and "OK" or "WARN", "Party announcements",
 		ns.Announce:StatusText() .. (ns.Announce:Locked() and " (chat locked by the game right now)" or ""))
+	Line(out, "OK", "Setup wizard", ns.db.setupDone and "done (/nq setup runs it again)" or "not run yet (/nq setup)")
 	Line(out, "OK", "Raid attunements", ns.Attune:StatusText() .. (ns.db.guide.attunements and "" or ", guide steps off"))
 	local mb = ns.MinimapButton.button
 	Line(out, (not ns.db.minimapButton.shown or (mb and mb:IsShown())) and "OK" or "WARN", "Minimap button",

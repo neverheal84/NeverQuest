@@ -6,6 +6,10 @@ _G.NeverQuest = ns
 
 ns.name = ADDON
 ns.version = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ADDON, "Version")) or "1.0.0"
+ns.AUTHOR = "NeverHeal84"
+ns.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\Media\\"
+ns.LOGO = ns.MEDIA .. "Logo"   -- 256x256 TGA
+ns.ICON = ns.MEDIA .. "Icon"   -- 64x64 TGA
 
 local DEFAULTS = {
 	hud    = { shown = true, locked = false, scale = 1, showRested = true, showRate = true, showToLevel = true, showFooter = true },
@@ -37,6 +41,7 @@ local DEFAULTS = {
 	           showAll = false, aim = true, markClick = true },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
 	guides = {},       -- recorded or imported guides, shared by all characters
+	setupDone = false, setupHinted = false,  -- setup wizard finished or skipped; one-time hint about it shown
 	positions = {},    -- saved frame positions
 	npcs = { giver = {}, turnin = {}, giverAt = {}, turninAt = {} },  -- NPC names and spots learned from your own quest dialogs
 	chains = { next = {}, prev = {} },   -- quest follow-ups seen right after a turn-in
@@ -187,9 +192,9 @@ end
 ns.inits = {}
 function ns:OnInit(fn) table.insert(self.inits, fn) end
 
--- Moving from QuestMax (this addon's old name): when QuestMax is still installed, it loads first
--- (OptionalDeps), so its saved settings are here to copy. Account settings come over once, each
--- character's on its first login, and QuestMax is switched off for that character.
+-- Moving from this addon's old name: when the old addon is still installed, its saved settings
+-- are copied over once (account settings once, each character's on its first login), and the
+-- old addon is switched off for that character. It may load before or after this one.
 local OLD_NAME = "QuestMax"
 local function DeepCopy(v)
 	if type(v) ~= "table" then return v end
@@ -218,9 +223,44 @@ function ns.MigrateFromOldName()
 	return moved, loaded
 end
 
+-- The old addon loading after this one: its settings arrive now. Copy them into the (still
+-- empty) saved tables in place, so every module keeps the same tables; the reload offered at
+-- login saves them.
+local function CopyInto(dst, src, defaults)
+	for k in pairs(dst) do dst[k] = nil end
+	for k, v in pairs(DeepCopy(src)) do dst[k] = v end
+	Merge(dst, defaults)
+end
+
+function ns.LateMigrate()
+	local oldDB, oldChar = _G[OLD_NAME .. "DB"], _G[OLD_NAME .. "CharDB"]
+	local moved = false
+	if ns.freshInstall and type(oldDB) == "table" and type(NeverQuestDB) == "table" then
+		CopyInto(NeverQuestDB, oldDB, DEFAULTS)
+		ns.freshInstall = false
+		moved = true
+	end
+	if ns.freshChar and type(oldChar) == "table" and type(NeverQuestCharDB) == "table" then
+		CopyInto(NeverQuestCharDB, oldChar, CHAR_DEFAULTS)
+		ns.freshChar = false
+		moved = true
+	end
+	if C_AddOns and C_AddOns.DisableAddOn then pcall(C_AddOns.DisableAddOn, OLD_NAME, UnitName("player")) end
+	ns.oldAddonRunning = true
+	ns.migrated = ns.migrated or moved
+	return moved
+end
+
 ns:RegisterEvent("ADDON_LOADED", function(_, name)
+	if name == OLD_NAME and ns.ready then
+		ns.LateMigrate()
+		return
+	end
 	if name ~= ADDON then return end
 	ns.MigrateFromOldName()
+	-- Nothing saved yet: a new install, which gets the setup wizard.
+	ns.freshInstall = type(NeverQuestDB) ~= "table" or next(NeverQuestDB) == nil
+	ns.freshChar = type(NeverQuestCharDB) ~= "table" or next(NeverQuestCharDB) == nil
 	NeverQuestDB = Merge(type(NeverQuestDB) == "table" and NeverQuestDB or {}, DEFAULTS)
 	NeverQuestCharDB = Merge(type(NeverQuestCharDB) == "table" and NeverQuestCharDB or {}, CHAR_DEFAULTS)
 	ns.db, ns.char = NeverQuestDB, NeverQuestCharDB
@@ -264,7 +304,7 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 		ns.Call("rename dialog", OfferReload)
 	end
 	if not ns.db.quietLogin then
-		ns.Print(ns.version .. " loaded. /nq opens it, /nq check runs a self-test.")
+		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything.")
 	end
 end)
 

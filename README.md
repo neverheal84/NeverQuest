@@ -1,5 +1,7 @@
 # NeverQuest for WoW Forever
 
+By NeverHeal84.
+
 A leveling guide, raid attunement guides, route planner, quest tracker, waypoint arrow, spawn and objective maps, quest buttons and XP tracker in one addon, built for the WoW Forever client (interface 16001).
 
 ## Install
@@ -9,18 +11,11 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 3. Put that folder in your Forever client's `Interface\AddOns` folder, next to any other Forever addons you use. If you had an earlier NeverQuest, replace the whole folder; your settings and guides are kept.
 4. Start the game. If it shows as out of date, tick "Load out of date AddOns" on the character select AddOns screen. You can check your client's interface number in game with `/dump select(4, GetBuildInfo())`.
 
-### Moving from QuestMax
-
-NeverQuest is the new name for QuestMax. To bring your settings, recorded guides, learned spawn spots and journal across:
-
-1. Install the `NeverQuest` folder **and leave the old `QuestMax` folder where it is** for now.
-2. Log in. NeverQuest copies QuestMax's settings, switches QuestMax off for that character and offers a reload. Click **Reload now**.
-3. Do the same once on each of your other characters (their journals and per-character settings come over on their first login).
-4. Then delete the `QuestMax` folder. Key bindings need setting again under the NeverQuest heading. `/qmax` still works as a shortcut for `/nq`.
-
-Party members need NeverQuest too for party sync and shared spawn spots; QuestMax and NeverQuest don't talk to each other.
-
 ## What you get
+
+**Getting started**
+- **Setup wizard (`/nq setup`):** a few short pages that pick the main settings: leveling style, maps and arrow, the quest tracker, automation, group play, and text size. It opens by itself the first time you log in with NeverQuest; "Use recommended" keeps the defaults and finishes in one click.
+- **Help (`/nq help`, or the Help button in the main window):** an in-game guide to every feature, a full command list, key bindings and troubleshooting. `/nq help raids`, `/nq help tracker` and so on jump straight to a topic, and `/nq commands` lists every command in chat.
 
 **Guiding**
 - **Two leveling styles (Guide tab > 1-60 plan, `/nq style`, or Options > Guide & Routes):**
@@ -77,7 +72,7 @@ Party members need NeverQuest too for party sync and shared spawn spots; QuestMa
 - **Party announcements (toggle):** when you finish something, your group hears about it in party chat (instance chat in a dungeon finder group): "NeverQuest: [Quest] objective done: Boar Meat: 4/4", "NeverQuest: [Quest] complete, ready to turn in.", and raid attunement progress. Turn-ins (with the XP) can be added. Each kind has its own switch, and you can limit it to quests someone else in the group is also on, allow raid groups, drop the clickable links or the "NeverQuest:" tag. Repeats within 30 seconds are skipped, a burst of completions goes out a second apart, and nothing is sent while the game locks chat for addons. `/nq announce off` turns it all off; `/nq announce test` sends a test line. Settings: Options > NeverQuest > Party announcements.
 - **Party catch-up (toggle):** in a party, the guide and route adapt so everyone keeps up. Quests you share count for more. If you've finished a quest a party member hasn't, the turn-in waits and the route takes you back to its objective spot to help ("Help Anna: ..."), then you hand it in together. Quest givers for quests a party member is on count for more, and the guide suggests quests to share (click to share) or to ask them for. Zones are picked for the lowest level in the party, and a "Regroup" step points the arrow at anyone more than 300 yards away. Levels and positions work for everyone in the party; quest lists come from members running NeverQuest. Settings: Options > NeverQuest > Party.
 
-**Minimap button:** a round NeverQuest button on the edge of the minimap. Click to open NeverQuest, Shift+click to show or hide the tracker, right-click for quick settings (raid attunements, tracker, XP panel, arrow, party announcements, party catch-up, leveling style, options), and drag it anywhere around the minimap. Hide or lock it under Options > Display & Maps > Minimap, or with `/nq minimap`.
+**Minimap button:** a round NeverQuest button on the edge of the minimap. Click to open NeverQuest, Shift+click to show or hide the tracker, right-click for quick settings (raid attunements, help, setup wizard, tracker, XP panel, arrow, party announcements, party catch-up, leveling style, options), and drag it anywhere around the minimap. Hide or lock it under Options > Display & Maps > Minimap, or with `/nq minimap`.
 
 **Automation:** auto accept and turn in. **Hold Shift** when talking to an NPC to skip it. With several rewards it tells you the highest vendor value (or takes it, if you set that in Options).
 
@@ -86,6 +81,9 @@ Party members need NeverQuest too for party sync and shared spawn spots; QuestMa
 | Command | What it does |
 |---|---|
 | `/nq` | Open or close the window |
+| `/nq setup` | The setup wizard |
+| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, commands, keys, trouble) |
+| `/nq commands` | List every command in chat |
 | `/nq guide`, `quests`, `nearby`, `journal`, `guides` | Open a tab |
 | `/nq raids [follow \| unfollow]` | Raid attunement guides and your progress; follow your faction's chain in the guide |
 | `/nq announce [on \| off \| test]` | Party announcements on or off, or send a test line; `objectives`, `quests`, `turnins`, `attunements`, `raid`, `shared` switch one part |
