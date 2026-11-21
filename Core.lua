@@ -314,6 +314,13 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 	if not ns.db.quietLogin then
 		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything.")
 	end
+	-- After an update: one line pointing at what changed.
+	if ns.db.lastVersion ~= ns.version then
+		if ns.db.lastVersion or not ns.freshInstall then
+			ns.Print("updated to " .. ns.version .. ". /nq news shows what's new.")
+		end
+		ns.db.lastVersion = ns.version
+	end
 	if ns.QuestieOverlap() and not ns.db.compat.questieNoted then
 		ns.db.compat.questieNoted = true
 		ns.Print("Questie is running, so NeverQuest leaves quest givers and spawn spots on the maps to it. Your guide, route and arrow stay. /nq questie switches this.")

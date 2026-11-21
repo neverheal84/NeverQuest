@@ -65,6 +65,8 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 42. **Session and group.** `/nq session` shows this session's XP, quests and gold. Ctrl-click an elite quest in the guide: an LFG message with the quest link appears in your chat box (nothing is sent until you press Enter).
 
+43. **1.13 checks.** Right-click a reminder row in the guide (for example "Bags almost full"): it disappears until your next login. Learn a new flight path: its "Get the flight path" step goes away at once. After updating, chat says "updated to 1.13.0. /nq news shows what's new" once, and `/nq news` opens that page. During the first minutes after login (while the quest database scans), the guide and tracker should not flicker or stutter; say so if they do.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

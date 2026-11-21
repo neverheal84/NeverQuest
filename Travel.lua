@@ -49,7 +49,13 @@ end
 -- A new flight path learned: look again.
 function T:ForgetFlightPaths() wipe(taxiCache) end
 ns:RegisterEvent("TAXIMAP_OPENED", function() wipe(taxiCache) end)
-ns:RegisterEvent("UI_INFO_MESSAGE", function() wipe(taxiCache) end)
+ns:RegisterEvent("UI_INFO_MESSAGE", function(_, _, msg)
+	-- "New flight path discovered!": drop the step right away.
+	if msg ~= nil and msg == ERR_NEWTAXIPATH then
+		wipe(taxiCache)
+		ns.Debounce("travel:fp", 0.5, function() if ns.Guide then ns.Guide:Refresh() end end)
+	end
+end)
 
 function T:FlightStep()
 	if not Cfg().flightPaths or UnitLevel("player") < 5 or UnitOnTaxi("player") then return nil end
@@ -172,5 +178,10 @@ end)
 
 -- Rows for the guide: flight path (near the top when it's close), hearth (first).
 function T:GuideRows()
-	return self:HearthStep(), self:FlightStep()
+	local U = ns.Upkeep
+	local hearth, flight = self:HearthStep(), self:FlightStep()
+	if U then hearth, flight = U:Shown(hearth), U:Shown(flight) end
+	if hearth then hearth.reminder = true end
+	if flight then flight.reminder = true end
+	return hearth, flight
 end

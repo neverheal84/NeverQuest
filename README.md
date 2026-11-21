@@ -94,7 +94,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 
 **Questie:** if you also run Questie, NeverQuest leaves quest givers and spawn spots on the maps to it so nothing is drawn twice. Your guide, route and arrow keep working. `/nq questie` switches this.
 
-**Reminders (guide rows):** a full quest log, with which quests to drop first (failed, gray, far away or little XP for the walk; never ones ready to hand in or your attunement chain); low food and water, or a hunter's ammo; nearly full bags, with quest items you can safely delete because their quest is done. Logging out away from an inn or city reminds you there's no rested XP there (and mentions your Cozy Sleeping Bag if you carry one).
+**Reminders (guide rows):** a full quest log, with which quests to drop first (failed, gray, far away or little XP for the walk; never ones ready to hand in or your attunement chain); low food and water, or a hunter's ammo; nearly full bags, with quest items you can safely delete because their quest is done. Logging out away from an inn or city reminds you there's no rested XP there (and mentions your Cozy Sleeping Bag if you carry one). Right-click any reminder row (these, flight paths, hearth) to hide it until you log in again.
 
 **Flight paths and hearthstone:** a guide step points to any flight master in your zone you haven't talked to yet. NeverQuest notes where you bind your hearthstone; when it's ready, nothing is left near you, and finished quests are handed in near your inn, the guide's first step says to hearth back and the hearthstone appears on the quest item bar. At an inn far from your hearth spot with quests around, it says once that you could bind there.
 
@@ -108,13 +108,14 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 |---|---|
 | `/nq` | Open or close the window |
 | `/nq setup` | The setup wizard |
-| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, upkeep, database, commands, keys, trouble) |
+| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, upkeep, database, commands, keys, news, trouble) |
 | `/nq commands` | List every command in chat |
 | `/nq loot [on \| off]` | Auto loot on or off |
 | `/nq junk` | Sell gray items now (at a vendor), or see what they're worth |
 | `/nq repair [on \| off \| guild]` | Repair now at a vendor, switch auto repair, or switch guild-funded repairs |
 | `/nq db [name \| zone <zone> \| way <id> \| scan \| map]` | The quest database: your zone's quests, search, another zone, point the arrow, scan again, world map markers |
 | `/nq session` | What this play session brought in |
+| `/nq news` | What changed in recent versions (also offered once in chat after an update) |
 | `/nq lfg` | Put an LFG message for your next elite quest in the chat box |
 | `/nq questie` | With Questie running, hide or show NeverQuest's quest giver and spawn pins |
 | `/nq guide`, `quests`, `nearby`, `journal`, `guides` | Open a tab |
@@ -180,6 +181,7 @@ The live guide works for any race from level 1. For a curated route:
 - Turn-in spots for quests you're still doing are guesses until one of your characters has handed that quest in; the first time through, the pickup spot stands in.
 - Raid attunement steps follow Blizzard's raid overview (November 2026); NPCs and places come from published guides, and some quest IDs come from original Classic. Raid details may change before or after the raids open on December 9. If a step ticks off wrongly, right-click it.
 - Party announcements use the game's normal chat (party or instance chat); addons can't post there while the game locks chat for them, so those messages are skipped rather than sent late.
+- A two-handed reward is compared with your main hand and off-hand together, and no reward is judged or taken while the game is still loading its stats.
 - Reward upgrades use simple stat weights per class (the main stats, armor and weapon damage). They're good at spotting a clear upgrade, not a replacement for a gear planner, and the weights don't know your talents.
 - The quest database only knows what the game has shown one of your characters, so it fills in as you and your alts play. It contains nothing copied from other addons or websites. Class and race quests seen by another character can show on the map until this character's scan of that zone confirms they aren't for it.
 - Text matching for reminders (food and drink detection by spell name, the Cozy Sleeping Bag) is in English.

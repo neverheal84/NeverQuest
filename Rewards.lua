@@ -71,6 +71,7 @@ local function Info(link)
 		equipLoc = equipLoc, sell = ns.Num(sellPrice) or 0, classID = classID, subclassID = subclassID }
 end
 
+-- Second return: true when the game hasn't answered yet (stats still loading).
 local function Stats(link)
 	local ok, raw = pcall(C_Item.GetItemStats, link)
 	local out = {}
@@ -79,8 +80,9 @@ local function Stats(link)
 			local key = STAT_KEYS[k]
 			if key and ns.Num(v) then out[key] = (out[key] or 0) + v end
 		end
+		return out, false
 	end
-	return out
+	return out, true
 end
 R.Stats = Stats
 
@@ -133,15 +135,30 @@ function R:Compare(link, class, level)
 	elseif slots[1] == 17 and #slots == 1 and twoHanded then
 		return nil   -- an off-hand item would mean giving up your two-hander: not a simple upgrade
 	end
-	local mine = R.Score(Stats(link), class, slots)
+	local rs, loading = Stats(link)
+	if loading then return nil, true end   -- never judge (or take) a reward on missing stats
+	local mine = R.Score(rs, class, slots)
 	local worst, worstLink, worstStats
-	for _, slot in ipairs(slots) do
-		local eq = GetInventoryItemLink("player", slot)
-		local st = eq and Stats(eq) or {}
-		local sc = eq and R.Score(st, class, slots) or 0
-		if not worst or sc < worst then worst, worstLink, worstStats = sc, eq, st end
+	if info.equipLoc == "INVTYPE_2HWEAPON" then
+		-- A two-hander replaces both hands: compare with main hand and off-hand together.
+		worst, worstLink, worstStats = 0, mainLink, {}
+		for _, slot in ipairs({ 16, 17 }) do
+			local eq = GetInventoryItemLink("player", slot)
+			if eq then
+				local st = Stats(eq)
+				worst = worst + R.Score(st, class, { slot })
+				for k, v in pairs(st) do worstStats[k] = (worstStats[k] or 0) + v end
+				worstLink = worstLink or eq
+			end
+		end
+	else
+		for _, slot in ipairs(slots) do
+			local eq = GetInventoryItemLink("player", slot)
+			local st = eq and Stats(eq) or {}
+			local sc = eq and R.Score(st, class, slots) or 0
+			if not worst or sc < worst then worst, worstLink, worstStats = sc, eq, st end
+		end
 	end
-	local rs = Stats(link)
 	local diff = {}
 	for k, v in pairs(rs) do diff[k] = v - ((worstStats or {})[k] or 0) end
 	for k, v in pairs(worstStats or {}) do if rs[k] == nil then diff[k] = -v end end
@@ -161,7 +178,8 @@ function R:Best(count, getLink, getNum)
 		if not info then return nil end
 		local value = info.sell * math.max(1, ns.Num(getNum(i)) or 1)
 		if value > bestValue then bestValue, bestValueIndex = value, i end
-		local cmp = self:Compare(link)
+		local cmp, pending = self:Compare(link)
+		if pending then return nil end
 		if cmp and cmp.gain > 0.5 and (not bestUp or cmp.gain > bestUp.gain) then bestUp, bestUpIndex = cmp, i end
 	end
 	if bestUp then return { index = bestUpIndex, link = getLink(bestUpIndex), upgrade = bestUp, value = nil } end

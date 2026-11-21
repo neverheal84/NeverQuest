@@ -458,6 +458,16 @@ function UI:OnItemClick(item, button)
 		self:Refresh()
 		return
 	end
+	if item.reminder then
+		if button == "RightButton" then
+			ns.Upkeep:Hide(item.key)
+			return
+		end
+		if item.openQuest and QuestMapFrame_OpenToQuestDetails then
+			QuestMapFrame_OpenToQuestDetails(item.openQuest)
+			return
+		end
+	end
 	if button == "RightButton" then
 		if item.questID and C_QuestLog.IsOnQuest(item.questID) and QuestMapFrame_OpenToQuestDetails then
 			QuestMapFrame_OpenToQuestDetails(item.questID)

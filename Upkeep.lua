@@ -8,6 +8,16 @@ ns.Upkeep = U
 
 local function Cfg() return ns.db.upkeep end
 
+-- Reminders you right-clicked away: hidden until you log in again.
+U.hidden = {}
+function U:Hide(key)
+	if not key then return end
+	self.hidden[key] = true
+	ns.Print("reminder hidden until you log in again.")
+	if ns.Guide then ns.Guide:Refresh() end
+end
+function U:Shown(row) return row and not self.hidden[row.key] and row or nil end
+
 ---------------------------------------------------------------------------
 -- Quest log
 ---------------------------------------------------------------------------
@@ -179,7 +189,8 @@ function U:Tips(level)
 			for _, c in ipairs(drops) do table.insert(names, DropText(c)) end
 			table.insert(rows, { kind = "tip", key = "tip:logfull", questID = drops[1] and drops[1].e.questID,
 				title = string.format("Quest log full (%d/%d)", n, max),
-				sub = #names > 0 and ("Drop one to make room: " .. table.concat(names, "; ") .. ". Right-click to open it in your quest log.") or "Drop a quest to make room.",
+				openQuest = drops[1] and drops[1].e.questID,
+				sub = #names > 0 and ("Drop one to make room: " .. table.concat(names, "; ") .. ". Click to open it in your quest log.") or "Drop a quest to make room.",
 				color = { 1, 0.6, 0.3 } })
 		end
 	end
@@ -216,7 +227,14 @@ function U:Tips(level)
 				sub = "Gray items sell automatically at the next vendor." .. extra, color = { 1, 0.8, 0.4 } })
 		end
 	end
-	return rows
+	local out = {}
+	for _, row in ipairs(rows) do
+		if not self.hidden[row.key] then
+			row.reminder = true
+			table.insert(out, row)
+		end
+	end
+	return out
 end
 
 ---------------------------------------------------------------------------

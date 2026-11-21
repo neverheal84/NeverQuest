@@ -5,7 +5,7 @@ local ADDON, ns = ...
 local Help = {}
 ns.Help = Help
 
-local W, H, LIST_W = 680, 520, 170
+local W, H, LIST_W = 680, 548, 170
 local Y = "|cffffd100"   -- heading color
 local E = "|r"
 
@@ -219,6 +219,26 @@ Help.TOPICS = {
 		"  Skip guide step",
 		"  Mark a spawn where I stand")
 	end },
+	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.13" .. E,
+		"  Reminders in the guide (full log, supplies, bags, flight paths, hearth) can be right-clicked away until you log in again.",
+		"  Two-handed weapons are compared with your main hand and off-hand together.",
+		"  A reward is never judged or taken while the game is still loading its stats.",
+		"  The quest database scan waits outside dungeons and battlegrounds and no longer redraws the guide and maps for every zone it checks.",
+		"  A new flight path drops its guide step the moment you learn it.",
+		"",
+		Y .. "1.12" .. E,
+		"  Reward upgrades: the best quest reward for your class gets a green arrow.",
+		"  Auto repair, with guild funds if you want (" .. Y .. "/nq repair" .. E .. ").",
+		"  Quest database: " .. Y .. "/nq db" .. E .. " knows every quest your characters have been shown.",
+		"  Reminders: full quest log, food and water, ammo, bags, rested XP.",
+		"  Flight paths you're missing and when to hearth back.",
+		"  " .. Y .. "/nq session" .. E .. " for a session summary, " .. Y .. "/nq lfg" .. E .. " to ask for a group.",
+		"  The TARGET button is off by default (" .. Y .. "/nq buttons target" .. E .. ").",
+		"",
+		Y .. "1.11" .. E,
+		"  Setup wizard, this help window, auto loot and junk selling, hand-ins in other zones, a smaller button bar.")
+	end },
 	{ key = "trouble", title = "Troubleshooting", text = function() return Lines(
 		Y .. "Something isn't working" .. E,
 		"  " .. Y .. "/nq check" .. E .. " runs a self-test on your client and shows what's working, in a window you can copy.",
@@ -345,5 +365,6 @@ ns.slash.help = function(arg)
 	end
 	Help:Open(topic and topic.key or nil)
 end
-table.insert(ns.slashHelp, "/nq help [topic] - how everything works (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, commands, keys, trouble)")
+table.insert(ns.slashHelp, "/nq help [topic] - how everything works (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, upkeep, database, commands, keys, news, trouble)")
+ns:AddSlash("news", function() Help:Open("news") end, "/nq news - what changed in recent versions")
 ns:AddSlash("commands", PrintCommands, "/nq commands - list every command in chat")

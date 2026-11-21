@@ -121,7 +121,8 @@ end
 
 function D:Step()
 	if not self.scanning then return end
-	if InCombatLockdown() or UnitIsDeadOrGhost("player") then
+	-- Wait out combat, death, dungeons and battlegrounds.
+	if InCombatLockdown() or UnitIsDeadOrGhost("player") or (IsInInstance and IsInInstance()) then
 		ns.After(5, function() D:Step() end)
 		return
 	end
@@ -142,7 +143,7 @@ function D:Step()
 	pcall(C_QuestLine.RequestQuestLinesForMap, m)
 	ns.After(SCAN_WAIT, function()
 		local list = Collect(m)
-		D:Record(m, list, false)
+		D:Record(m, list, true)
 		D.found = (D.found or 0) + #list
 		ns.After(SCAN_GAP - SCAN_WAIT, function() D:Step() end)
 	end)

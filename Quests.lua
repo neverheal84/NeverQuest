@@ -312,6 +312,17 @@ function Q:BuildOffers()
 	if #list == 0 and #self.offers > 0 and self.offers[1].m == m and GetTime() - foreignRequest < 60 then
 		return
 	end
+	-- Nothing new (the game repeats itself a lot, above all during the quest database scan):
+	-- keep what we have and spare the guide, tracker and maps a rebuild.
+	local parts = { m }
+	for _, o in ipairs(list) do
+		parts[#parts + 1] = o.questID
+		parts[#parts + 1] = type(o.title) == "string" and not ns.IsSecret(o.title) and o.title or "?"
+		parts[#parts + 1] = string.format("%.3f,%.3f", ns.Num(o.x) or 0, ns.Num(o.y) or 0)
+	end
+	local sig = table.concat(parts, "|")
+	if sig == self.offerSig and #self.offers == #list then return end
+	self.offerSig = sig
 	wipe(self.offers)
 	for _, o in ipairs(list) do table.insert(self.offers, o) end
 	ns:SendMessage("OFFERS_UPDATED")
@@ -653,7 +664,10 @@ end)
 ns:RegisterEvent("QUESTLINE_UPDATE", function(_, requestRequired)
 	-- Fresh answers for the maps you've looked at, too.
 	for m, c in pairs(mapOffers) do c.t = 0 end
-	ns.Debounce("mapoffers", 0.5, function() ns:SendMessage("MAP_OFFERS_UPDATED") end)
+	-- The world map only needs redrawing while it's open.
+	if WorldMapFrame and WorldMapFrame:IsShown() then
+		ns.Debounce("mapoffers", 0.5, function() ns:SendMessage("MAP_OFFERS_UPDATED") end)
+	end
 	if requestRequired then
 		ns.Debounce("offers", 0.5, function() Q:RequestOffers() end)
 	else
