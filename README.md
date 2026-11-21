@@ -41,6 +41,13 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 - **Follow it in the guide:** click the raid row (or the reminder the guide shows from level 50) and the chain's next step joins your guide: right after your next leveling step while you level, first once you're at the level cap. The arrow goes where the game puts the quest, or to a spot NeverQuest has learned for the NPC, and the target button targets who you need to talk to. Browse the other faction's chain with the button at the bottom.
 - Settings: Options > Guide & Routes ("Raid attunements in the guide", and the level the reminder starts at).
 
+**Class quests (Class tab, `/nq class`)**
+- **In your log now:** any class quests you're on, read from the game (it files them under your class's name), with a click to point the arrow. Quests Forever has added for your class show here too.
+- **What's coming:** a checklist for your class by level: what each quest gives you, where it starts and what it takes. Defensive and Berserker Stance, the totems, the demons, Bear and Aquatic Form, Redemption and Verigan's Fist, Tame Beast, Poisons, the level 50 Sunken Temple quest every class gets, and the level 60 chains. Rows you have the level for say "now"; click to tick one off.
+- **Profession quests (`/nq professions`, or the Professions button in the tab):** the places a profession waits on a quest instead of a trainer: Artisan First Aid (Triage), Cooking (Clamlette Surprise) and Fishing (Nat Pagle), the armorsmith and weaponsmith paths, the three leatherworking paths, Gnomish or Goblin engineering, and smelting dark iron. Each row shows the skill it needs against yours and says "now" when you have the skill and the level. Profession quests in your log are listed at the top. Only your own professions show unless you turn that off.
+- **Both are options:** Options > Guide & Routes has a switch for each section. With one off the tab keeps the other; with both off the tab is removed.
+- Written for this addon from how the classes and professions work, not taken from another addon or a database. Your trainer is the authority where Forever differs.
+
 **Maps and navigation**
 - **Waypoint arrow:** rotating arrow with distance, ETA and coordinates, plus Blizzard's in-world marker. The arrow is NeverQuest's own art, drawn at 256 pixels and shown at a fraction of that with trilinear filtering and pixel snapping off, so it stays sharp at every size and angle instead of crawling as it turns. Four sizes under Options > Display & Maps. Adjustable size, compact mode. When you die and release, it points to your corpse (and says when you're close enough to resurrect), then goes back to your route once you're alive.
 - **Routes, not straight lines:** when a target needs a special path, the arrow goes there first and tells you what to do ("Enter Fargodeep Mine", "Take the tunnel...", "Fly from Goldshire to Lakeshire"), with a "then:" line for the final target. It uses, in order: a flight between flight masters you've discovered, when that's clearly faster; the game's own route for quests and for map pins (caves, buildings, tunnels, zone exits); and map links to cave or building entrances. Quest distances in the guide follow the route too, so a quest at the back of a mine ranks by how far it really is. Turn either part off under Options > NeverQuest > Routes.
@@ -126,7 +133,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 |---|---|
 | `/nq` | Open or close the window |
 | `/nq setup` | The setup wizard |
-| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, drops, raids, party, buttons, automation, upkeep, database, commands, keys, news, trouble) |
+| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, drops, raids, class, party, buttons, automation, upkeep, database, commands, keys, news, trouble) |
 | `/nq commands` | List every command in chat |
 | `/nq loot [on \| off]` | Auto loot on or off |
 | `/nq junk` | Sell gray items now (at a vendor), or see what they're worth |
@@ -148,6 +155,8 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 | `/nq tracker` | Show or hide the NeverQuest tracker; `lock` locks it, `blizzard` changes what happens to Blizzard's quest list |
 | `/nq drops [lock \| list]` | Show or hide the drops window, lock it, or print what you still have to collect |
 | `/nq plates [on \| off]` | Quest icons on the nameplates of mobs your quests want |
+| `/nq class` | Your class quests: what's in your log and what's coming |
+| `/nq professions` | The quests your professions wait on, and the skill each needs |
 | `/way 45.2 63.8 Innkeeper` | Waypoint in your current zone |
 | `/way Westfall 52 30` | Waypoint in another zone |
 | `/way list`, `clear`, `next`, `closest`, `here` | Manage waypoints |

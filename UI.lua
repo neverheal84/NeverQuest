@@ -234,7 +234,7 @@ end
 ---------------------------------------------------------------------------
 -- Main window
 ---------------------------------------------------------------------------
-local TABS = { { "guide", "Guide" }, { "quests", "Quests" }, { "nearby", "Nearby" }, { "raids", "Raids" }, { "journal", "Journal" }, { "guides", "Guides" } }
+local TABS = { { "guide", "Guide" }, { "quests", "Quests" }, { "nearby", "Nearby" }, { "raids", "Raids" }, { "class", "Class" }, { "journal", "Journal" }, { "guides", "Guides" } }
 
 function UI:Create()
 	local f = CreateFrame("Frame", "NeverQuestFrame", UIParent, "BackdropTemplate")
@@ -272,10 +272,11 @@ function UI:Create()
 
 	self.tabs = {}
 	for i, t in ipairs(TABS) do
-		local b = Button(f, t[2], 66, function() UI:SetTab(t[1]) end)
-		b:SetPoint("TOPLEFT", 10 + (i - 1) * 69, -36)
+		local b = Button(f, t[2], 57, function() UI:SetTab(t[1]) end)
+		b:SetPoint("TOPLEFT", 10 + (i - 1) * 59, -36)
 		self.tabs[t[1]] = b
 	end
+	self:LayoutTabs()
 
 	self.header = f:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmall")
 	self.header:SetPoint("TOPLEFT", 14, -66)
@@ -314,6 +315,12 @@ function UI:Create()
 	self.btnHistory = Button(f, "History", 70, function() ns.db.window.journalView = "history" UI:Refresh() end)
 	self.btnSplits:SetPoint("BOTTOMRIGHT", -10, 10)
 	self.btnHistory:SetPoint("RIGHT", self.btnSplits, "LEFT", -4, 0)
+	self.btnProfs = Button(f, "Professions", 90, function() ns.db.window.classView = "professions" UI.list.offset = 0 UI:Refresh() end)
+	self.btnClassQ = Button(f, "Class quests", 90, function() ns.db.window.classView = "class" UI.list.offset = 0 UI:Refresh() end)
+	self.btnProfs:SetPoint("BOTTOMRIGHT", -10, 10)
+	self.btnClassQ:SetPoint("RIGHT", self.btnProfs, "LEFT", -4, 0)
+	self.btnProfs:Hide()
+	self.btnClassQ:Hide()
 	self.btnLive:SetPoint("BOTTOMRIGHT", -10, 10)
 	self.btnSkip:SetPoint("RIGHT", self.btnLive, "LEFT", -4, 0)
 	self.btnBack:SetPoint("RIGHT", self.btnSkip, "LEFT", -4, 0)
@@ -359,7 +366,34 @@ function UI:Create()
 	self:SetTab(ns.db.window.tab or "guide")
 end
 
+-- The Class tab holds class quests and profession quests, each of which can be switched off.
+-- With both off the tab goes, and the ones after it close the gap.
+function UI:ClassTabShown()
+	return ns.db.guide.classTab or ns.db.guide.profQuests
+end
+
+function UI:LayoutTabs()
+	if not self.tabs then return end
+	local n = 0
+	for _, t in ipairs(TABS) do
+		local b = self.tabs[t[1]]
+		if b then
+			if t[1] == "class" and not self:ClassTabShown() then
+				b:Hide()
+			else
+				if t[1] == "class" then b:SetText(ns.db.guide.classTab and "Class" or "Trades") end
+				b:ClearAllPoints()
+				b:SetPoint("TOPLEFT", 10 + n * 59, -36)
+				b:Show()
+				n = n + 1
+			end
+		end
+	end
+	if self.tab == "class" and not self:ClassTabShown() then self:SetTab("guide") end
+end
+
 function UI:SetTab(tab)
+	if tab == "class" and not self:ClassTabShown() then tab = "guide" end
 	self.tab = tab
 	ns.db.window.tab = tab
 	for key, b in pairs(self.tabs) do
@@ -454,6 +488,20 @@ function UI:OnItemClick(item, button)
 			return
 		end
 	end
+	if item.classLog then
+		if ns.Tracker then ns.Tracker:Point(item.classLog) end
+		return
+	end
+	if item.classKey then
+		ns.ClassQuests:Toggle(item.classKey)
+		self:Refresh()
+		return
+	end
+	if item.profKey then
+		ns.ClassQuests:ToggleProf(item.profKey)
+		self:Refresh()
+		return
+	end
 	if item.milestoneKey and button ~= "RightButton" then
 		local done = ns.char.milestones
 		done[item.milestoneKey] = (not done[item.milestoneKey]) or nil
@@ -514,6 +562,8 @@ function UI:Refresh()
 	self.btnFaction:Hide()
 	self.btnSplits:Hide()
 	self.btnHistory:Hide()
+	self.btnProfs:Hide()
+	self.btnClassQ:Hide()
 	self.btnPlan:Hide()
 	self.btnRace:Hide()
 	self.btnClass:Hide()
@@ -607,6 +657,29 @@ function UI:Refresh()
 			end
 		end
 		self.list:SetItems(items)
+	elseif tab == "class" then
+		local CQ = ns.ClassQuests
+		local g = ns.db.guide
+		local view = ns.db.window.classView
+		if view == "professions" and not g.profQuests then view = "class" end
+		if view ~= "professions" and not g.classTab then view = "professions" end
+		if g.classTab and g.profQuests then
+			self.btnProfs:Show()
+			self.btnClassQ:Show()
+			if view == "professions" then self.btnProfs:LockHighlight() self.btnClassQ:UnlockHighlight()
+			else self.btnClassQ:LockHighlight() self.btnProfs:UnlockHighlight() end
+		end
+		self.list.hint = "Click a quest in your log to point the arrow at it.  Click a checklist row to tick it off or on."
+		if view == "professions" then
+			self.header:SetText("The quests your professions wait on, and the skill each one needs.")
+			self.footer:SetText("")
+			self.list:SetItems(CQ:ProfItems())
+		else
+			local due = #CQ:Due()
+			self.header:SetText("The quests only your class gets: what's in your log, and what's coming at which level.")
+			self.footer:SetText(due > 0 and (due .. (due == 1 and " class quest" or " class quests") .. " open at your level") or "Nothing waiting at your level")
+			self.list:SetItems(CQ:Items())
+		end
 	elseif tab == "journal" then
 		local splits = ns.db.window.journalView == "splits"
 		self.btnSplits:Show()
@@ -1135,6 +1208,13 @@ function UI:CreateOptions()
 	Check(g, L1.x, L1:Next(), "Follow my 1-60 plan", function() return db.guide.profile end, function(v) db.guide.profile = v ns.Planner.dirty = true Guide() end,
 		"Uses your leveling style's route for your race: quests in the zones it wants you in count for more, and the guide says when to move on. Off: no zone preference.")
 	Check(g, L1.x, L1:Next(), "Class milestones and trainer reminders", function() return db.guide.milestones end, function(v) db.guide.milestones = v Guide() end)
+	local function Tabs() UI:LayoutTabs() UI:Refresh() end
+	Check(g, L1.x, L1:Next(), "Class quests section", function() return db.guide.classTab end, function(v) db.guide.classTab = v Tabs() end,
+		"The Class tab: class quests in your log and a checklist of what your class has coming.")
+	Check(g, L1.x, L1:Next(), "Profession quests section", function() return db.guide.profQuests end, function(v) db.guide.profQuests = v Tabs() end,
+		"The quests your professions wait on, in the same tab. With both sections off the tab is removed.")
+	Check(g, L1.x + 16, L1:Next(), "Only my professions", function() return db.guide.profMine end, function(v) db.guide.profMine = v Tabs() end,
+		"Off lists every profession, to plan what to pick up.")
 	Check(g, L1.x, L1:Next(), "Dungeons for my level", function() return db.guide.dungeonTips end, function(v) db.guide.dungeonTips = v Guide() end)
 	Check(g, L1.x, L1:Next(), "Tell me when to move to the next zone", function() return db.guide.zoneAdvice end, function(v) db.guide.zoneAdvice = v Guide() end)
 	Check(g, L1.x, L1:Next(), "Tell me when I've outleveled a zone", function() return db.guide.outleveledTip end, function(v) db.guide.outleveledTip = v Guide() end)

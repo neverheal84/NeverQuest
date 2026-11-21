@@ -77,6 +77,10 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 48. **Bag finds, sharing, flights (1.14.0).** Put a piece of gear better than what you're wearing in your bags: the guide should add an "Upgrade in your bags" row. Fill your bags with some gray items in them: the bags row should name the cheapest. Turn on "Share quests with my party as I pick them up" and accept a quest in a party: the others should be offered it. Take a flight the guide planned twice: the second time the arrow should count down.
 49. **Other languages (1.14.0).** On a non-English client, a kill quest should still give the TARGET button a mob name, and `/nq check` should report the Language line as OK.
 
+50. **Class tab (1.15.0).** `/nq class` should open a seventh tab that still fits the window. The checklist should be for your class, rows at or below your level should say "now", and clicking one should tick it to "done" and back. With a class quest in your log it should appear at the top, and clicking it should point the arrow.
+
+51. **Profession quests and the options (1.15.0).** In the Class tab, the Professions button should list your own professions with your skill beside each, and rows should say "now" only when you have both the skill and the level. Under Options > Guide & Routes, turning "Profession quests section" off should leave the tab with class quests only; turning "Class quests section" off instead should rename the tab to Trades; turning both off should remove the tab and close the gap.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

@@ -131,6 +131,21 @@ Help.TOPICS = {
 		"",
 		"The Barrow Deeps and Hyjal Summit need no attunement. Raid details may change as the raids open; right-click a step if it ticks off wrongly.")
 	end },
+	{ key = "class", title = "Class quests", text = function() return Lines(
+		Y .. "Class quests" .. E,
+		"The Class tab (" .. Y .. "/nq class" .. E .. ") gathers the quests only your class gets.",
+		"",
+		"  At the top: any class quests in your quest log right now, read from the game. Click one to point the arrow at it. Quests Forever has added for your class show here too.",
+		"  Below: a checklist of what your class has coming and at which level, what each one gives you and where it starts. Rows you have the level for say \"now\". Click a row to tick it off, and again to untick it.",
+		"",
+		"Every class also gets a quest at 50 that sends it into the Sunken Temple for a pick of three rare items.",
+		"",
+		Y .. "Profession quests" .. E,
+		"The Professions button at the bottom of the tab (" .. Y .. "/nq professions" .. E .. ") lists the places a profession waits on a quest instead of a trainer: Artisan First Aid, Cooking and Fishing, the blacksmithing, leatherworking and engineering paths, and smelting dark iron. Each row shows the skill it needs against the skill you have, and says \"now\" when you have both the skill and the level. Only your own professions are listed unless you turn that off.",
+		"",
+		"Both sections are options under Options > Guide & Routes. Turn one off and the tab keeps the other; turn both off and the tab is removed.",
+		"The checklist is written for this addon from how the classes work. Your trainer is the authority: if Forever has moved something, the quest your trainer offers is the one to follow.")
+	end },
 	{ key = "party", title = "Playing in a group", text = function() return Lines(
 		Y .. "Party sync" .. E,
 		"Party members who also run NeverQuest see each other's progress on shared quests, and spawn spots one of you learns show up for the other.",
@@ -240,6 +255,11 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.15.0" .. E,
+		"  New Class tab: the class quests in your log, and a checklist of what your class has coming at which level, what it gives you and where it starts. " .. Y .. "/nq class" .. E .. " opens it.",
+		"  Profession quests in the same tab: the quests your professions wait on, with the skill each needs against the skill you have. " .. Y .. "/nq professions" .. E .. ".",
+		"  Both are options (Options > Guide & Routes); with both off the tab is removed.",
+		"",
 		Y .. "1.14.0" .. E,
 		"  New drops window: the quest items you still have to collect, how far along each one is, and the mobs you have seen them drop from. " .. Y .. "/nq drops" .. E .. " opens it.",
 		"  Quest icons on nameplates: a sword on mobs to kill, a bag on mobs that drop something you need, and a skull on the one the guide is sending you at. Drawn on your screen only. " .. Y .. "/nq plates" .. E .. " switches them.",

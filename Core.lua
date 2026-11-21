@@ -16,7 +16,7 @@ local DEFAULTS = {
 	hud    = { shown = true, locked = false, scale = 1, showRested = true, showRate = true, showToLevel = true, showFooter = true },
 	arrow  = { shown = true, locked = false, arrival = 10, alwaysShow = false, scale = 1, compact = false,
 	           size = 54, showETA = true, showThen = true, sound = true, corpse = true },
-	window = { tab = "guide", journalView = "history", scale = 1 },
+	window = { tab = "guide", journalView = "history", classView = "class", scale = 1 },
 	style  = { font = "default", textScale = 1, outline = "", shadow = true },
 	tracker = { shown = true, blizzard = "hide", locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
@@ -38,7 +38,8 @@ local DEFAULTS = {
 	           profile = true, milestones = true, dungeonTips = true,
 	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true,
 	           nearbyFirst = true, zoneAdvice = true, outleveledTip = true, restedTip = true,
-	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50 },
+	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
+	           classTab = true, profQuests = true, profMine = true },
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
 	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 1, wmScale = 1 },
@@ -72,6 +73,8 @@ local CHAR_DEFAULTS = {
 	levels = {},                             -- [level] = { time = seconds, quest = xp, kill = xp }
 	journal = {},                            -- turned-in quests, newest last
 	milestones = {},                         -- plan milestones ticked off
+	classQuests = {},                        -- class quest checklist rows ticked off
+	profQuests = {},                         -- profession quest rows ticked off
 	trainedLevel = 0,                        -- level at your last class trainer visit
 	trackerHidden = {},                      -- quests hidden from the NeverQuest tracker
 	trackerPinned = {},                      -- quests pinned to its top
