@@ -28,6 +28,9 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 - **Live guide (Guide tab):** always shows your best next move, in route order. When your zone runs dry or goes gray, it suggests zones in your level range. The arrow follows the top step.
 - **Recorded guides (Guides tab):** record a run and replay it on alts. Steps tick off on their own, including trainer, vendor, hearth and flight master visits, and "grind to X%" steps. Export and import guides as plain text.
 
+**Scavenger-hunt quests**
+- Some quests have no objectives and no map marker: the quest text is the only clue (the Cozy Sleeping Bag chain that starts with "...and that note you found" is one). NeverQuest carries its own hand-checked spots for these, so the arrow, map and tracker point at the right object in the right zone (for Alliance, the Burned-Out Remains in The Barrens, not back in Westfall), the step says what to click and how to get there, and the chain shows as "Cozy Sleeping Bag 1/6". Text-only quests without a known spot say so instead of sending you back to where you picked them up.
+
 **Raid attunements (Raids tab, `/nq raids`)**
 - **What Forever needs:** Onyxia's Lair asks every raid member to carry the Drakefire Amulet, earned through a long quest chain that's different for each faction (16 quests for Alliance, 15 for Horde, counting The True Masters and the Tests of Skulls one by one). The Barrow Deeps and Hyjal Summit have no attunement; they're listed so you know you're set.
 - **Every step:** who gives it, where, what to do, and whether you need a group or a dungeon (Blackrock Depths, Lower or Upper Blackrock Spire). Where Blizzard hasn't published something yet (minimum levels, where the four drakes for the Test of Skulls are, whether Upper Blackrock Spire needs a key in Forever), the step says so instead of guessing.

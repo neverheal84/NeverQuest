@@ -108,7 +108,7 @@ local function ObjectiveSummary(questID, complete)
 		end
 	end
 	local progress = total > 0 and done / total or (complete and 1 or 0)
-	return progress, firstOpen, mob
+	return progress, firstOpen, mob, objectives and #objectives or 0
 end
 
 function Q:Scan()
@@ -142,7 +142,9 @@ function Q:Scan()
 					group = (info.suggestedGroup or 0) > 1 and info.suggestedGroup or nil,
 					xp = ns.Num(GetQuestLogRewardXP(qid)),
 				}
-				e.progress, e.objective, e.mob = ObjectiveSummary(qid, complete)
+				local count
+				e.progress, e.objective, e.mob, count = ObjectiveSummary(qid, complete)
+				e.noObjectives = count == 0   -- "find the place" quests: the text is the only guide
 				e.logIndex = i
 				local link, icon, charges, showWhenComplete = GetQuestLogSpecialItemInfo(i)
 				if link and not ns.IsSecret(link) and (not complete or showWhenComplete) then
@@ -165,6 +167,7 @@ function Q:Scan()
 	for _, e in ipairs(self.log) do
 		MarkNPCSpot(e)
 		ApplySpawn(e)
+		if ns.QuestSpots then ns.QuestSpots:Apply(e) end   -- hand-checked spots have the last word
 		UpdatePath(e)
 	end
 
@@ -379,6 +382,8 @@ end)
 local headerZone = {}
 function Q:ZoneOf(e)
 	if not e then return nil end
+	-- A finished quest with a known hand-in spot belongs to the zone you hand it in.
+	if e.complete and e.knownSpot and e.pos and e.pos.zone then return e.pos.zone end
 	if e.zone then
 		local known = headerZone[e.zone]
 		if known == nil then

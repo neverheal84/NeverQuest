@@ -41,9 +41,18 @@ function G:MakeStep(kind, e)
 	if catchupNote then table.insert(parts, "|cff66ccff" .. catchupNote .. "|r") end
 	if kind == "turnin" then
 		s.title = "Turn in: " .. tag .. e.title
-		s.npc = ns.Quests:TurnInName(e.questID)
-		if s.npc then table.insert(parts, "to " .. s.npc) end
-		if e.zone then table.insert(parts, e.zone) end
+		if e.knownSpot and e.pos and e.pos.known then
+			-- Handed in at an object, often in another zone: say what to click and how to get there.
+			table.insert(parts, "at the " .. e.pos.label .. ", " .. e.pos.zone)
+			table.insert(parts, "|cffbbbbbb" .. e.pos.how .. "|r")
+		else
+			s.npc = ns.Quests:TurnInName(e.questID)
+			if s.npc then table.insert(parts, "to " .. s.npc) end
+			if e.zone then table.insert(parts, e.zone) end
+			if not s.m and e.noObjectives then
+				table.insert(parts, "|cff999999no map marker: the quest text is your only guide|r")
+			end
+		end
 	elseif kind == "pickup" then
 		s.title = "Pick up: " .. tag .. e.title
 		s.npc = ns.Quests:GiverName(e.questID)
@@ -61,7 +70,7 @@ function G:MakeStep(kind, e)
 		local party = cfg.partyInSteps and ns.Party and ns.Party:Summary(e.questID)
 		if party then table.insert(parts, "|cff66ccffparty: " .. party .. "|r") end
 	end
-	local chain = cfg.chains and ns.Chains and ns.Chains:Label(e.questID)
+	local chain = cfg.chains and ((ns.Chains and ns.Chains:Label(e.questID)) or (ns.QuestSpots and ns.QuestSpots:ChainLabel(e)))
 	if chain then table.insert(parts, "|cffc8a2ff" .. chain .. "|r") end
 	if cfg.viaInSteps and e.leg and e.leg.text then table.insert(parts, "|cff99ccffvia: " .. e.leg.text .. "|r") end
 	if cfg.xpInSteps and e.xp and e.xp > 0 then table.insert(parts, "+" .. ns.Comma(e.xp) .. " XP") end

@@ -142,7 +142,13 @@ function P:Bundles(cont)
 					table.insert(b.stops, h)
 					b.value = b.value + help.value
 				end
-				local pos = e.pos or ns.Quests:TurnInSpot(e.questID)
+				local pos = e.pos
+				if not pos then
+					-- No marker: the quest giver is a fair guess for most quests, but not for
+					-- "find the place" quests, which end somewhere the text only hints at.
+					local at, guess = ns.Quests:TurnInSpot(e.questID)
+					if at and not (guess and e.noObjectives) then pos = at end
+				end
 				local s = Stop("turnin", e.questID, e, pos, cont, STOP_WORK)
 				if s then table.insert(b.stops, s) end
 			else
