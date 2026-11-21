@@ -51,7 +51,7 @@ local DEFAULTS = {
 	minimapButton = { shown = true, locked = false, angle = 210 },
 	givers = { worldmap = true, otherZones = true, gray = false, red = false, dailies = true, levels = true, turnins = false },
 	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = false, dotSize = 1,
-	           showAll = false, aim = true, markClick = true },
+	           showAll = false, aim = true, markClick = true, levelFilter = true, levelBand = 8 },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
 	questDB = { q = {}, scan = {}, chars = {} },  -- quests the game has shown any of your characters (QuestDB.lua)
 	guides = {},       -- recorded or imported guides, shared by all characters

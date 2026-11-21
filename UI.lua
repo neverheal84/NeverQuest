@@ -1349,6 +1349,11 @@ function UI:CreateOptions()
 	Check(d, L2.x, L2:Next(), "\"then:\" line for the final target", function() return db.arrow.showThen end, function(v) db.arrow.showThen = v ns.Nav:Update() end)
 	local pl = db.plates
 	local function Plates() ns.Plates:RefreshAll() end
+	Check(d, L2.x, L2:Next(), "Hide spots well below my level", function() return db.spawns.levelFilter end,
+		function(v) db.spawns.levelFilter = v ns.Spawns:Invalidate() ns.Pins:Refresh(true) end,
+		"Learned spots for mobs far below you are left off the map. Anything a quest in your log points at is always shown, whatever its level.")
+	Cycle(d, L2.x + 16, L2:Next(30), "Hide below:", { { 5, "5 levels" }, { 8, "8 levels" }, { 12, "12 levels" }, { 20, "20 levels" } },
+		function() return db.spawns.levelBand end, function(v) db.spawns.levelBand = v ns.Spawns:Invalidate() ns.Pins:Refresh(true) end)
 	Check(d, L2.x, L2:Next(), "Quest icons on nameplates", function() return pl.enabled end, function(v) pl.enabled = v Plates() end,
 		"A small icon on the nameplate of every mob your quests want: a sword to kill, a bag when it drops something you need. Drawn on your screen only; these are not raid markers.")
 	Check(d, L2.x + 16, L2:Next(), "Skull on the mob the guide sends me at", function() return pl.skull end, function(v) pl.skull = v Plates() end)

@@ -87,6 +87,8 @@ Help.TOPICS = {
 		"",
 		Y .. "Marking spots" .. E,
 		"  Alt+right-click the world map to mark a spawn, an objective, a mob by name or a note.",
+		"  Hover a spawn dot: the first line says what it is (quest mob, drops something you need, quest object, rare) and its level if NeverQuest saw it, then the quests it belongs to and how often you've seen it there.",
+		"  Dots for mobs far below you are hidden, so an old zone isn't buried under spots you've outgrown. Anything a quest in your log points at always shows, whatever its level.",
 		"",
 		Y .. "Nameplates and tooltips" .. E,
 		"Every mob your quests want gets a small icon on its nameplate: a sword to kill, a bag when it drops something you need, and a skull on the one the guide is sending you at, with your count underneath. They are drawn on your screen only (the game no longer lets addons place raid markers) and need enemy nameplates showing. Hover a mob NeverQuest has learned as a drop source and its tooltip says which quest and how far along; in a party it shows everyone's progress. Items say which quest wants them. Options > Display & Maps and Options > NeverQuest > Tooltips.",
@@ -255,6 +257,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.17.0" .. E,
+		"  Spawn dots say what they are: hover one and the first line now says whether it's a quest mob, something that drops what you need, a quest object or a rare, with its level when NeverQuest saw it.",
+		"  Mobs you have long outgrown are left off the map. Anything a quest in your log points at is always shown, whatever its level, and so is anything above you. Options > Display & Maps sets how far below to cut.",
+		"",
 		Y .. "1.16.1" .. E,
 		"  Fixes 1.16.0: finished quests whose hand-in is only known as a zone were put above everything, so they outranked work at your feet and the arrow followed one to the middle of a zone. They now sit above travel but below what is in front of you, and never steer the arrow on their own.",
 		"",

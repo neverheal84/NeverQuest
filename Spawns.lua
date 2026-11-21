@@ -133,7 +133,7 @@ local function AddSpot(rec, m, x, y, count, merge)
 	return spot, true
 end
 
-function S:LearnNpc(name, m, x, y, count, questID, objIndex, fromParty)
+function S:LearnNpc(name, m, x, y, count, questID, objIndex, fromParty, level)
 	name = Clean(name)
 	if not name or not ValidPoint(m, x, y) then return end
 	local npcs = Data().npcs
@@ -143,13 +143,17 @@ function S:LearnNpc(name, m, x, y, count, questID, objIndex, fromParty)
 		rec = { n = name, m = {} }
 		npcs[key] = rec
 	end
+	-- A mob's own level, when we saw it: it decides whether the dot is worth showing you
+	-- later. Older spots have none, and fall back to the zone's level range.
+	level = ns.Num(level)
+	if level and level > 0 and level < 200 then rec.lv = level end
 	if questID then
 		rec.q = rec.q or {}
 		if objIndex or not rec.q[questID] then rec.q[questID] = objIndex or 0 end
 	end
 	local spot, new = AddSpot(rec, m, x, y, count or 1, MERGE_YARDS)
 	Changed()
-	if new and not fromParty then self:Share("n", name, m, spot[1], spot[2], questID or 0, objIndex or 0) end
+	if new and not fromParty then self:Share("n", name, m, spot[1], spot[2], questID or 0, objIndex or 0, rec.lv or 0) end
 	ns.Debug(string.format("spawns: %s %s at %s %.1f, %.1f", new and "new spot for" or "seen", name, ns.Nav.MapName(m), x * 100, y * 100))
 	return spot, new
 end
@@ -574,7 +578,7 @@ function S:MapPoints(mapID)
 	for _, p in ipairs(self:Index().points) do
 		if p.mark then
 			Place(p, { kind = "mark" })
-		elseif zoomedIn then
+		elseif zoomedIn and self:WorthShowing(p) then
 			table.insert(learned, p)
 		end
 	end
@@ -591,7 +595,8 @@ function S:MapPoints(mapID)
 			local ent = { kind = "rare", rec = rec, name = rec.n, refs = {} }
 			for m, spots in pairs(rec.m or {}) do
 				for _, s in ipairs(spots) do
-					Place({ m = m, x = s[1], y = s[2], w = s[3], t = s[4], ent = ent, spot = s, spots = spots }, { kind = "rare" })
+					local p = { m = m, x = s[1], y = s[2], w = s[3], t = s[4], ent = ent, spot = s, spots = spots }
+					if self:WorthShowing(p) then Place(p, { kind = "rare" }) end
 				end
 			end
 		end
@@ -636,6 +641,34 @@ end
 ---------------------------------------------------------------------------
 -- Tooltips and menus for drawn points
 ---------------------------------------------------------------------------
+-- How far below you a spot can be before it is just clutter on the map. Nothing is hidden for
+-- being too high: that is where you are heading next.
+local LEVEL_BAND = 8
+
+-- The level a spot is for: the mob's own if we saw it, else the zone's range.
+function S:PointLevel(p)
+	local ent = p.ent
+	local rec = ent and ent.rec
+    if rec and ns.Num(rec.lv) then return rec.lv, "mob" end
+	local _, maxL = ns.Profiles.ZoneLevels(ns.Nav.MapName(p.m) or "")
+	if maxL then return maxL, "zone" end
+	return nil
+end
+
+-- Spots for a quest you are on are always shown: you are doing it, whatever its level. The
+-- band only trims the rest, the ones learned long ago that would otherwise bury the map.
+function S:WorthShowing(p)
+	if not Cfg().levelFilter then return true end
+	local ent = p.ent
+	if not ent then return true end
+	if ent.kind == "mark" then return true end
+	if ent.refs and #ent.refs > 0 then return true end
+	local lv = self:PointLevel(p)
+	if not lv then return true end
+	local mine = UnitLevel("player") or 1
+	return lv >= mine - (Cfg().levelBand or LEVEL_BAND)
+end
+
 function S:PointTitle(p)
 	local ent = p.ent
 	if not ent then return "?" end
@@ -643,10 +676,32 @@ function S:PointTitle(p)
 	return ent.name or "?"
 end
 
+-- One line saying what this dot is, so a map full of them reads at a glance.
+function S:PointKind(p)
+	local ent = p.ent
+	if not ent then return nil end
+	if ent.kind == "mark" then return nil end
+	if ent.kind == "rare" then return "Rare or treasure" end
+	local drop, kill, obj = false, false, ent.kind == "obj"
+	for _, r in ipairs(ent.refs or {}) do
+		local q = self:Index().quests[r.q]
+		local o = q and r.i and q.open[r.i]
+		if o and o.type == "monster" then kill = true
+		elseif o then drop = true
+		else drop = true end
+	end
+	local what = obj and "Quest object" or (kill and "Quest mob") or (drop and "Drops something you need") or "Seen here"
+	local lv, src = self:PointLevel(p)
+	if lv and src == "mob" then what = what .. "  ·  level " .. lv end
+	return what
+end
+
 function S:Tooltip(tt, p)
 	local ent = p.ent
 	if not ent then return end
 	tt:AddLine(self:PointTitle(p), 1, 0.82, 0, true)
+	local what = self:PointKind(p)
+	if what then tt:AddLine(what, 0.6, 0.85, 1) end
 	if ent.kind == "mark" then
 		tt:AddLine(ent.rec.by and ("Marked by " .. ent.rec.by) or "Your mark", 0.6, 0.8, 1)
 	elseif ent.kind == "rare" then
@@ -859,7 +914,7 @@ function S:FromParty(sender, body)
 	local kind = f[1]
 	if kind == "n" then
 		local m, x, y = tonumber(f[3]), tonumber(f[4]), tonumber(f[5])
-		if ValidPoint(m, x, y) then self:LearnNpc(f[2], m, x, y, 1, NonZero(f[6]), NonZero(f[7]), true) end
+		if ValidPoint(m, x, y) then self:LearnNpc(f[2], m, x, y, 1, NonZero(f[6]), NonZero(f[7]), true, NonZero(f[8])) end
 	elseif kind == "o" then
 		local q, o, m, x, y = tonumber(f[2]), tonumber(f[3]), tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
 		if q and o and ValidPoint(m, x, y) then self:LearnObjective(q, o, f[7], m, x, y, 1, true) end
@@ -1014,7 +1069,7 @@ local function Progressed(e, i, o, counted)
 		-- One kill that counts for two quests is still one sighting.
 		if name and counted[Key(name)] then return S:Link(name, e.questID, i) end
 		if name then counted[Key(name)] = true end
-		if name and m then S:LearnNpc(name, m, x, y, 1, e.questID, i) end
+		if name and m then S:LearnNpc(name, m, x, y, 1, e.questID, i, nil, ns.SafeCall(UnitLevel, "target")) end
 	elseif o.type == "item" then
 		-- Items count only when they came out of a loot window just now; bags, mail and
 		-- vendors don't tell us where anything spawns.
@@ -1146,7 +1201,7 @@ local function Sight(unit, m, x, y)
 		return
 	end
 	recentSight[name] = { m = m, x = x, y = y, t = GetTime() }
-	S:LearnNpc(name, m, x, y, 1)
+	S:LearnNpc(name, m, x, y, 1, nil, nil, nil, ns.SafeCall(UnitLevel, unit))
 end
 
 function S:ScanNearby()
