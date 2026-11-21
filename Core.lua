@@ -22,6 +22,7 @@ local DEFAULTS = {
 	            showObjectives = true, hideDoneObjectives = false, finishedFirst = true, showNumbers = true,
 	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 25 },
 	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest" },
+	loot   = { auto = true, junk = true, junkReport = true },   -- auto loot everything; sell gray items at vendors
 	alerts = { complete = true, sound = true, trackTurnin = false },
 	announce = { enabled = true, objectives = true, quests = true, turnins = false, attunements = true,
 	             raid = false, sharedOnly = false, links = true, tag = true },

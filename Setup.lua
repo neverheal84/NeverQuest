@@ -79,7 +79,7 @@ Setup.PAGES = {
 	},
 	{
 		key = "automation", title = "Automation",
-		text = "Hold |cffffd100Shift|r while talking to an NPC to skip automation for that conversation.",
+		text = "Hold |cffffd100Shift|r while talking to an NPC, looting or opening a vendor to skip automation that time.",
 		build = function(p, U, row)
 			local au = Cfg().auto
 			U.Check(p, 0, row(), "Accept quests automatically", function() return au.accept end, function(v) au.accept = v end)
@@ -88,6 +88,10 @@ Setup.PAGES = {
 			U.Check(p, 0, row(), "Skip gray quests", function() return au.skipGray end, function(v) au.skipGray = v end)
 			U.Cycle(p, 0, row(30), "Reward choice:", { { "suggest", "Suggest in chat" }, { "value", "Highest vendor value" }, { "off", "Do nothing" } },
 				function() return au.reward end, function(v) au.reward = v end)
+			local lt = Cfg().loot
+			U.Check(p, 0, row(), "Auto loot everything (hold Shift to look first)", function() return lt.auto end, function(v) lt.auto = v end)
+			U.Check(p, 0, row(), "Sell junk (gray items) at vendors", function() return lt.junk end, function(v) lt.junk = v end,
+				"You can buy them back from the vendor's Buyback tab.")
 		end,
 	},
 	{

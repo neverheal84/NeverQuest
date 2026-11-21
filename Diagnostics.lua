@@ -138,6 +138,9 @@ function D:Check()
 	local sendFn = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
 	Line(out, (not ns.db.announce.enabled or sendFn) and "OK" or "WARN", "Party announcements",
 		ns.Announce:StatusText() .. (ns.Announce:Locked() and " (chat locked by the game right now)" or ""))
+	Line(out, (LootSlot and GetNumLootItems) and "OK" or "WARN", "Auto loot", ns.db.loot.auto and "on (hold Shift to look first)" or "off")
+	local canSell = (C_MerchantFrame and C_MerchantFrame.SellAllJunkItems) and "the game's sell-all-junk" or (C_Container and C_Container.UseContainerItem) and "one item at a time" or nil
+	Line(out, (canSell or not ns.db.loot.junk) and "OK" or "WARN", "Sell junk", ns.db.loot.junk and ("on, using " .. (canSell or "nothing: this client can't sell from addons")) or "off")
 	Line(out, "OK", "Setup wizard", ns.db.setupDone and "done (/nq setup runs it again)" or "not run yet (/nq setup)")
 	Line(out, "OK", "Raid attunements", ns.Attune:StatusText() .. (ns.db.guide.attunements and "" or ", guide steps off"))
 	local mb = ns.MinimapButton.button

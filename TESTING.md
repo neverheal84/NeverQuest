@@ -9,7 +9,7 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 ## The checklist
 
-1. **Login.** Chat says "NeverQuest 1.10.0 by NeverHeal84 loaded". Stand somewhere outdoors and run `/nq check`. Copy the window text (Ctrl+C) and save it to send later.
+1. **Login.** Chat says "NeverQuest 1.11.0 by NeverHeal84 loaded". Stand somewhere outdoors and run `/nq check`. Copy the window text (Ctrl+C) and save it to send later.
 2. **Panels.** `/nq` opens the window and all six tabs switch. The XP panel and arrow show up. Drag them where you like, then `/nq lock`.
 3. **Options.** Esc > Options > AddOns > NeverQuest. All six pages open (NeverQuest, Guide & Routes, Tracker, Display & Maps, Spawns & Objectives, Scale & Text) and scroll if they're long. Flip a couple of settings and back. On Scale & Text, try a bigger text size and a different font: the main window, tracker, XP panel and arrow should all change.
 4. **Quests and Nearby tabs.** Your quest log shows XP and distances. Nearby lists quests to pick up (open the world map once if it's empty).
@@ -41,6 +41,9 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 28. **Map route.** With a few unfinished quests, open the world map: the numbered route and its line go to quest objectives (and finished turn-ins and pickups), not to the NPCs where unfinished quests get handed in. Turn on "Include turn-ins for unfinished quests" under Display & Maps > World map and the "Then turn in" stops join the line. If a step says "the map only marks the quest NPC", tell me which quest.
 29. **Setup wizard.** `/nq setup` opens the wizard with the NeverQuest logo and "by NeverHeal84" at the top. Step through every page with Next and Back, change a setting or two (they should take effect straight away), and Finish. "Use recommended" on the first page jumps to the last page. On a fresh install (no NeverQuest settings saved yet) it opens by itself a few seconds after login; an existing install just gets a one-time chat note about it.
 30. **Help.** `/nq help` opens the help window; click through the topics on the left and scroll a long one. `/nq help raids` opens the raid topic, `/nq commands` lists commands in chat, and the Help button in the main window and the minimap menu open it too. The main window title and the minimap button show the logo.
+
+31. **Auto loot.** Kill something and loot it: the window empties at once. Hold Shift while looting the next one: the window stays open. In a group with roll items, those are left for the roll. `/nq loot off` turns it off.
+32. **Sell junk.** With a few gray items in your bags, open a vendor: they sell and chat says "sold N junk items for ...". Check the Buyback tab. Open a vendor again holding Shift with junk in your bags: nothing sells. Away from a vendor, `/nq junk` says what your junk is worth. In `/nq check`, the "Sell junk" line says which way it sells on your client.
 
 ## Afterwards, send
 

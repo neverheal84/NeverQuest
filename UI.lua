@@ -968,6 +968,11 @@ function UI:CreateOptions()
 		"Avoids handing in stacks of items to repeatable quests without asking.")
 	Cycle(p, L.x, L:Next(30), "Reward choice:", { { "suggest", "Suggest in chat" }, { "value", "Highest vendor value" }, { "off", "Do nothing" } },
 		function() return db.auto.reward end, function(v) db.auto.reward = v end)
+	Check(p, L.x, L:Next(), "Auto loot everything", function() return db.loot.auto end, function(v) db.loot.auto = v end,
+		"Takes everything from a loot window at once. Hold Shift (the game's auto-loot key) to look first. Items waiting on a group roll are left alone.")
+	Check(p, L.x, L:Next(), "Sell junk at vendors", function() return db.loot.junk end, function(v) db.loot.junk = v end,
+		"Gray items are sold when you open a vendor. Hold Shift while opening the vendor to skip it. You can buy them back from the vendor's Buyback tab.")
+	Check(p, L.x + 16, L:Next(), "Say what the junk sold for", function() return db.loot.junkReport end, function(v) db.loot.junkReport = v end)
 
 	L:Next(10)
 	Heading(p, L.x, L:Next(), "Alerts")

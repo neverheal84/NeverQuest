@@ -76,6 +76,10 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 
 **Automation:** auto accept and turn in. **Hold Shift** when talking to an NPC to skip it. With several rewards it tells you the highest vendor value (or takes it, if you set that in Options).
 
+**Auto loot (on by default):** takes everything from a loot window at once. Hold Shift (the game's auto-loot key) to look first. Items waiting on a group roll are left alone, and bind-on-pickup items still ask you. `/nq loot` turns it on or off.
+
+**Sell junk (on by default):** gray items are sold when you open a vendor, and chat says what they brought in (the vendor's Buyback tab has the most recent ones if you change your mind). Hold Shift while opening the vendor to skip it. It uses the game's own sell-all-junk when the client has it, otherwise one item at a time and only while the vendor is open. `/nq junk` sells now at a vendor, or tells you what your junk is worth anywhere else.
+
 ## Commands
 
 | Command | What it does |
@@ -84,6 +88,8 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 | `/nq setup` | The setup wizard |
 | `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, commands, keys, trouble) |
 | `/nq commands` | List every command in chat |
+| `/nq loot [on \| off]` | Auto loot on or off |
+| `/nq junk` | Sell gray items now (at a vendor), or see what they're worth |
 | `/nq guide`, `quests`, `nearby`, `journal`, `guides` | Open a tab |
 | `/nq raids [follow \| unfollow]` | Raid attunement guides and your progress; follow your faction's chain in the guide |
 | `/nq announce [on \| off \| test]` | Party announcements on or off, or send a test line; `objectives`, `quests`, `turnins`, `attunements`, `raid`, `shared` switch one part |
@@ -119,7 +125,7 @@ Arrow: right-click clears the current waypoint, Shift+right-click clears all, dr
 
 Esc > Options > AddOns > NeverQuest has six pages, and almost everything can be switched on or off:
 
-- **NeverQuest:** automation, alerts, party sharing, party announcements (objectives, quests, turn-ins, attunements, shared quests only, raids, links, tag) and party catch-up (group level, regroup, share suggestions), chat messages.
+- **NeverQuest:** automation (quests, auto loot, sell junk), alerts, party sharing, party announcements (objectives, quests, turn-ins, attunements, shared quests only, raids, links, tag) and party catch-up (group level, regroup, share suggestions), chat messages.
 - **Guide & Routes:** leveling style (optimized 1-60 or zone by zone), raid attunement steps and reminder level, following your 1-60 plan, move-on reminders, route planning, quest chains, pickups along the way, "then turn in" steps, the route summary, zone and plan advice, rested and outleveled tips, what each step shows (XP, directions, party), paths and flights.
 - **Tracker:** show it, what happens to Blizzard's list, sort order, group by zone, current zone first, collapse other zones, finished quests first, gray quests, each line it shows (objectives, finished objectives, numbers, level, distance, chain, party), how many quests, width, height, background and size.
 - **Display & Maps:** the minimap button, each XP panel line, the arrow's lines (coordinates, ETA, "then:"), arrival sound and distance, quest buttons, minimap and world map pins, and quest givers (world map, other zones, minimap, levels, gray, red, dailies, turn-in spots).

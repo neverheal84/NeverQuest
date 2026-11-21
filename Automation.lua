@@ -1,5 +1,5 @@
--- NeverQuest Automation: auto accept / turn in quests and pick the most valuable reward.
--- Hold Shift while talking to an NPC to skip all of it.
+-- NeverQuest Automation: auto accept / turn in quests, pick the most valuable reward, auto loot,
+-- and sell junk at vendors. Hold Shift while talking to an NPC (or opening a vendor) to skip it.
 
 local ADDON, ns = ...
 local A = {}
@@ -149,3 +149,133 @@ ns:RegisterEvent("QUEST_GREETING", function()
 		end
 	end
 end)
+
+---------------------------------------------------------------------------
+-- Auto loot: take everything from a loot window at once. Holding the game's auto-loot key
+-- (Shift unless you changed it) leaves the window open so you can look first. Items waiting
+-- on a group roll are left alone, and bind-on-pickup items still ask you, as usual.
+---------------------------------------------------------------------------
+local lootDone = false
+
+function A:LootAll(isGameAutoLoot)
+	if type(LootSlot) ~= "function" then return 0 end
+	local n = ns.Num(GetNumLootItems and GetNumLootItems()) or 0
+	local taken = 0
+	for slot = n, 1, -1 do
+		local ok, _, _, _, _, _, locked = pcall(GetLootSlotInfo, slot)
+		if ok and not (locked == true) then
+			LootSlot(slot)
+			taken = taken + 1
+		end
+	end
+	return taken
+end
+
+ns:RegisterEvent("LOOT_READY", function(_, isGameAutoLoot)
+	if lootDone or not ns.db.loot.auto then return end
+	local toggleHeld = IsModifiedClick and IsModifiedClick("AUTOLOOTTOGGLE")
+	-- The game's own auto loot inverts with that key; ours just steps aside.
+	if toggleHeld and not isGameAutoLoot then return end
+	lootDone = true
+	local taken = A:LootAll(isGameAutoLoot)
+	ns.Debug("auto loot: " .. taken .. " slots")
+end)
+ns:RegisterEvent("LOOT_CLOSED", function() lootDone = false end)
+
+---------------------------------------------------------------------------
+-- Sell junk: gray items go when you open a vendor. Hold Shift while opening to skip it.
+-- Uses the game's own "sell all junk" when it's there, so nothing can be used by mistake.
+---------------------------------------------------------------------------
+local merchantOpen = false
+A.junkLog = {}
+
+-- Every gray item with a sell price: { bag, slot, itemID, count, value }.
+function A:Junk()
+	local out, total = {}, 0
+	if not (C_Container and C_Container.GetContainerNumSlots) then return out, 0 end
+	local lastBag = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
+	for bag = 0, lastBag do
+		local slots = ns.SafeCall(C_Container.GetContainerNumSlots, bag) or 0
+		for slot = 1, slots do
+			local info = ns.SafeCall(C_Container.GetContainerItemInfo, bag, slot)
+			if info and info.quality == 0 and not info.hasNoValue and info.itemID then
+				local ok, _, _, _, _, _, _, _, _, _, _, price = pcall(C_Item.GetItemInfo, info.itemID)
+				price = ok and ns.Num(price) or 0
+				if price > 0 then
+					local value = price * math.max(1, ns.Num(info.stackCount) or 1)
+					table.insert(out, { bag = bag, slot = slot, itemID = info.itemID, count = info.stackCount or 1, value = value, locked = info.isLocked })
+					total = total + value
+				end
+			end
+		end
+	end
+	return out, total
+end
+
+-- One item at a time, checking the vendor is still open and the slot still holds that item:
+-- using an item with no vendor open would equip or use it.
+local function SellNext(queue, i, done)
+	if not merchantOpen then return done(i - 1) end
+	local item = queue[i]
+	if not item then return done(i - 1) end
+	local info = ns.SafeCall(C_Container.GetContainerItemInfo, item.bag, item.slot)
+	if info and info.itemID == item.itemID and not info.isLocked then
+		C_Container.UseContainerItem(item.bag, item.slot)
+	end
+	C_Timer.After(0.2, function() SellNext(queue, i + 1, done) end)
+end
+
+function A:SellJunk(fromCommand)
+	if not merchantOpen then return false end
+	local junk, total = self:Junk()
+	if #junk == 0 then
+		if fromCommand then ns.Print("no junk to sell.") end
+		return false
+	end
+	local count = #junk
+	local function Report()
+		-- Count what actually left your bags.
+		local left, leftValue = self:Junk()
+		local sold, value = count - #left, total - leftValue
+		if sold > 0 and ns.db.loot.junkReport then
+			ns.Print(string.format("sold %d junk item%s for %s.", sold, sold == 1 and "" or "s", ns.Money(value)))
+		end
+		table.insert(self.junkLog, { sold = sold, value = value })
+	end
+	local usedGame = false
+	if C_MerchantFrame and C_MerchantFrame.SellAllJunkItems then
+		local enabled = not C_MerchantFrame.IsSellAllJunkEnabled or ns.SafeCall(C_MerchantFrame.IsSellAllJunkEnabled) ~= false
+		if enabled then usedGame = pcall(C_MerchantFrame.SellAllJunkItems) end
+	end
+	if usedGame then
+		C_Timer.After(1.5, Report)
+	else
+		SellNext(junk, 1, function() C_Timer.After(0.5, Report) end)
+	end
+	return true
+end
+
+ns:RegisterEvent("MERCHANT_SHOW", function()
+	merchantOpen = true
+	if ns.db.loot.junk and not IsShiftKeyDown() then
+		C_Timer.After(0.3, function() if merchantOpen then A:SellJunk() end end)
+	end
+end)
+ns:RegisterEvent("MERCHANT_CLOSED", function() merchantOpen = false end)
+function A:MerchantOpen() return merchantOpen end
+
+ns:AddSlash("junk", function()
+	if merchantOpen then
+		A:SellJunk(true)
+	else
+		local junk, total = A:Junk()
+		ns.Print(#junk == 0 and "no junk in your bags." or string.format("%d junk item%s worth %s; %s", #junk, #junk == 1 and "" or "s", ns.Money(total),
+			ns.db.loot.junk and "they sell when you next open a vendor." or "open a vendor and type /nq junk to sell them."))
+	end
+end, "/nq junk - sell gray items now (at a vendor), or see what they're worth")
+
+ns:AddSlash("loot", function(arg)
+	arg = (arg or ""):lower()
+	if arg == "on" or arg == "off" then ns.db.loot.auto = arg == "on" else ns.db.loot.auto = not ns.db.loot.auto end
+	ns.Print("auto loot " .. (ns.db.loot.auto and "on (hold Shift to look first)." or "off."))
+end, "/nq loot [on|off] - auto loot everything at once")

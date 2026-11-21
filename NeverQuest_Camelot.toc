@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: NeverQuest
-## Notes: Leveling guide, setup wizard and help, raid attunements, waypoint arrow, spawn and objective maps, quest buttons and XP tracker for WoW Forever.
-## Version: 1.10.0
+## Notes: Leveling guide, setup wizard and help, raid attunements, waypoint arrow, spawn and objective maps, quest buttons, XP tracker, auto loot and junk selling for WoW Forever.
+## Version: 1.11.0
 ## SavedVariables: NeverQuestDB
 ## SavedVariablesPerCharacter: NeverQuestCharDB
 ## IconTexture: Interface\AddOns\NeverQuest\Media\Icon

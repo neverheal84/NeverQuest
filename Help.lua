@@ -138,12 +138,16 @@ Help.TOPICS = {
 		"Quests ranks your log by XP per distance. Nearby lists quests you can pick up close by. Journal lists every quest you've turned in, and Splits compares each level's time with your fastest character.")
 	end },
 	{ key = "automation", title = "Automation", text = function() return Lines(
-		Y .. "Automation" .. E,
-		"NeverQuest can accept quests and turn in finished ones for you, and pick quests in NPC dialog windows. Gray and repeatable quests are skipped by default.",
+		Y .. "Quests" .. E,
+		"NeverQuest can accept quests and turn in finished ones for you, and pick quests in NPC dialog windows. Gray and repeatable quests are skipped by default. With several rewards it tells you which sells for the most, or takes it if you choose that under Options.",
 		"",
-		Y .. "Hold Shift" .. E .. " while talking to an NPC to skip automation for that conversation.",
+		Y .. "Auto loot" .. E,
+		"Takes everything from a loot window at once. Items waiting on a group roll are left alone, and bind-on-pickup items still ask you. " .. Y .. "/nq loot" .. E .. " turns it on or off.",
 		"",
-		"With several rewards it tells you which sells for the most, or takes it if you choose that under Options.")
+		Y .. "Sell junk" .. E,
+		"Gray items are sold when you open a vendor, and chat says what they brought in. Changed your mind? The vendor's Buyback tab has the most recent ones. " .. Y .. "/nq junk" .. E .. " sells them now at a vendor, or tells you what they're worth anywhere else.",
+		"",
+		Y .. "Hold Shift" .. E .. " while talking to an NPC, looting, or opening a vendor to skip automation that time.")
 	end },
 	{ key = "commands", title = "All commands", text = function()
 		local out = { Y .. "All commands" .. E, "", "Type these in chat. " .. Y .. "/neverquest" .. E .. " works in place of " .. Y .. "/nq" .. E .. ".", "" }
