@@ -46,9 +46,21 @@ function G:MakeStep(kind, e)
 			table.insert(parts, "at the " .. e.pos.label .. ", " .. e.pos.zone)
 			table.insert(parts, "|cffbbbbbb" .. e.pos.how .. "|r")
 		else
-			s.npc = ns.Quests:TurnInName(e.questID)
+			local t = e.turnin
+			s.npc = ns.Quests:TurnInName(e.questID) or (t and t.npc)
 			if s.npc then table.insert(parts, "to " .. s.npc) end
-			if e.zone then table.insert(parts, e.zone) end
+			local where = (t and t.source ~= "giver" and (t.zone or (t.m and ns.Nav.MapName(ns.Nav.GetZoneMap(t.m))))) or e.zone
+			if where then table.insert(parts, where) end
+			if not s.m and t and t.m then s.m, s.x, s.y = t.m, t.x, t.y end
+			if t and not e.pos then
+				if t.source == "zone" then
+					table.insert(parts, "|cff999999somewhere in " .. t.zone .. "|r")
+				elseif t.source == "giver" then
+					table.insert(parts, "|cff999999guess: where you picked it up|r")
+				elseif t.source == "unknown" then
+					table.insert(parts, "|cff999999where they are isn't known yet|r")
+				end
+			end
 			if not s.m and e.noObjectives then
 				table.insert(parts, "|cff999999no map marker: the quest text is your only guide|r")
 			end

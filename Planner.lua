@@ -144,10 +144,10 @@ function P:Bundles(cont)
 				end
 				local pos = e.pos
 				if not pos then
-					-- No marker: the quest giver is a fair guess for most quests, but not for
-					-- "find the place" quests, which end somewhere the text only hints at.
-					local at, guess = ns.Quests:TurnInSpot(e.questID)
-					if at and not (guess and e.noObjectives) then pos = at end
+					-- No marker: use what's known about the hand-in (Quests:ResolveTurnin). A zone
+					-- with no spot in it isn't a stop to plan around; the guide lists it instead.
+					local at = ns.Quests:TurnInSpot(e.questID)
+					if at and at.source ~= "zone" then pos = at end
 				end
 				local s = Stop("turnin", e.questID, e, pos, cont, STOP_WORK)
 				if s then table.insert(b.stops, s) end
@@ -160,6 +160,7 @@ function P:Bundles(cont)
 					-- no separate turn-in stop on the same spot.
 					if e.pos.npc then b.value = b.value * 0.5 end
 					local spot = not e.pos.npc and ns.Quests:TurnInSpot(e.questID)
+					if spot and spot.source == "zone" then spot = nil end
 					local s2 = spot and Stop("turnin", e.questID, e, spot, cont, STOP_WORK, { predicted = true, key = "then:" .. e.questID })
 					if s2 then table.insert(b.stops, s2) end
 				end

@@ -118,6 +118,9 @@ function Q:Scan()
 	local playerMap = C_Map.GetBestMapForUnit("player")
 	local zoneMap = playerMap and ns.Nav.GetZoneMap(playerMap)
 	local positions = {}
+	local scannedMaps = {}
+	if playerMap then scannedMaps[playerMap] = true end
+	if zoneMap then scannedMaps[zoneMap] = true end
 	CollectPositions(playerMap, positions)
 	if zoneMap ~= playerMap then CollectPositions(zoneMap, positions) end
 
@@ -151,6 +154,16 @@ function Q:Scan()
 					e.item = { link = link, icon = icon, charges = ns.Num(charges), id = tonumber(link:match("item:(%d+)")) }
 				end
 				local p = positions[qid]
+				-- Not on the maps around you: ask the game which map the quest points to (for a
+				-- finished quest, where it's handed in) and read its marker there.
+				if not p and GetQuestUiMapID then
+					local qm = ns.Num(ns.SafeCall(GetQuestUiMapID, qid, true))
+					if qm and qm ~= 0 and not scannedMaps[qm] then
+						scannedMaps[qm] = true
+						CollectPositions(qm, positions)
+					end
+					p = positions[qid]
+				end
 				if not p then
 					local m, x, y = C_QuestLog.GetNextWaypoint(qid)
 					if m and ns.Num(x) and ns.Num(y) then p = { m = m, x = x, y = y, waypoint = true } end
@@ -168,6 +181,7 @@ function Q:Scan()
 		MarkNPCSpot(e)
 		ApplySpawn(e)
 		if ns.QuestSpots then ns.QuestSpots:Apply(e) end   -- hand-checked spots have the last word
+		e.turnin = Q:ResolveTurnin(e)
 		UpdatePath(e)
 	end
 
@@ -372,9 +386,12 @@ end
 
 ns:RegisterEvent("QUEST_ACCEPTED", function(_, questID)
 	if questID and Q:LastNPC(10) then ns.db.npcs.giverAt[questID] = Spot() end
+	Q:NPCsChanged()
 end)
 ns:RegisterEvent("QUEST_TURNED_IN", function(_, questID)
 	if questID then ns.db.npcs.turninAt[questID] = Spot() end
+	Q:NPCsChanged()
+	if questID then Q:ForgetText(questID) end
 end)
 
 -- Which zone a quest belongs to: its quest log header when that's a zone, else where its
@@ -382,8 +399,13 @@ end)
 local headerZone = {}
 function Q:ZoneOf(e)
 	if not e then return nil end
-	-- A finished quest with a known hand-in spot belongs to the zone you hand it in.
+	-- A finished quest belongs to the zone you hand it in, when that's known.
 	if e.complete and e.knownSpot and e.pos and e.pos.zone then return e.pos.zone end
+	local t = e.complete and e.turnin
+	if t and t.source ~= "giver" then
+		if t.zone then return t.zone end
+		if t.m then return ns.Nav.MapName(ns.Nav.GetZoneMap(t.m)) end
+	end
 	if e.zone then
 		local known = headerZone[e.zone]
 		if known == nil then
@@ -412,7 +434,159 @@ function Q:ZoneWork(name)
 end
 
 -- Best guess at where a quest is handed in, or nil.
+---------------------------------------------------------------------------
+-- Where a quest is handed in
+--
+-- In order: where any of your characters handed it in; the game's own marker; the NPC the
+-- quest text names, if you've met them; the zone the text names; and only when nothing says
+-- otherwise, where you picked it up. "Bring this to Zargh" when Zargh isn't the quest giver
+-- never falls back to the quest giver.
+---------------------------------------------------------------------------
+local CITIES = { "Stormwind City", "Stormwind", "Ironforge", "Darnassus", "Orgrimmar", "Thunder Bluff", "Undercity" }
+local zoneNames
+local function ZoneNames()
+	if zoneNames then return zoneNames end
+	zoneNames = {}
+	for name in pairs((ns.Profiles and ns.Profiles.ZONES) or {}) do table.insert(zoneNames, name) end
+	for _, c in ipairs(CITIES) do table.insert(zoneNames, c) end
+	table.sort(zoneNames, function(a, b) return #a > #b end)
+	return zoneNames
+end
+
+-- The last zone a text names ("...to Gryan Stoutmantle in Westfall.").
+function Q.ZoneInText(text)
+	if type(text) ~= "string" or ns.IsSecret(text) then return nil end
+	local lower = text:lower()
+	local best, bestAt
+	for _, name in ipairs(ZoneNames()) do
+		local l, from = name:lower(), 1
+		while true do
+			local i = lower:find(l, from, true)
+			if not i then break end
+			local before, after = lower:sub(i - 1, i - 1), lower:sub(i + #l, i + #l)
+			if not before:match("%a") and not after:match("%a") and (not bestAt or i > bestAt) then best, bestAt = name, i end
+			from = i + 1
+		end
+	end
+	if best == "Stormwind" then best = "Stormwind City" end
+	return best
+end
+
+local NPC_PATTERNS = {
+	"[Rr]eturn to (.-) at ", "[Rr]eturn to (.-) in ", "[Rr]eturn to (.-)[%.!,]",
+	"[Rr]eport to (.-) at ", "[Rr]eport to (.-) in ", "[Rr]eport to (.-)[%.!,]",
+	"[Ss]peak with (.-) at ", "[Ss]peak with (.-) in ", "[Ss]peak with (.-)[%.!,]",
+	"[Ss]peak to (.-) at ", "[Ss]peak to (.-) in ", "[Tt]alk to (.-) at ", "[Tt]alk to (.-) in ", "[Tt]alk to (.-)[%.!,]",
+	" to (%u[^%.,!]-) at ", " to (%u[^%.,!]-) in ", " to (%u[^%.,!]-)[%.!]",
+}
+
+-- The NPC a text sends you to, if it names one.
+function Q.NPCInText(text)
+	if type(text) ~= "string" or ns.IsSecret(text) then return nil end
+	for _, pat in ipairs(NPC_PATTERNS) do
+		local name = text:match(pat)
+		if name then
+			name = name:gsub("^%s+", ""):gsub("%s+$", "")
+			local words = select(2, name:gsub("%S+", ""))
+			if name:match("^%u") and not name:find("%d") and words <= 5 and #name <= 40
+				and Q.ZoneInText(name) ~= name and not name:match("^The %u%l+$") then
+				return name
+			end
+		end
+	end
+end
+
+-- Quest texts don't change: read them once.
+local textInfo = {}
+local function TextInfo(e)
+	local qid = e.questID
+	local info = textInfo[qid]
+	if not info then
+		info = {}
+		local ok, _, objectives = pcall(GetQuestLogQuestText, e.logIndex)
+		if ok and type(objectives) == "string" and not ns.IsSecret(objectives) then
+			info.objNpc, info.objZone = Q.NPCInText(objectives), Q.ZoneInText(objectives)
+		end
+		textInfo[qid] = info
+	end
+	if e.complete and info.doneRead == nil and GetQuestLogCompletionText then
+		local ok, done = pcall(GetQuestLogCompletionText, e.logIndex)
+		info.doneRead = true
+		if ok and type(done) == "string" and not ns.IsSecret(done) then
+			info.doneNpc, info.doneZone = Q.NPCInText(done), Q.ZoneInText(done)
+		end
+	end
+	return info
+end
+Q.TextInfo = TextInfo
+function Q:ForgetText(questID) textInfo[questID] = nil end
+
+-- NPCs you've met, from quests you picked up or handed in: name -> where they stand.
+local npcIndex, npcDirty = nil, true
+local function NPCSpot(name)
+	if npcDirty or not npcIndex then
+		npcIndex = {}
+		local npcs = ns.db.npcs
+		for qid, n in pairs(npcs.giver) do
+			local at = npcs.giverAt[qid]
+			if at and type(n) == "string" then npcIndex[n:lower()] = at end
+		end
+		for qid, n in pairs(npcs.turnin) do
+			local at = npcs.turninAt[qid]
+			if at and type(n) == "string" then npcIndex[n:lower()] = at end
+		end
+		npcDirty = false
+	end
+	local at = npcIndex[name:lower()]
+	if at then return at end
+	if ns.Spawns and ns.Spawns.NpcSpot then
+		local m, x, y = ns.Spawns:NpcSpot(name)
+		if m then return { m = m, x = x, y = y } end
+	end
+end
+function Q:NPCsChanged() npcDirty = true end
+
+function Q:ResolveTurnin(e)
+	local qid = e.questID
+	local npcs = ns.db.npcs
+	local at = npcs.turninAt[qid]
+	if at then return { m = at.m, x = at.x, y = at.y, source = "learned", npc = npcs.turnin[qid] } end
+	if e.complete and e.pos and not e.pos.waypoint then
+		return { m = e.pos.m, x = e.pos.x, y = e.pos.y, source = e.knownSpot and "known" or "game", npc = npcs.turnin[qid] }
+	end
+	local info = TextInfo(e)
+	local npc = (e.complete and info.doneNpc) or info.objNpc
+	local zone = (e.complete and info.doneZone) or info.objZone
+	if npc then
+		local spot = NPCSpot(npc)
+		if spot then return { m = spot.m, x = spot.x, y = spot.y, source = "npc", npc = npc } end
+	end
+	local giver, giverName = npcs.giverAt[qid], npcs.giver[qid]
+	local sameNPC = npc and giverName and npc:lower() == giverName:lower()
+	if giver then
+		local giverZone = ns.Nav.MapName(ns.Nav.GetZoneMap(giver.m))
+		local sameZone = not zone or (ns.Profiles and ns.Profiles.SameZone(zone, giverZone))
+		if sameNPC then return { m = giver.m, x = giver.x, y = giver.y, source = "npc", npc = npc } end
+		if not npc and sameZone and not e.noObjectives then
+			return { m = giver.m, x = giver.x, y = giver.y, source = "giver", npc = giverName }
+		end
+	end
+	if zone then
+		local m = ns.Profiles and ns.Profiles.ZoneID(zone)
+		if m then return { m = m, x = 0.5, y = 0.5, source = "zone", zone = zone, npc = npc } end
+	end
+	if npc then return { source = "unknown", npc = npc } end
+end
+
+-- Where a quest will be handed in: a spot (or nil) and whether it's only a guess.
 function Q:TurnInSpot(questID)
+	local e = self.byID[questID]
+	if e then
+		-- In your log: ResolveTurnin already weighed everything, including "nowhere known".
+		local t = e.turnin
+		if t and t.m then return t, t.source == "giver" or t.source == "zone" end
+		return nil
+	end
 	local at = ns.db.npcs.turninAt[questID]
 	if at then return at, false end
 	at = ns.db.npcs.giverAt[questID]

@@ -9,7 +9,7 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 ## The checklist
 
-1. **Login.** Chat says "NeverQuest 1.11.2 by NeverHeal84 loaded". Stand somewhere outdoors and run `/nq check`. Copy the window text (Ctrl+C) and save it to send later.
+1. **Login.** Chat says "NeverQuest 1.11.3 by NeverHeal84 loaded". Stand somewhere outdoors and run `/nq check`. Copy the window text (Ctrl+C) and save it to send later.
 2. **Panels.** `/nq` opens the window and all six tabs switch. The XP panel and arrow show up. Drag them where you like, then `/nq lock`.
 3. **Options.** Esc > Options > AddOns > NeverQuest. All six pages open (NeverQuest, Guide & Routes, Tracker, Display & Maps, Spawns & Objectives, Scale & Text) and scroll if they're long. Flip a couple of settings and back. On Scale & Text, try a bigger text size and a different font: the main window, tracker, XP panel and arrow should all change.
 4. **Quests and Nearby tabs.** Your quest log shows XP and distances. Nearby lists quests to pick up (open the world map once if it's empty).
@@ -48,6 +48,8 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 33. **Button bar.** With a quest that needs a mob killed, the bar near the bottom of the screen shows the NeverQuest logo on the left and a "TARGET" pill with the mob's name (no floating name above it). Click the pill to target the mob; bind "Target next NPC or mob" and the key shows on the pill. Quest item buttons are rounded with a gold frame. Drag the logo to move the bar. Send a screenshot if anything looks off.
 
 34. **"...and that note you found".** With it in your log (Alliance), the guide's turn-in step says "at the Burned-Out Remains, The Barrens" with directions and "Cozy Sleeping Bag 1/6"; the arrow and world map point to the ruined tower south of Camp Taurajo, and the tracker lists it under The Barrens. Each later step (Stepping Stones, Scramble, Wet Job, Eagle's Fist, This Must Be The Place) should point at its spot too. Tell me if any spot is off.
+
+35. **Hand-ins in another zone.** Finish a quest that's handed in somewhere other than where you got it (like the Stonetalon/Barrens one in your screenshot). The world map's numbered "?" and the guide step should point at the real hand-in, or say "somewhere in <zone>" / "where they are isn't known yet"; never back at the pickup spot. If one still points at the pickup spot, send the quest name and what its quest log text says.
 
 ## Afterwards, send
 
