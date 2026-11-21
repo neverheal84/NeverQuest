@@ -63,27 +63,110 @@ function D:ResetVoices(qid, from)
 	voices[qid] = from and { [from] = true } or nil
 end
 
+---------------------------------------------------------------------------
+-- What other players send is checked before any of it is kept.
+--
+-- Your own client can be taken at its word. A message from a guildmate, a party member or a
+-- pasted import cannot: it may come from a broken addon, an old version, or somebody being
+-- clever. So a report has to look like a quest (a sane number, a real map, a plausible level),
+-- its title is cleaned of anything the game would draw as a colour, a texture or a link, and
+-- no one sender can pour an unlimited number of them into your saved data.
+---------------------------------------------------------------------------
+local MAX_QUEST_ID = 999999     -- far above any quest the game has
+local MAX_LEVEL = 100
+local MAX_TITLE = 80
+local INTAKE_BURST = 300        -- reports one sender may deliver at once
+local INTAKE_PER_SEC = 0.5      -- and how fast that allowance comes back
+local MAX_HEARSAY = 20000       -- quests known only from other people, in all
+
+local intake, realMap, hearsay = {}, {}, nil
+
+function D:ResetIntake()
+	intake, hearsay = {}, nil
+end
+
+-- No escape codes (the game reads "|T...|t" as a picture and "|H...|h" as a link), no control
+-- characters, and no essays.
+local function CleanTitle(title)
+	title = Text(title)
+	if not title then return nil end
+	title = title:gsub("|", ""):gsub("%c", " "):gsub("^%s+", ""):gsub("%s+$", "")
+	if #title > MAX_TITLE then title = title:sub(1, MAX_TITLE):gsub("%s+$", "") end
+	return title ~= "" and title or nil
+end
+D.CleanTitle = CleanTitle
+
+local function RealMap(m)
+	if type(m) ~= "number" or m <= 0 or m ~= math.floor(m) then return false end
+	local known = realMap[m]
+	if known == nil then
+		known = ns.SafeCall(C_Map.GetMapInfo, m) ~= nil
+		realMap[m] = known
+	end
+	return known
+end
+
+local function HearsayCount()
+	if not hearsay then
+		hearsay = 0
+		for _, q in pairs(Store().q) do
+			if q.o ~= 2 then hearsay = hearsay + 1 end
+		end
+	end
+	return hearsay
+end
+
+-- May this sender add one more report? Imports have no sender: you pasted those yourself.
+local function Allowed(from)
+	if not from or from == "" then return true end
+	local now = GetTime()
+	local b = intake[from]
+	if not b then
+		b = { n = INTAKE_BURST, t = now }
+		intake[from] = b
+	end
+	b.n = math.min(INTAKE_BURST, b.n + (now - b.t) * INTAKE_PER_SEC)
+	b.t = now
+	if b.n < 1 then return false end
+	b.n = b.n - 1
+	return true
+end
+
 function D:Add(qid, title, level, m, x, y, origin, from)
 	qid = ns.Num(qid)
 	if not qid or qid <= 0 then return nil end
+	local theirs = origin == "them"
+	level = ns.Num(level)
+	x, y = ns.Num(x), ns.Num(y)
 	local s = Store()
 	local q = s.q[qid]
+	if theirs then
+		if qid > MAX_QUEST_ID or qid ~= math.floor(qid) then return nil end
+		title = CleanTitle(title)
+		if level and (level < 1 or level > MAX_LEVEL or level ~= math.floor(level)) then level = nil end
+		if m and not RealMap(m) then return nil end
+		if not Allowed(from) then return nil end
+		if not q and HearsayCount() >= MAX_HEARSAY then return nil end
+	end
+	local changed = false
 	if not q then
 		q = {}
 		s.q[qid] = q
+		changed = true
+		if theirs and hearsay then hearsay = hearsay + 1 end
 	end
-	local theirs = origin == "them"
-	if Text(title) and not (theirs and q.t) then q.t = Text(title) end
-	level = ns.Num(level)
-	if level and level > 0 and not (theirs and q.l) then q.l = level end
-	x, y = ns.Num(x), ns.Num(y)
+	local was = q.o
+	if Text(title) and not (theirs and q.t) and q.t ~= Text(title) then q.t, changed = Text(title), true end
+	if level and level > 0 and not (theirs and q.l) and q.l ~= level then q.l, changed = level, true end
 	if m and x and y and not (x == 0 and y == 0) and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
 		x, y = R3(x), R3(y)
 		if not theirs then
 			-- Yours: takes the slot whatever was there before.
+			if q.m ~= m or q.x ~= x or q.y ~= y or q.o ~= 2 then changed = true end
 			q.m, q.x, q.y, q.o, q.n = m, x, y, 2, nil
 		elseif not q.m then
 			q.m, q.x, q.y, q.o, q.n = m, x, y, 1, 1
+			changed = true
 			self:ResetVoices(qid, from)
 		elseif q.o ~= 2 then
 			-- Theirs against theirs: agreement counts, disagreement defers to the better backed.
@@ -93,10 +176,13 @@ function D:Add(qid, title, level, m, x, y, origin, from)
 				if self:NewVoice(qid, from) then q.n = (q.n or 1) + 1 end
 			elseif (q.n or 1) <= 1 then
 				q.m, q.x, q.y, q.n = m, x, y, 1
+				changed = true
 				self:ResetVoices(qid, from)
 			end
 		end
 	end
+	-- Something you had only heard about and have now seen for yourself is no longer hearsay.
+	if hearsay and was and was ~= 2 and q.o == 2 and hearsay > 0 then hearsay = hearsay - 1 end
 	-- Faction and class record which of YOUR characters has seen this quest, so they are only
 	-- ever stamped first-hand. Stamping them from a report would claim your class was offered a
 	-- quest it has never seen, and would mark another faction's quest as yours.
@@ -107,7 +193,9 @@ function D:Add(qid, title, level, m, x, y, origin, from)
 		if not q.c then q.c = "," .. c .. "," elseif not q.c:find("," .. c .. ",", 1, true) then q.c = q.c .. c .. "," end
 	end
 	q.s = time()
-	D:ClearNearby()
+	-- The game repeats the same offers many times a minute. Only something actually new is a
+	-- reason to work out the minimap's points again.
+	if changed then D:ClearNearby() end
 	return q
 end
 
@@ -628,7 +716,9 @@ function D:Import(text)
 			if qid and f[2] ~= "" and m and x and y then
 				local q = self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them")
 				if q then
-					if f[7] ~= "" then q.f = f[7] end
+					-- Which factions can take it fills a gap and nothing more: what your own
+					-- characters have seen is never rewritten by somebody's file.
+					if not q.f and f[7] and #f[7] <= 3 and f[7]:match("^[AHN]+$") then q.f = f[7] end
 					if had then updated = updated + 1 else added = added + 1 end
 				else
 					skipped = skipped + 1
@@ -695,8 +785,17 @@ end
 local ASK_COOLDOWN = 600      -- seconds before you may ask again
 local ANSWER_COOLDOWN = 300   -- seconds before you answer another request
 local ANSWER_CAP = 120        -- most starts one answer carries
-local ANSWER_GAP = 0.4        -- seconds between the lines of an answer
 local MSG_ROOM = 200          -- characters to fill before starting a new line
+-- The game lets an addon send a short burst and then about one message a second, and silently
+-- drops the rest. So an answer starts briskly and then settles to a pace the game accepts, and
+-- a line the game refuses is sent again rather than lost.
+local ANSWER_QUICK = 5        -- lines sent at the quick pace
+local ANSWER_GAP = 0.4        -- seconds between those
+local ANSWER_STEADY = 1.1     -- seconds between the rest
+local ANSWER_RETRY = 2.5      -- wait after a refused line
+local ANSWER_TRIES = 6        -- refusals in a row before giving up
+local ENOUGH_ANSWERS = 3      -- others already answering: yours would only add traffic
+local ASK_WINDOW = 120        -- seconds an ask of yours is still "being answered"
 
 function D:Ask()
 	if not ns.db.questdb.guild then return false, "guild sharing is off. /nq db guild turns it on." end
@@ -715,6 +814,9 @@ end
 function D:OnAsked(sender)
 	if not ns.db.questdb.guild or not ns.Party then return end
 	local now = GetTime()
+	-- Who else answers this request is counted from here (see FromBatch).
+	local ask = { at = now, n = 0, who = {} }
+	self.heardAsk = ask
 	if self.answeredAt and now - self.answeredAt < ANSWER_COOLDOWN then return end
 	self.answeredAt = now
 	local picks, base = {}, Base()
@@ -746,19 +848,37 @@ function D:OnAsked(sender)
 		len = len + #rec + 1
 	end
 	if #cur > 0 then lines[#lines + 1] = table.concat(cur, REC) end
-	local i = 0
+	local i, tries = 1, 0
 	local function nextLine()
-		i = i + 1
-		if not lines[i] then return end
-		ns.Party:SendRaw("B" .. lines[i], "guild")
-		ns.After(ANSWER_GAP, nextLine)
+		if not lines[i] or not ns.db.questdb.guild then return end
+		if ns.Party:SendRaw("B" .. lines[i], "guild") then
+			i, tries = i + 1, 0
+			ns.After(i <= ANSWER_QUICK and ANSWER_GAP or ANSWER_STEADY, nextLine)
+		else
+			tries = tries + 1
+			if tries < ANSWER_TRIES then ns.After(ANSWER_RETRY, nextLine) end
+		end
 	end
-	ns.After(1 + math.random() * 4, nextLine)
+	-- Everybody with the addon hears the same request. Waiting a random moment spreads the
+	-- answers out, and whoever finds that a few guildmates got there first says nothing: the
+	-- asker already has plenty coming, and you stay free to answer the next one.
+	ns.After(1 + math.random() * 4, function()
+		if ask.n >= ENOUGH_ANSWERS then
+			if D.answeredAt == now then D.answeredAt = nil end
+			return
+		end
+		nextLine()
+	end)
 end
 
 -- A batch answering a request: the same records, several to a line.
 function D:FromBatch(sender, body)
 	if not ns.db.questdb.guild or type(body) ~= "string" then return end
+	local ask = self.heardAsk
+	if ask and sender and not ask.who[sender] and GetTime() - ask.at < 30 then
+		ask.who[sender] = true
+		ask.n = ask.n + 1
+	end
 	local got = 0
 	for record in body:gmatch("[^" .. REC .. "]+") do
 		local f = Split(record)
@@ -769,8 +889,13 @@ function D:FromBatch(sender, body)
 	end
 	if got > 0 then
 		-- Counted apart from the ones that drift in passively, so an answer to /nq db ask
-		-- reports what the ask actually brought and not everything since you logged in.
-		self.fromAsk = (self.fromAsk or 0) + got
+		-- reports what the ask actually brought and not everything since you logged in. An
+		-- answer to somebody else's ask is learned from just the same, without a word in chat.
+		if self.askedAt and GetTime() - self.askedAt < ASK_WINDOW then
+			self.fromAsk = (self.fromAsk or 0) + got
+		else
+			self.fromOthers = (self.fromOthers or 0) + got
+		end
 		ns.Debounce("questdb:guilddraw", 3, function()
 			ns:SendMessage("MAP_OFFERS_UPDATED")
 			ns:SendMessage("QUESTDB_UPDATED")

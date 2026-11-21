@@ -21,6 +21,7 @@ local RARE_MERGE = 60
 local MAX_SPOTS = 40        -- per mob or objective per map; the weakest spots drop off
 local MAX_COUNT = 999
 local MAX_MARKS = 500
+local MAX_FOREIGN_MARKS = 150   -- of those, how many may be ones other people sent
 local SIGHT_COOLDOWN = 45   -- seconds before the same mob near the same spot counts again
 local LOOT_WINDOW = 8       -- seconds a loot window stays linked to quest progress
 local VISITED_YARDS = 25    -- the guide moves on from a spot once you've been this close
@@ -131,6 +132,29 @@ local function AddSpot(rec, m, x, y, count, merge)
 		spots[#spots] = nil
 	end
 	return spot, true
+end
+
+-- What the party sends is rationed per sender, like quest starts are (see QuestDB.lua): a
+-- broken or mischievous client gets a fair hearing and then has to wait.
+local INTAKE_BURST = 100
+local INTAKE_PER_SEC = 0.2
+local intake = {}
+
+function S:ResetIntake() intake = {} end
+
+local function Allowed(from)
+	from = from or "?"
+	local now = GetTime()
+	local b = intake[from]
+	if not b then
+		b = { n = INTAKE_BURST, t = now }
+		intake[from] = b
+	end
+	b.n = min(INTAKE_BURST, b.n + (now - b.t) * INTAKE_PER_SEC)
+	b.t = now
+	if b.n < 1 then return false end
+	b.n = b.n - 1
+	return true
 end
 
 function S:LearnNpc(name, m, x, y, count, questID, objIndex, fromParty, level)
@@ -250,9 +274,28 @@ function S:AddMark(m, x, y, kind, label, questID, objIndex, from)
 			return mk
 		end
 	end
+	-- Marks other people sent make room first, and only ever for each other: nothing that
+	-- arrives from the party can push out a mark you placed yourself.
+	local foreign, oldest = 0, nil
+	for i, mk in ipairs(marks) do
+		if mk.by then
+			foreign = foreign + 1
+			oldest = oldest or i
+		end
+	end
+	if from and foreign >= MAX_FOREIGN_MARKS then
+		table.remove(marks, oldest)
+	elseif #marks >= MAX_MARKS then
+		if oldest then
+			table.remove(marks, oldest)
+		elseif from then
+			return nil
+		else
+			table.remove(marks, 1)
+		end
+	end
 	local mark = { m = m, x = x, y = y, k = kind, l = label, q = questID, o = objIndex, t = time(), by = from }
 	table.insert(marks, mark)
-	while #marks > MAX_MARKS do table.remove(marks, 1) end
 	Changed()
 	if not from then
 		self:Share("k", kind, label or "", m, x, y, questID or 0, objIndex or 0)
@@ -912,6 +955,8 @@ function S:FromParty(sender, body)
 	if not Cfg().share or type(body) ~= "string" then return end
 	local f = Split(body)
 	local kind = f[1]
+	if kind ~= "n" and kind ~= "o" and kind ~= "k" then return end
+	if not Allowed(sender) then return end
 	if kind == "n" then
 		local m, x, y = tonumber(f[3]), tonumber(f[4]), tonumber(f[5])
 		if ValidPoint(m, x, y) then self:LearnNpc(f[2], m, x, y, 1, NonZero(f[6]), NonZero(f[7]), true, NonZero(f[8])) end
@@ -1069,7 +1114,15 @@ local function Progressed(e, i, o, counted)
 		-- One kill that counts for two quests is still one sighting.
 		if name and counted[Key(name)] then return S:Link(name, e.questID, i) end
 		if name then counted[Key(name)] = true end
-		if name and m then S:LearnNpc(name, m, x, y, 1, e.questID, i, nil, ns.SafeCall(UnitLevel, "target")) end
+		if name and m then
+			-- The level is only the mob's if the mob is what you have targeted. Credit often
+			-- arrives while you are looking at something else entirely: a party member's
+			-- kill, a pet's, or the next thing you tabbed to.
+			local level
+			local target = Clean(ns.SafeName("target"))
+			if target and Key(target) == Key(name) then level = ns.SafeCall(UnitLevel, "target") end
+			S:LearnNpc(name, m, x, y, 1, e.questID, i, nil, level)
+		end
 	elseif o.type == "item" then
 		-- Items count only when they came out of a loot window just now; bags, mail and
 		-- vendors don't tell us where anything spawns.

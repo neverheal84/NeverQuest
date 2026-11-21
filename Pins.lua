@@ -261,20 +261,29 @@ function P:UpdateMinimap()
 		if show then
 			n = n + 1
 			local pin = MinimapPin(n)
-			pin.point = pt
 			pin:ClearAllPoints()
 			pin:SetPoint("CENTER", Minimap, "CENTER", sx, sy)
-			if pt.spawn then
-				pin:SetFrameLevel(Minimap:GetFrameLevel() + 5)
-				ApplySpawnLook(pin, pt.spawn, 0.85 * (ns.db.pins.mmScale or 1))
-			else
-				pin:SetFrameLevel(Minimap:GetFrameLevel() + 6)
-				pin.Dot:Hide()
-				pin.Ring:Hide()
-				pin.icon:Show()
-				pin.icon:SetAtlas(pt.atlas or ATLAS[pt.kind] or ATLAS.waypoint, false)
-				local size = ((pt.kind == "active") and 16 or 13) * (ns.db.pins.mmScale or 1)
-				pin:SetSize(size, size)
+			-- This runs many times a second and all that changes between runs is where the
+			-- pin sits. What it looks like is only set when the pin is given something else
+			-- to show (or the size setting changes).
+			local scale = ns.db.pins.mmScale or 1
+			if pin.point ~= pt or pin.lookScale ~= scale then
+				pin.point, pin.lookScale, pin.lookEdge = pt, scale, nil
+				if pt.spawn then
+					pin:SetFrameLevel(Minimap:GetFrameLevel() + 5)
+					ApplySpawnLook(pin, pt.spawn, 0.85 * scale)
+				else
+					pin:SetFrameLevel(Minimap:GetFrameLevel() + 6)
+					pin.Dot:Hide()
+					pin.Ring:Hide()
+					pin.icon:Show()
+					pin.icon:SetAtlas(pt.atlas or ATLAS[pt.kind] or ATLAS.waypoint, false)
+					local size = ((pt.kind == "active") and 16 or 13) * scale
+					pin:SetSize(size, size)
+				end
+			end
+			if not pt.spawn and pin.lookEdge ~= edge then
+				pin.lookEdge = edge
 				pin:SetAlpha(edge and 0.75 or (pt.faded and 0.55 or 1))
 			end
 			pin:Show()

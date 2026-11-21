@@ -196,7 +196,14 @@ function Q:Scan()
 	end
 	for qid, e in pairs(self.byID) do
 		if scannedOnce and e.complete and not completeState[qid] then
-			ns:SendMessage("QUEST_READY", e)
+			-- A quest with nothing to do ("go and talk to...") is finished the moment you take
+			-- it. That is not news, and telling you, your party and the recorder that it is
+			-- "ready to turn in" as you accept it is noise. A quest you could already finish
+			-- when you took it (you were carrying the items) still says so: that one is.
+			local justTaken = completeState[qid] == nil
+			if not (justTaken and e.noObjectives) then
+				ns:SendMessage("QUEST_READY", e)
+			end
 		end
 		completeState[qid] = e.complete
 	end
@@ -351,7 +358,24 @@ function Q:ForgetMapOffers()
 	wipe(mapOffers)
 end
 
-function Q:UpdateDistances()
+-- Distances only change when you move, so this does nothing while you stand still: no pass
+-- over the log, and no message for the guide, tracker, maps and nameplates to rebuild on.
+-- It still looks again every so often, because a few things here go by the clock (a spawn
+-- spot you visited comes back onto the tour after a few minutes).
+local MOVE_YARDS = 4
+local IDLE_REFRESH = 30
+local lastPass = { t = -math.huge }
+
+function Q:DistancesStale() lastPass.t = -math.huge end
+
+function Q:UpdateDistances(force)
+	local m, x, y = ns.Nav.GetPlayerPosition()
+	local now = GetTime()
+	if not force and now - lastPass.t < IDLE_REFRESH and m == lastPass.m then
+		if not m then return false end
+		if ns.Nav.DistanceBetween(lastPass.m, lastPass.x, lastPass.y, m, x, y) < MOVE_YARDS then return false end
+	end
+	lastPass.m, lastPass.x, lastPass.y, lastPass.t = m, x, y, now
 	for _, e in ipairs(self.log) do
 		ApplySpawn(e)
 		UpdatePath(e)
@@ -360,7 +384,11 @@ function Q:UpdateDistances()
 		o.dist = ns.Nav.Distance(o.m, o.x, o.y)
 	end
 	ns:SendMessage("DISTANCES_UPDATED")
+	return true
 end
+
+-- A spot learned while you stand still changes where the nearest one is.
+ns:RegisterMessage("SPAWNS_UPDATED", function() Q:DistancesStale() end)
 
 ---------------------------------------------------------------------------
 -- NPC memory: names of quest givers and turn-in NPCs, learned from your own quest dialogs
@@ -713,7 +741,8 @@ ns:RegisterMessage("QUEST_READY", function(_, e)
 	end
 end)
 
--- Distances refresh every 2 seconds; available quests are re-requested every 30.
+-- Looked at every 2 seconds, and redone only if you have moved (see UpdateDistances);
+-- available quests are re-requested every 30.
 local tick = 0
 ns.Ticker(2, "Quest distances", function()
 	if not ns.ready then return end

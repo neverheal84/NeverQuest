@@ -1,7 +1,8 @@
 ## Interface: 16001
 ## Title: NeverQuest
 ## Notes: Leveling guide, quest database, reward upgrades, raid attunements, waypoint arrow, spawn and objective maps, quest buttons, XP tracker, auto loot, junk selling and repairs for WoW Forever.
-## Version: 1.19.0
+## Version: 1.20.0
+## X-Curse-Project-ID: 1810798
 ## SavedVariables: NeverQuestDB
 ## SavedVariablesPerCharacter: NeverQuestCharDB
 ## IconTexture: Interface\AddOns\NeverQuest\Media\Icon

@@ -359,35 +359,60 @@ local function Short(name)
 	return (Ambiguate and ns.SafeCall(Ambiguate, name, "short")) or name:gsub("%-.*$", "")
 end
 
+-- A name with its realm, lower case. The game leaves the realm off for people on yours, so a
+-- bare name means your realm and nothing else: "Thrall" is not "Thrall-SomewhereElse".
+local function Full(name)
+	if type(name) ~= "string" or name == "" or ns.IsSecret(name) then return nil end
+	if not name:find("-", 1, true) then
+		local realm = (GetNormalizedRealmName and ns.SafeCall(GetNormalizedRealmName))
+			or (GetRealmName and (ns.SafeCall(GetRealmName) or ""):gsub("[%s%-]", "")) or ""
+		if type(realm) ~= "string" or realm == "" then return nil end
+		name = name .. "-" .. realm
+	end
+	return name:lower()
+end
+
 -- Guildmate or friend. Anything we can't check counts as unknown, so a failed lookup errs
 -- towards not accepting rather than towards letting anyone in.
-local function Known(name)
-	local short = Short(name)
-	if not short then return false end
+--
+-- The game says who is inviting by ID as well as by name, and the ID is the one to trust: it
+-- cannot be imitated by making a character with a guildmate's name on another realm, and it is
+-- the only thing that recognises a Battle.net friend playing a character you have never seen.
+-- Names are the fallback, and they are compared whole, realm and all.
+local function Known(name, guid)
+	if type(guid) == "string" and guid ~= "" and not ns.IsSecret(guid) then
+		if IsGuildMember and ns.SafeCall(IsGuildMember, guid) == true then return true end
+		if C_FriendList and C_FriendList.IsFriend and ns.SafeCall(C_FriendList.IsFriend, guid) == true then return true end
+		if C_BattleNet and C_BattleNet.GetGameAccountInfoByGUID
+			and ns.SafeCall(C_BattleNet.GetGameAccountInfoByGUID, guid) ~= nil then return true end
+	end
+	local full = Full(name)
+	if not full then return false end
 	if ns.SafeCall(IsInGuild) then
 		local total = ns.Num(ns.SafeCall(GetNumGuildMembers)) or 0
-		for i = 1, math.min(total, 600) do
+		for i = 1, math.min(total, 1000) do
 			local n = ns.SafeCall(GetGuildRosterInfo, i)
-			if n and Short(n) == short then return true end
+			if n and Full(n) == full then return true end
 		end
 	end
 	if C_FriendList then
 		local n = ns.Num(ns.SafeCall(C_FriendList.GetNumFriends)) or 0
 		for i = 1, n do
 			local info = ns.SafeCall(C_FriendList.GetFriendInfoByIndex, i)
-			if info and Short(info.name) == short then return true end
+			if info and Full(info.name) == full then return true end
 		end
 	end
 	return false
 end
 
-ns:RegisterEvent("PARTY_INVITE_REQUEST", function(_, inviter)
+-- The seventh thing the game says about an invite is who sent it, by ID.
+ns:RegisterEvent("PARTY_INVITE_REQUEST", function(_, inviter, _, _, _, _, _, guid)
 	local cfg = ns.db.auto
 	if cfg.inviteFrom ~= "known" and cfg.inviteFrom ~= "anyone" then return end
 	if Skip() then return end
 	local who = Short(inviter)
 	if not who then return end
-	if cfg.inviteFrom == "known" and not Known(inviter) then
+	if cfg.inviteFrom == "known" and not Known(inviter, guid) then
 		ns.Debug("invite from " .. who .. " left alone: not a guildmate or friend")
 		return
 	end
@@ -412,12 +437,17 @@ ns:RegisterEvent("CHAT_MSG_WHISPER", function(_, text, sender)
 	local said = text:lower():match("^%s*(.-)%s*$")
 	if said ~= word and said:sub(1, #word + 1) ~= word .. " " then return end
 	local now = GetTime()
-	if lastInvite[who] and now - lastInvite[who] < INVITE_GAP then return end
+	-- Counted per person, realm and all, and old entries are dropped as it goes.
+	local id = Full(sender) or who
+	for k, t in pairs(lastInvite) do
+		if now - t >= INVITE_GAP then lastInvite[k] = nil end
+	end
+	if lastInvite[id] and now - lastInvite[id] < INVITE_GAP then return end
 	if C_PartyInfo and C_PartyInfo.CanInvite and ns.SafeCall(C_PartyInfo.CanInvite) == false then
 		ns.Debug("asked for an invite by " .. who .. " but you can't invite right now")
 		return
 	end
-	lastInvite[who] = now
+	lastInvite[id] = now
 	local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
 	if invite and pcall(invite, sender) then
 		ns.Print("invited " .. who .. ".")

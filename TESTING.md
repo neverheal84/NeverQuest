@@ -86,6 +86,15 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 54. **Spawn dots (1.17.0).** Hover a learned spawn dot: the first line should say what it is and its level. Kill some low mobs in a starting zone, then come back at a much higher level with "Hide spots well below my level" on: those dots should be gone, while anything a current quest points at stays. Turning the option off should bring them all back.
 
+55. **Review release (1.20.0), the parts only the game can confirm.**
+    - *Guild answers.* With two NeverQuest users in a guild, one runs `/nq db ask`. The asker should see one "N quest starts from your guild" line a minute or so later, and N should match what the answerer had to give (up to 120). Anyone else in the guild should see nothing in chat.
+    - *Invites.* With `/nq invites known`, an invite from a guildmate, a character friend and a Battle.net friend on another realm should each be accepted; one from a stranger should be left on screen.
+    - *Dismissing the arrow.* Right-click the arrow while it follows a guide step. It should move to the next step, not go blank, and clicking the dismissed step in the guide should bring it back.
+    - *Tracker in a dungeon.* With Blizzard's list hidden, walk into a dungeon: Blizzard's tracker should appear with the boss list, and go again when you leave.
+    - *Tracker at logout.* With Blizzard's list hidden, log out, disable NeverQuest at the character screen and log in: your quests should be tracked in Blizzard's list, and accepting a quest should track it automatically. Re-enable NeverQuest and it should all be hidden again within a second of logging in.
+    - *Standing still.* `/nq debug`, then stand still for a minute: there should be no stream of guide or route lines. Walk a few steps and they resume.
+    - *Talk-to quests.* Accept a quest whose only step is "speak to someone": no "Ready to turn in" alert and no party announcement.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

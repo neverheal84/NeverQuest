@@ -315,6 +315,8 @@ function Nav:ApplyNative(wp)
 		self.ownedQuest = wp.questID
 	elseif wp.m and C_Map.CanSetUserWaypointOnMap(wp.m) then
 		self.applyingNative = true
+		-- Remembered before the call: the game may report the new pin during it or after it.
+		self.nativeM, self.nativeX, self.nativeY = wp.m, wp.x, wp.y
 		local ok = C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(wp.m, wp.x, wp.y)) ~= false
 		self.applyingNative = false
 		if ok then
@@ -358,6 +360,11 @@ ns:RegisterEvent("USER_WAYPOINT_UPDATED", function()
 	local point = C_Map.GetUserWaypoint()
 	if not point or not point.uiMapID or not point.position then return end
 	local x, y = point.position:GetXY()
+	x, y = ns.Num(x), ns.Num(y)
+	if not x or not y then return end
+	-- The pin NeverQuest placed for the arrow's own target is not one of yours. The flag above
+	-- covers a client that reports it during the call; this covers one that reports it after.
+	if Nav.nativeM == point.uiMapID and Nav.nativeX and math.abs(Nav.nativeX - x) < 0.002 and math.abs(Nav.nativeY - y) < 0.002 then return end
 	for _, wp in ipairs(ns.char.waypoints) do
 		if wp.m == point.uiMapID and math.abs(wp.x - x) < 0.002 and math.abs(wp.y - y) < 0.002 then return end
 	end
@@ -375,6 +382,15 @@ end)
 local ARROW_SIZE = 54       -- default width of the texture, not of the arrow drawn in it
 local ART_FILL = 0.76       -- of the square's height
 local ART_PAD = 0.19        -- empty margin below the arrow
+
+-- The arrow redraws twenty times a second. Text is only handed to the game when it has
+-- actually changed, and nothing below builds a string just to compare it with the last one.
+local function Put(fs, text)
+	if fs.nqText ~= text then
+		fs.nqText = text
+		fs:SetText(text)
+	end
+end
 
 local function CreateArrow()
 	local f = CreateFrame("Button", "NeverQuestArrow", UIParent)
@@ -461,56 +477,88 @@ local function CreateArrow()
 	end
 
 	function f:UpdateArrow()
-		local m, px, py = Nav.GetPlayerPosition()
-		if m then
-			self.coords:SetFormattedText("%s  %.1f, %.1f", Nav.MapName(m), px * 100, py * 100)
-		else
-			self.coords:SetText("")
+		if not ns.db.arrow.compact then
+			local m, px, py = Nav.GetPlayerPosition()
+			if m then
+				-- To a tenth of a percent of the map, which is all the text shows.
+				local cx, cy = floor(px * 1000 + 0.5), floor(py * 1000 + 0.5)
+				if m ~= self.coordM or cx ~= self.coordX or cy ~= self.coordY then
+					self.coordM, self.coordX, self.coordY = m, cx, cy
+					Put(self.coords, string.format("%s  %.1f, %.1f", Nav.MapName(m), cx / 10, cy / 10))
+				end
+			else
+				self.coordM = nil
+				Put(self.coords, "")
+			end
 		end
 
 		local wp = Nav:GetActive()
 		if not wp then
 			self.tex:Hide()
-			self.title:SetText("No waypoint")
-			self.dist:SetText("")
-			self.next:SetText("")
+			Put(self.title, "No waypoint")
+			Put(self.dist, "")
+			Put(self.next, "")
+			self.distKey = nil
 			return
 		end
-		local finalTitle = wp.title or string.format("%s %.1f, %.1f", Nav.MapName(wp.m), wp.x * 100, wp.y * 100)
-		local finalDist, _, finalElsewhere = Nav.Vector(wp.m, wp.x, wp.y)
+		local finalTitle = wp.title
+		if not finalTitle then
+			-- An untitled waypoint is named by where it is; worked out once per waypoint.
+			if self.untitledFor ~= wp then
+				self.untitledFor = wp
+				self.untitled = string.format("%s %.1f, %.1f", Nav.MapName(wp.m), wp.x * 100, wp.y * 100)
+			end
+			finalTitle = self.untitled
+		end
+		local finalDist, finalAngle, finalElsewhere = Nav.Vector(wp.m, wp.x, wp.y)
 
 		-- Follow the route's next leg (entrance, tunnel, flight master...) when there is one.
 		local leg = ns.Route and ns.Route:Leg(wp)
+		-- Whole yards are all the "then:" line shows, so that is all it is rebuilt for.
+		local finalYards = finalDist and floor(finalDist + 0.5) or -1
 		if leg and leg.inFlight then
 			self.tex:Hide()
-			self.title:SetText(leg.text)
-			self.dist:SetText(finalDist and (ns.Yards(finalDist) .. " to go") or "")
-			self.next:SetText("then: " .. finalTitle)
+			Put(self.title, leg.text)
+			if self.distKey ~= "fly" or self.distYards ~= finalYards then
+				self.distKey, self.distYards = "fly", finalYards
+				Put(self.dist, finalDist and (ns.Yards(finalDist) .. " to go") or "")
+			end
+			if self.thenFor ~= finalTitle or self.thenYards ~= -2 then
+				self.thenFor, self.thenYards = finalTitle, -2
+				Put(self.next, "then: " .. finalTitle)
+			end
 			return
 		end
 		local aimM, aimX, aimY = wp.m, wp.x, wp.y
-		if leg and leg.m then aimM, aimX, aimY = leg.m, leg.x, leg.y end
-		local aimKey = string.format("%d:%.4f:%.4f", aimM, aimX, aimY)
-		if aimKey ~= Nav.aimKey then
-			Nav.aimKey = aimKey
+		local viaLeg = leg and leg.m and true or false
+		if viaLeg then aimM, aimX, aimY = leg.m, leg.x, leg.y end
+		if aimM ~= Nav.aimM or aimX ~= Nav.aimX or aimY ~= Nav.aimY then
+			Nav.aimM, Nav.aimX, Nav.aimY = aimM, aimX, aimY
 			Nav.speed, Nav.lastDist, Nav.lastTime = 0, nil, nil
 		end
 		if leg then
-			self.title:SetText(leg.text or "Next waypoint")
-			self.next:SetText("then: " .. finalTitle .. (finalDist and ("  (" .. ns.Yards(finalDist) .. ")") or ""))
+			Put(self.title, leg.text or "Next waypoint")
+			if self.thenFor ~= finalTitle or self.thenYards ~= finalYards then
+				self.thenFor, self.thenYards = finalTitle, finalYards
+				Put(self.next, "then: " .. finalTitle .. (finalDist and ("  (" .. ns.Yards(finalDist) .. ")") or ""))
+			end
 		else
-			self.title:SetText(finalTitle)
-			self.next:SetText("")
+			Put(self.title, finalTitle)
+			Put(self.next, "")
+			self.thenFor = nil
 		end
 
-		local dist, angle, elsewhere = Nav.Vector(aimM, aimX, aimY)
+		-- Aiming straight at the target is the distance just measured; only a leg needs its own.
+		local dist, angle, elsewhere = finalDist, finalAngle, finalElsewhere
+		if viaLeg then dist, angle, elsewhere = Nav.Vector(aimM, aimX, aimY) end
 		if not dist then
 			self.tex:Hide()
+			self.distKey = nil
 			if elsewhere or finalElsewhere then
 				local cont = Nav.GetContinentMap(wp.m)
-				self.dist:SetText("On " .. (cont and Nav.MapName(cont) or "another continent") .. ": take a boat, zeppelin or portal")
+				Put(self.dist, "On " .. (cont and Nav.MapName(cont) or "another continent") .. ": take a boat, zeppelin or portal")
 			else
-				self.dist:SetText("No position here")
+				Put(self.dist, "No position here")
 			end
 			return
 		end
@@ -545,7 +593,12 @@ local function CreateArrow()
 			Nav.lastDist, Nav.lastTime = dist, now
 		end
 		local eta = ns.db.arrow.showETA and (Nav.speed or 0) > 1 and (dist / Nav.speed) or nil
-		self.dist:SetText(ns.Yards(dist) .. (eta and ("  ~" .. ns.Duration(eta)) or ""))
+		-- Shown to the yard and to the second, so that is how often the text is rebuilt.
+		local yards, secs = floor(dist + 0.5), eta and floor(eta + 0.5) or -1
+		if self.distKey ~= "go" or self.distYards ~= yards or self.distSecs ~= secs then
+			self.distKey, self.distYards, self.distSecs = "go", yards, secs
+			Put(self.dist, ns.Yards(dist) .. (eta and ("  ~" .. ns.Duration(eta)) or ""))
+		end
 
 		local remaining = leg and finalDist or dist
 		if wp.arrive and remaining and remaining <= (ns.db.arrow.arrival or 10) then

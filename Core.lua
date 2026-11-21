@@ -133,10 +133,20 @@ local function Trace(err)
 	return { err = err, stack = debugstack and debugstack(2, 8, 0) or nil }
 end
 
+-- The game's xpcall hands extra arguments on to the function; plain Lua 5.1's drops them.
+-- Where it does, a protected call costs no memory at all, which matters because every event
+-- and every frame of every OnUpdate handler comes through here.
+local XPCALL_ARGS = select(2, xpcall(function(a) return a end, function() end, true)) == true
+
 -- Runs fn(...) protected. Returns true when it worked.
 function ns.Call(where, fn, ...)
-	local n, args = select("#", ...), { ... }
-	local ok, res = xpcall(function() return fn(unpack(args, 1, n)) end, Trace)
+	local ok, res
+	if XPCALL_ARGS then
+		ok, res = xpcall(fn, Trace, ...)
+	else
+		local n, args = select("#", ...), { ... }
+		ok, res = xpcall(function() return fn(unpack(args, 1, n)) end, Trace)
+	end
 	if not ok then
 		local err = type(res) == "table" and res.err or res
 		RecordError(where, err, type(res) == "table" and res.stack or nil)

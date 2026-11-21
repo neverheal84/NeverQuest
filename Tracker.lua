@@ -3,12 +3,15 @@
 --
 -- It also decides what happens to Blizzard's own quest list in the objective tracker:
 --   hide   while the NeverQuest tracker is shown, quests are untracked so Blizzard's list is
---          empty (its other sections, like bonus objectives, stay). Turning this off gives
---          the quests back.
+--          empty, the two settings that make the game track quests by itself are switched
+--          off, and (unless turned off) Blizzard's tracker frame is parked on a hidden parent
+--          so it cannot flash up. Inside a dungeon, raid or scenario the frame is given back,
+--          because that is where the game shows boss and scenario objectives.
 --   sort   Blizzard's list stays, with quests tracked in NeverQuest's priority order.
 --   leave  NeverQuest doesn't touch it.
--- Only quest tracking is changed, through the game's own tracking functions, and only out of
--- combat; Blizzard's frames aren't modified.
+-- Everything changed is put back when you choose another mode, and again every time you log
+-- out, so removing the addon never leaves quests untracked or a setting switched off. All of
+-- it happens out of combat only.
 
 local ADDON, ns = ...
 local T = {}
@@ -569,7 +572,10 @@ function T:ControlBlizzard()
 	local mode = self:BlizzardMode()
 	if mode == "hide" then
 		self:SuppressAutoWatch()
-		self:ParkBlizzardFrame()
+		-- In an instance that frame is where boss, scenario and challenge objectives are
+		-- shown, and NeverQuest has no list of its own for those. It stays in view there.
+		local inside = IsInInstance and ns.SafeCall(IsInInstance)
+		if inside == true then self:UnparkBlizzardFrame() else self:ParkBlizzardFrame() end
 		local watched = Watched()
 		for _, id in ipairs(watched) do
 			ns.char.trackerUntracked[id] = true
@@ -628,7 +634,22 @@ ns:RegisterEvent("QUEST_WATCH_LIST_CHANGED", function() Control(1) end)
 ns:RegisterEvent("QUEST_ACCEPTED", function() if Cfg().blizzard == "hide" then Control(0.05) end end)
 ns:RegisterEvent("QUEST_TURNED_IN", function() if Cfg().blizzard == "hide" then Control(0.05) end end)
 ns:RegisterEvent("PLAYER_REGEN_ENABLED", function() Control(1) end)
-ns:RegisterEvent("PLAYER_ENTERING_WORLD", function() Control(3) end)
+-- Straight away on the way in (so the list is not there to be seen), and once more when the
+-- game has finished filling the quest log, which on a slow login is a few seconds later.
+ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+	Control(0.4)
+	ns.After(3.5, function() Control(0.1) end)
+end)
+
+-- Logging out puts back everything that was changed: your own auto-track settings, and your
+-- quests in Blizzard's list. They are taken away again on the way back in. That way an addon
+-- that is switched off or removed between sessions leaves nothing behind it.
+function T:HandBack()
+	if not ns.char then return end
+	self:RestoreAutoWatch()
+	GiveBack()
+end
+ns:RegisterEvent("PLAYER_LOGOUT", function() T:HandBack() end)
 ns:RegisterMessage("GUIDE_UPDATED", function() if Cfg().blizzard == "sort" then Control(3) end end)
 
 ns:AddSlash("tracker", function(rest)

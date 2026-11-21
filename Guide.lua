@@ -763,6 +763,20 @@ function G:AutoTrack()
 			if s.key == key and s.m then return s end
 		end
 	end
+	-- A step you right-clicked off the arrow stays off it, and the arrow moves on to the next
+	-- one rather than going blank. Once that step is finished or gone, so is the dismissal:
+	-- if it ever comes back it is a new decision.
+	local dismissed = ns.Nav.dismissedKey
+	if dismissed then
+		local still = false
+		for _, s in ipairs(self.steps) do
+			if s.key == dismissed then still = true break end
+		end
+		if not still then
+			ns.Nav.dismissedKey = nil
+			dismissed = nil
+		end
+	end
 	if self:GetScript() then
 		pick = self.steps[1] and self.steps[1].current and self.steps[1].m and self.steps[1] or nil
 		if self.pinnedKey then pick = Find(self.pinnedKey) or pick end
@@ -773,14 +787,14 @@ function G:AutoTrack()
 		end
 		-- Keep the current target while it's still one of the top two, so the arrow doesn't flip back and forth.
 		local cur = ns.Nav.guideTarget
-		if not pick and cur then
+		if not pick and cur and cur.key ~= dismissed then
 			for i = 1, math.min(2, #self.steps) do
 				if self.steps[i].key == cur.key and self.steps[i].m then pick = self.steps[i] break end
 			end
 		end
 		if not pick then
 			for _, s in ipairs(self.steps) do
-				if s.m and not s.noAuto then pick = s break end
+				if s.m and not s.noAuto and s.key ~= dismissed then pick = s break end
 			end
 		end
 	end

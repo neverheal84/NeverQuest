@@ -66,6 +66,11 @@ function Ann:Say(kind, text, force)
 	if not self:Channel() then return false end
 	local now = GetTime()
 	if not force and self.sent[text] and now - self.sent[text] < REPEAT_WINDOW then return false end
+	-- Only the last few seconds matter, so that is all that is kept: over a long session this
+	-- would otherwise hold every line ever announced.
+	for line, at in pairs(self.sent) do
+		if now - at >= REPEAT_WINDOW then self.sent[line] = nil end
+	end
 	self.sent[text] = now
 	if #self.queue >= MAX_QUEUE then table.remove(self.queue, 1) end
 	if cfg.tag then text = "NeverQuest: " .. text end

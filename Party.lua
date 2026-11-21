@@ -25,13 +25,17 @@ local function Active()
 	return ns.ready and ns.db.party.enabled and IsInGroup() and not IsInRaid()
 end
 
+-- True when the game took the message. Current clients answer with a result code (0 is
+-- success, anything else is a refusal such as the per-addon throttle); older ones answer true
+-- or nothing at all. Only a real refusal counts as one.
 local function SendTo(msg, channel)
 	local ok, result = pcall(C_ChatInfo.SendAddonMessage, PREFIX, msg, channel)
-	if ok and result ~= nil and result ~= 0 and channel == "PARTY" then
+	local delivered = ok and (result == nil or result == true or result == 0)
+	if not delivered and channel == "PARTY" then
 		-- Throttled or locked down (restricted content): try a full resend later.
 		Party.retry = true
 	end
-	return ok
+	return delivered
 end
 
 local function Send(msg) return SendTo(msg, "PARTY") end
@@ -68,14 +72,14 @@ end
 -- where: "party" (the default), "guild", or "both".
 function Party:SendRaw(msg, where)
 	where = where or "party"
+	-- Answers whether the game actually took it on at least one channel, so a caller that
+	-- paces itself (or counts what it has shared) goes by what was delivered.
 	local sent = false
 	if (where == "party" or where == "both") and Active() then
-		Send(msg)
-		sent = true
+		if Send(msg) then sent = true end
 	end
 	if (where == "guild" or where == "both") and self:GuildActive() then
-		SendTo(msg, "GUILD")
-		sent = true
+		if SendTo(msg, "GUILD") then sent = true end
 	end
 	return sent
 end
