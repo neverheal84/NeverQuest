@@ -139,6 +139,8 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 
 **Flight times:** the game doesn't tell an addon how long a flight takes, so NeverQuest times each planned flight the first time you take it and counts it down on the arrow from then on.
 
+**Changing your mind:** a flight plan is dropped as soon as you leave the place it was sending you out from, whether you took a different flight, hearthed, used a portal or took a boat. The route is then worked out again from wherever you actually are.
+
 **Asking for a group:** Ctrl-click an elite or group quest in the guide, or pick "Ask for a group" in its tracker menu, to put an LFG message with the quest link in your chat box. Nothing is sent until you press Enter. `/nq lfg` does it for your next elite quest.
 
 ## Commands

@@ -143,6 +143,20 @@ local function TargetKey(t)
 	return t and (t.key or string.format("%d:%.4f:%.4f", t.m or 0, t.x or 0, t.y or 0)) or nil
 end
 
+-- A plan that says "fly from Darkshire" is worth nothing once you are no longer anywhere near
+-- Darkshire. Walking to the flight master brings you closer, so only a jump the wrong way
+-- counts: a different flight, a hearthstone, a portal, a boat, a spirit healer. Measured
+-- against how far away you were when the plan was made, since being far from the origin is
+-- the normal state of a plan that starts with "walk there".
+local ORIGIN_DRIFT = 1500
+
+function R:DropFlight()
+	if not self.flight then return end
+	self.flight, self.plannedFor, self.plannedAt = nil, nil, nil
+	self.airborne = nil
+	self:Invalidate()
+end
+
 -- Flight plans stick to a target once chosen, until you land or get close enough to go direct.
 function R:FlightFor(t)
 	local key = TargetKey(t)
@@ -150,6 +164,16 @@ function R:FlightFor(t)
 	if f and f.key ~= key then f, self.flight = nil, nil end
 	if f then
 		if f.landed then return nil end
+		if f.from then
+			local away = ns.Nav.Distance(f.from.m, f.from.x, f.from.y)
+			if away and f.originDist and away > f.originDist + ORIGIN_DRIFT then
+				ns.Debug("route: left the flight's starting point, planning again from here")
+				self:DropFlight()
+				f = nil
+			end
+		end
+	end
+	if f then
 		local d = ns.Nav.Distance(t.m, t.x, t.y)
 		if d and d < MIN_FLIGHT_TRIP * 0.6 then
 			self.flight = { key = key, landed = true }
@@ -162,6 +186,9 @@ function R:FlightFor(t)
 	local plan = R.PlanFlight(t)
 	if plan then
 		plan.key = key
+		-- How far the origin was when this was planned, so a later jump away can be told from
+		-- simply not having walked there yet.
+		if plan.from then plan.originDist = ns.Nav.Distance(plan.from.m, plan.from.x, plan.from.y) end
 		self.flight = plan
 	end
 	return plan
@@ -268,6 +295,11 @@ ns:RegisterEvent("PLAYER_CONTROL_GAINED", function()
 			if d and d < 250 then
 				R.flight = { key = f.key, landed = true }
 				R:Invalidate()
+			elseif air then
+				-- You flew, but not to where the plan was sending you. Wherever you have ended
+				-- up, the old plan is spent: work the route out again from here.
+				ns.Debug("route: landed somewhere else, planning again from here")
+				R:DropFlight()
 			end
 		end
 	end)
