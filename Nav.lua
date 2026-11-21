@@ -4,7 +4,7 @@ local ADDON, ns = ...
 local Nav = {}
 ns.Nav = Nav
 
-local atan2, sqrt, abs, pi = math.atan2, math.sqrt, math.abs, math.pi
+local atan2, sqrt, abs, pi, floor = math.atan2, math.sqrt, math.abs, math.pi, math.floor
 local TWO_PI = pi * 2
 
 ---------------------------------------------------------------------------
@@ -370,6 +370,12 @@ end)
 ---------------------------------------------------------------------------
 -- Arrow frame
 ---------------------------------------------------------------------------
+-- Media/Arrow.tga is 256 square with the arrow drawn inside the circle that fits in it, so no
+-- corner is ever clipped as it turns. These say how much of the square the art actually uses.
+local ARROW_SIZE = 54       -- default width of the texture, not of the arrow drawn in it
+local ART_FILL = 0.76       -- of the square's height
+local ART_PAD = 0.19        -- empty margin below the arrow
+
 local function CreateArrow()
 	local f = CreateFrame("Button", "NeverQuestArrow", UIParent)
 	f:SetSize(150, 110)
@@ -377,11 +383,17 @@ local function CreateArrow()
 	f:RegisterForClicks("RightButtonUp")
 	ns.MakeMovable(f, "arrow", function() return ns.db.arrow.locked end, { "TOP", UIParent, "TOP", 0, -120 })
 
+	-- Our own arrow, drawn at 256 pixels and shown at a fraction of that, so the edges stay
+	-- smooth however far it is scaled up and whatever angle it is turned to. Trilinear
+	-- filtering picks the right mip level instead of aliasing the full-size art down.
 	f.tex = f:CreateTexture(nil, "ARTWORK")
-	f.tex:SetAtlas("Navigation-Tracked-Arrow", false)
-	f.tex:SetSize(42, 42)
+	f.tex:SetTexture(ns.MEDIA .. "Arrow", nil, nil, "TRILINEAR")
+	f.tex:SetSize(ARROW_SIZE, ARROW_SIZE)
 	f.tex:SetPoint("TOP", 0, -2)
-	f.tex:SetDesaturated(true)
+	-- A texture that snaps to whole pixels crawls and goes jagged as it rotates, because the
+	-- snapping fights the rotation. Turning it off is what keeps the edges clean while it turns.
+	if f.tex.SetSnapToPixelGrid then ns.SafeCall(f.tex.SetSnapToPixelGrid, f.tex, false) end
+	if f.tex.SetTexelSnappingBias then ns.SafeCall(f.tex.SetTexelSnappingBias, f.tex, 0) end
 
 	f.title = f:CreateFontString(nil, "OVERLAY", "NeverQuestFontNormal")
 	f.title:SetPoint("TOP", f.tex, "BOTTOM", 0, -2)
@@ -430,6 +442,16 @@ local function CreateArrow()
 
 	function f:Refresh()
 		self:SetScale(ns.db.arrow.scale or 1)
+		local size = ns.db.arrow.size or ARROW_SIZE
+		if self.texSize ~= size then
+			self.texSize = size
+			self.tex:SetSize(size, size)
+			-- The art leaves a margin inside its square so that spinning it never clips a
+			-- corner, so the title is pulled up into that margin instead of floating below it.
+			self.title:ClearAllPoints()
+			self.title:SetPoint("TOP", self.tex, "BOTTOM", 0, floor(size * ART_PAD) - 2)
+			self:SetHeight(floor(size * ART_FILL) + 70)
+		end
 		self.coords:SetShown(not ns.db.arrow.compact)
 		self.next:SetShown(ns.db.arrow.showThen)
 		local wp = Nav:GetActive()

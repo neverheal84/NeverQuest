@@ -93,7 +93,7 @@ end
 local function MobName(o)
 	local text = o.text
 	if not text or o.type ~= "monster" then return nil end
-	return text:match("^(.-) slain: %d+/%d+") or text:match("^%d+/%d+ (.-) slain") or text:match("^(.-): %d+/%d+")
+	return ns.KillName(text) or text:match("^(.-): %d+/%d+")
 end
 
 local function ObjectiveSummary(questID, complete)
@@ -415,6 +415,13 @@ end
 -- party member, started from an item, or handed in remotely (a pop-up turn-in, a shared
 -- completion), where where you stood says nothing about where the NPC is.
 local SPOT_WINDOW = 90
+
+-- Did you just take this quest from an NPC yourself, rather than have it shared to you or
+-- start it from an item?
+function Q:TakenFromNPC(questID)
+	return questID ~= nil and lastDetail ~= nil and lastDetail.questID == questID
+		and GetTime() - lastDetail.t <= SPOT_WINDOW
+end
 ns:RegisterEvent("QUEST_ACCEPTED", function(_, questID)
 	if questID and lastDetail and lastDetail.questID == questID and GetTime() - lastDetail.t <= SPOT_WINDOW then
 		ns.db.npcs.giverAt[questID] = Spot()

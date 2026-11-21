@@ -69,6 +69,14 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 44. **Finished quests you have levelled past (1.13.2).** Carry a few completed quests whose turn-in is in a zone you have left, far enough that they have gone gray in your log, and leave "Include gray quests" off. `/nq route` should list every one of them, the guide should show the trip, and the tracker should agree. One gray hand-in on its own, with nothing else near it, should stay off the route and be listed as "later" instead. An unfinished gray quest should still be hidden while that option is off.
 
+45. **Drops window (1.14.0).** With a couple of "collect N of these" quests in your log, run `/nq drops`. Every item you're short of should be listed with its count, and a kill-only quest should not be. Kill something that drops one: its name should appear on the gray line under that item, with a distance. Click the item to point the arrow at it, Shift+click to link it. Right-click the header to change the sorting and to turn the source line off. Check the key binding (Open or close the drops window) under Esc > Options > Keybindings > AddOns > NeverQuest, and that the window stays where you drag it after a reload.
+
+46. **Arrow quality (1.14.0).** Watch the waypoint arrow while you turn on the spot. The edges should stay clean rather than crawling or stepping, and the outline should stay dark while the fill goes green, yellow or orange. Try each of the four sizes under Options > Display & Maps: the largest should be just as sharp as the smallest, and the title line should sit right under the arrow at every size, not float below a gap.
+
+47. **Nameplate icons and tooltips (1.14.0).** Turn enemy nameplates on (V). Mobs for a kill quest should show a sword, the mob the guide's top step names should show a skull, and each should have your count under it; a mob no quest wants should show nothing. Loot a quest item from a mob, then look at another of the same kind: it should now show a bag, and its tooltip should name the quest and your count. Finish the objective and the icons should go. Hover a quest item in your bags for its "Quest:" line. In a party with another NeverQuest user, mob tooltips should show their progress. Try `/nq plates off`.
+48. **Bag finds, sharing, flights (1.14.0).** Put a piece of gear better than what you're wearing in your bags: the guide should add an "Upgrade in your bags" row. Fill your bags with some gray items in them: the bags row should name the cheapest. Turn on "Share quests with my party as I pick them up" and accept a quest in a party: the others should be offered it. Take a flight the guide planned twice: the second time the arrow should count down.
+49. **Other languages (1.14.0).** On a non-English client, a kill quest should still give the TARGET button a mob name, and `/nq check` should report the Language line as OK.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

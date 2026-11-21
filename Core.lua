@@ -7,6 +7,7 @@ _G.NeverQuest = ns
 ns.name = ADDON
 ns.version = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ADDON, "Version")) or "1.0.0"
 ns.AUTHOR = "NeverHeal84"
+ns.DISCORD = "https://discord.gg/mmCB2teWvf"   -- never-expiring invite; bug reports, help and suggestions
 ns.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\Media\\"
 ns.LOGO = ns.MEDIA .. "Logo"   -- 256x256 TGA
 ns.ICON = ns.MEDIA .. "Icon"   -- 64x64 TGA
@@ -14,17 +15,19 @@ ns.ICON = ns.MEDIA .. "Icon"   -- 64x64 TGA
 local DEFAULTS = {
 	hud    = { shown = true, locked = false, scale = 1, showRested = true, showRate = true, showToLevel = true, showFooter = true },
 	arrow  = { shown = true, locked = false, arrival = 10, alwaysShow = false, scale = 1, compact = false,
-	           showETA = true, showThen = true, sound = true, corpse = true },
+	           size = 54, showETA = true, showThen = true, sound = true, corpse = true },
 	window = { tab = "guide", journalView = "history", scale = 1 },
 	style  = { font = "default", textScale = 1, outline = "", shadow = true },
 	tracker = { shown = true, blizzard = "hide", locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
 	            showObjectives = true, hideDoneObjectives = false, finishedFirst = true, showNumbers = true,
 	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 25 },
+	drops  = { shown = false, locked = false, scale = 1, width = 250, maxHeight = 420, bgAlpha = 0.45,
+	           collapsed = false, showSource = true, sort = "progress" },  -- sort: progress | remaining | distance
 	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest" },  -- reward: suggest | upgrade | value | off
 	loot   = { auto = true, junk = true, junkReport = true, repair = true, repairGuild = false },  -- auto loot; sell grays; repair at vendors
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
-	           rested = true, sessionAtLogout = false },
+	           rested = true, sessionAtLogout = false, upgrades = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
 	questdb = { scan = true, worldmap = true, ahead = 3, grayBelow = 6 },
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
@@ -40,7 +43,10 @@ local DEFAULTS = {
 	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 1, wmScale = 1 },
 	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
-	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true },
+	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false },
+	tooltips = { units = true, items = true, party = true },   -- quest lines on mob and item tooltips
+	plates = { enabled = true, count = true, skull = true, scale = 1, side = "left" },   -- quest icons on nameplates (drawn by us; not raid markers)
+	flightTimes = {},   -- seconds each flight took, learned from your own flights
 	minimapButton = { shown = true, locked = false, angle = 210 },
 	givers = { worldmap = true, otherZones = true, gray = false, red = false, dailies = true, levels = true, turnins = false },
 	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = false, dotSize = 1,
@@ -366,6 +372,35 @@ function ns.SafeName(unit)
 	local name = UnitName(unit)
 	if name == nil or ns.IsSecret(name) or name == "" then return nil end
 	return name
+end
+
+-- The mob in a kill objective, read with the client's own wording for it. The game formats
+-- these lines from QUEST_MONSTERS_KILLED ("%s slain: %d/%d" in English, something else in
+-- every other language), so that string is turned into a pattern rather than matching the
+-- English word. The English forms stay as a fallback for clients that don't expose it.
+local killPatterns = {}
+local function KillPattern()
+	local fmt = QUEST_MONSTERS_KILLED
+	if type(fmt) ~= "string" or fmt == "" then return nil end
+	local p = killPatterns[fmt]
+	if p == nil then
+		p = fmt:gsub("%%%d+%$", "%%")                          -- %1$s -> %s
+		p = p:gsub("([%^%$%(%)%.%[%]%*%+%-%?])", "%%%1")       -- the rest is literal text
+		p = p:gsub("%%s", "(.-)"):gsub("%%d", "%%d+")
+		p = "^" .. p .. "$"
+		killPatterns[fmt] = p
+	end
+	return p
+end
+
+function ns.KillName(text)
+	if type(text) ~= "string" or ns.IsSecret(text) then return nil end
+	local p = KillPattern()
+	local name = p and text:match(p)
+	if not name or name == "" then
+		name = text:match("^(.-) slain: %d+/%d+") or text:match("^%d+/%d+ (.-) slain")
+	end
+	return (name and name ~= "") and name or nil
 end
 
 function ns.Print(msg)

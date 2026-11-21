@@ -72,6 +72,8 @@ end
 function S.ObjectiveName(text)
 	text = Clean(text)
 	if not text then return nil end
+	local killed = ns.KillName(text)
+	if killed then return killed end
 	local s = text:gsub("^%-%s*", ""):gsub("%s*%(.-%)%s*$", "")
 	s = s:gsub("%d+%s*/%s*%d+", "")
 	s = s:gsub("%s*:%s*$", ""):gsub("^%s*:%s*", "")

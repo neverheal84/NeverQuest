@@ -42,7 +42,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 - Settings: Options > Guide & Routes ("Raid attunements in the guide", and the level the reminder starts at).
 
 **Maps and navigation**
-- **Waypoint arrow:** rotating arrow with distance, ETA and coordinates, plus Blizzard's in-world marker. Adjustable size, compact mode. When you die and release, it points to your corpse (and says when you're close enough to resurrect), then goes back to your route once you're alive.
+- **Waypoint arrow:** rotating arrow with distance, ETA and coordinates, plus Blizzard's in-world marker. The arrow is NeverQuest's own art, drawn at 256 pixels and shown at a fraction of that with trilinear filtering and pixel snapping off, so it stays sharp at every size and angle instead of crawling as it turns. Four sizes under Options > Display & Maps. Adjustable size, compact mode. When you die and release, it points to your corpse (and says when you're close enough to resurrect), then goes back to your route once you're alive.
 - **Routes, not straight lines:** when a target needs a special path, the arrow goes there first and tells you what to do ("Enter Fargodeep Mine", "Take the tunnel...", "Fly from Goldshire to Lakeshire"), with a "then:" line for the final target. It uses, in order: a flight between flight masters you've discovered, when that's clearly faster; the game's own route for quests and for map pins (caves, buildings, tunnels, zone exits); and map links to cave or building entrances. Quest distances in the guide follow the route too, so a quest at the back of a mine ranks by how far it really is. Turn either part off under Options > NeverQuest > Routes.
 - **Minimap pins:** quest givers, objectives, turn-ins and your waypoints. Your current target clings to the minimap edge when it's out of range. Works with a rotating minimap.
 - **World map:** all your waypoints, numbered, plus a route preview of the guide's next steps joined by a line from where you stand (the line can be turned off or made thinner or thicker; the numbered pins stay). The route goes to objectives, finished turn-ins and pickups; where an unfinished quest will be handed in is left off the line unless you turn on "Include turn-ins for unfinished quests". When the game only marks a quest's NPC rather than its objective area, NeverQuest treats that spot as the NPC: a learned spawn spot takes over, the step says so, and the quest waits instead of sending you to the NPC early. **Alt+click** the map to drop a waypoint. Blizzard's own map pin (Ctrl+click) is picked up by the arrow too.
@@ -62,9 +62,21 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 - **Rares and treasures** the game shows on your minimap are remembered on the world map, with when you last saw them.
 - **Share:** new spots and marks go to party members who run NeverQuest. **Export** and **Import** (Options > Spawns & Objectives, or `/nq spawns export`) pass everything to friends or alts on another account as one text string.
 
+**Nameplates and tooltips**
+- **Quest icons on nameplates (`/nq plates`):** every mob your quests want gets a small icon on its nameplate: a sword to kill, a bag when it drops something you need, and a skull on the mob the guide is sending you at, with your count (3/8) underneath. They're pictures NeverQuest draws on your own screen, not raid markers: Forever no longer lets an addon place those, and nobody else sees these. What earns an icon is the game's own answer to "does this unit count for a quest I'm on" plus the drop sources NeverQuest has learned, never anything about a fight. When the game hides a unit's name from addons the icon still shows, just without the count. Left, right or above the nameplate, four sizes, and they step aside while Questie runs.
+- **Mob tooltips:** a mob NeverQuest has learned drops a quest item says which quest and how far along you are (the game already lists objectives on mobs it knows about, so those aren't repeated). In a party, every mob shows how far along each member is on its quest.
+- **Item tooltips:** an item an open objective is collecting says which quest wants it and your count.
+- Settings: Options > Display & Maps (nameplates) and Options > NeverQuest > Tooltips.
+
 **Quest tracker (right side)**
 - **Sorted by priority, grouped by zone:** the NeverQuest tracker lists your quests in the order the guide will do them, numbered, grouped under zone headers with your current zone first. Each quest shows its level, distance, objectives, "Ready to turn in (to NPC)", its chain and party progress. Click a quest to point the arrow at it, Shift+click to link it, right-click to pin it to the top, hide it or open it in the quest log. Click a zone header to collapse it; right-click the tracker header for sorting (priority, distance, level) and quick options.
 - **Blizzard's quest list:** by default it's emptied while the NeverQuest tracker shows (your quests are untracked, so Blizzard's objective tracker keeps only its other sections, like bonus objectives). Or choose "Sort by priority" to keep Blizzard's list in NeverQuest's order, or "Leave it alone". Turning the hide option off gives your tracked quests back. NeverQuest only changes which quests are tracked, out of combat, and never edits Blizzard's frames.
+
+**Drops window (`/nq drops`)**
+- **What you still have to collect:** a second, smaller window listing every quest item you're short of and everything you pick up off the ground, with how many you have of how many you need. Where the TARGET button answers "who am I looking for", this answers "what am I still short of". Mobs you only have to kill stay with the button.
+- **Where it drops:** under each item, the mobs you've seen it come from and the distance to the nearest spot NeverQuest knows. These are yours, learned from the credit you've earned, not a shipped database, so a brand new item shows nothing until the first one drops for you.
+- **Use it:** click an item to point the arrow at the nearest spot you know, Shift+click to link it in chat, right-click for the arrow, the link or to forget its spots. Right-click the header for sorting (closest to done, fewest left, nearest), the source line, lock and hide. Drag the header to move it.
+- Off until you turn it on: `/nq drops`, the key binding, or Options > Tracker > Drops window. `/nq drops list` prints the same list in chat.
 
 **Buttons**
 - **Quest item bar:** a slim bar with the NeverQuest logo as its drag handle, holding usable quest items for your next steps (rounded buttons with cooldowns and key labels). Keybindable.
@@ -100,6 +112,12 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 
 **Session summary (`/nq session`):** time played, XP and XP per hour, levels, quests, kills, gold and deaths since you logged in. Optionally shown when you log out.
 
+**Sharing as you go:** with "Share quests with my party as I pick them up" on (Options > NeverQuest > Party, off by default), each quest you take from an NPC is offered to your party. A quest that was shared to you isn't shared back, and nothing is sent in a raid.
+
+**Upgrades and junk in your bags:** the guide adds a row when something in your bags beats what you're wearing, judged the same way as quest rewards, with what it replaces and the stat difference. When your bags are nearly full it also names the cheapest piece of junk, the one to throw out if you need a slot before the next vendor.
+
+**Flight times:** the game doesn't tell an addon how long a flight takes, so NeverQuest times each planned flight the first time you take it and counts it down on the arrow from then on.
+
 **Asking for a group:** Ctrl-click an elite or group quest in the guide, or pick "Ask for a group" in its tracker menu, to put an LFG message with the quest link in your chat box. Nothing is sent until you press Enter. `/nq lfg` does it for your next elite quest.
 
 ## Commands
@@ -108,7 +126,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 |---|---|
 | `/nq` | Open or close the window |
 | `/nq setup` | The setup wizard |
-| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, upkeep, database, commands, keys, news, trouble) |
+| `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, drops, raids, party, buttons, automation, upkeep, database, commands, keys, news, trouble) |
 | `/nq commands` | List every command in chat |
 | `/nq loot [on \| off]` | Auto loot on or off |
 | `/nq junk` | Sell gray items now (at a vendor), or see what they're worth |
@@ -116,6 +134,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 | `/nq db [name \| zone <zone> \| way <id> \| scan \| map]` | The quest database: your zone's quests, search, another zone, point the arrow, scan again, world map markers |
 | `/nq session` | What this play session brought in |
 | `/nq news` | What changed in recent versions (also offered once in chat after an update) |
+| `/nq discord` | A copyable link to the NeverQuest Discord |
 | `/nq lfg` | Put an LFG message for your next elite quest in the chat box |
 | `/nq questie` | With Questie running, hide or show NeverQuest's quest giver and spawn pins |
 | `/nq guide`, `quests`, `nearby`, `journal`, `guides` | Open a tab |
@@ -127,6 +146,8 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 | `/nq style [optimized \| zone]` | Switch leveling style |
 | `/nq minimap [lock]` | Show or hide the minimap button, or lock it |
 | `/nq tracker` | Show or hide the NeverQuest tracker; `lock` locks it, `blizzard` changes what happens to Blizzard's quest list |
+| `/nq drops [lock \| list]` | Show or hide the drops window, lock it, or print what you still have to collect |
+| `/nq plates [on \| off]` | Quest icons on the nameplates of mobs your quests want |
 | `/way 45.2 63.8 Innkeeper` | Waypoint in your current zone |
 | `/way Westfall 52 30` | Waypoint in another zone |
 | `/way list`, `clear`, `next`, `closest`, `here` | Manage waypoints |
@@ -168,6 +189,12 @@ The live guide works for any race from level 1. For a curated route:
 2. Pickups, completions, turn-ins (with NPC names), flights, hearths, trainers, vendors and level-ups are saved with coordinates. Use `/nq grind` after grinding and `/nq note` for tips.
 3. `/nq stop`. The guide appears in the Guides tab on all your characters.
 4. **Export** gives you text to share. **Import** loads someone else's. Guides from version 1.0 still import.
+
+## Help and bug reports
+
+**Discord:** [discord.gg/mmCB2teWvf](https://discord.gg/mmCB2teWvf) (bug reports, help and suggestions each have a channel). In game, the **Discord** button at the top of the main window or `/nq discord` gives you the link to copy.
+
+For a bug, paste the output of `/nq report` in the bug reports channel and say what you were doing. That report carries your version, client build and recent errors, which is usually enough to find it.
 
 ## Notes
 

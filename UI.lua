@@ -266,6 +266,9 @@ function UI:Create()
 	local help = Button(f, "Help", 50, function() if ns.Help then ns.Help:Open() end end)
 	help:SetPoint("RIGHT", opts, "LEFT", -4, 0)
 	self.btnHelp = help
+	local disc = Button(f, "Discord", 62, function() UI:ShowDiscord() end)
+	disc:SetPoint("RIGHT", help, "LEFT", -4, 0)
+	self.btnDiscord = disc
 
 	self.tabs = {}
 	for i, t in ipairs(TABS) do
@@ -780,6 +783,12 @@ end
 
 ---------------------------------------------------------------------------
 -- Import / export box
+-- The game can't open a browser, so the invite goes in a box you can copy out of.
+function UI:ShowDiscord()
+	self:ShowIO("export", ns.DISCORD, "NeverQuest on Discord",
+		"Press Ctrl+C to copy, then paste it into your browser. Bug reports, help and suggestions all have a channel.")
+end
+
 ---------------------------------------------------------------------------
 -- onImport(text) handles the Import button (default: guides) and returns true to close.
 function UI:ShowIO(mode, text, title, hint, onImport)
@@ -1001,6 +1010,9 @@ function UI:CreateOptions()
 	L:Next(10)
 	Heading(p, L.x, L:Next(), "Reminders")
 	local up = db.upkeep
+	Check(p, L.x, L:Next(), "Upgrades sitting in my bags", function() return up.upgrades end,
+		function(v) up.upgrades = v ns.Upkeep.bagCache = nil ns.Guide:Refresh() end,
+		"A guide row when something in your bags beats what you're wearing, judged the same way as quest rewards.")
 	local function Re() ns.Guide:Refresh() end
 	Check(p, L.x, L:Next(), "Quest log full: say what to drop", function() return up.logFull end, function(v) up.logFull = v Re() end,
 		"Suggests quests to drop (failed, gray, far away, little XP for the walk). Never ones ready to hand in or your attunement.")
@@ -1043,6 +1055,18 @@ function UI:CreateOptions()
 		function(v) db.party.regroup = v Party() end, "Adds a step that points the arrow at a party member more than 300 yards away.")
 	Check(p, R.x + 16, R:Next(), "Suggest quests to share or ask for", function() return db.party.shareTips end,
 		function(v) db.party.shareTips = v Party() end, "Quests lists come from party members running NeverQuest.")
+	Check(p, R.x, R:Next(), "Share quests with my party as I pick them up", function() return db.party.autoShare end,
+		function(v) db.party.autoShare = v end,
+		"Offers each quest you take from an NPC to your party. A quest that was shared to you isn't shared back, and nothing is sent in a raid.")
+
+	R:Next(10)
+	Heading(p, R.x, R:Next(), "Tooltips")
+	local tt = db.tooltips
+	Check(p, R.x, R:Next(), "Quest lines on mobs", function() return tt.units end, function(v) tt.units = v end,
+		"Adds the quest and objective to mobs NeverQuest has learned drop a quest item. The game already lists objectives on mobs it knows about.")
+	Check(p, R.x, R:Next(), "Party progress on mobs", function() return tt.party end, function(v) tt.party = v end,
+		"How far along each party member is on the quest a mob counts for. Needs them to run NeverQuest.")
+	Check(p, R.x, R:Next(), "Which quest wants an item", function() return tt.items end, function(v) tt.items = v end)
 
 	R:Next(10)
 	Heading(p, R.x, R:Next(), "Party announcements")
@@ -1199,6 +1223,25 @@ function UI:CreateOptions()
 	Cycle(t, Rt.x, Rt:Next(30), "Background:", { { 0, "None" }, { 0.25, "Light" }, { 0.45, "Medium" }, { 0.75, "Dark" } },
 		function() return tc.bgAlpha end, function(v) tc.bgAlpha = v Track() end)
 	Cycle(t, Rt.x, Rt:Next(30), "Tracker size:", St.SCALES, function() return tc.scale end, function(v) tc.scale = v Track() end)
+
+	local dc = db.drops
+	local function Drop() ns.Drops:Refresh() end
+	Lt:Next(10)
+	Heading(t, Lt.x, Lt:Next(), "Drops window")
+	Check(t, Lt.x, Lt:Next(), "Show the drops window", function() return dc.shown end, function(v) dc.shown = v Drop() end,
+		"A separate list of the quest items you still have to collect, how many you have, and which mobs you have seen them drop from.")
+	Check(t, Lt.x, Lt:Next(), "Show where it drops", function() return dc.showSource end, function(v) dc.showSource = v Drop() end,
+		"The gray line under each item: the mobs NeverQuest has watched you get it from, and the distance to the nearest spot it knows.")
+	Cycle(t, Lt.x, Lt:Next(30), "Sort by:", { { "progress", "Closest to done" }, { "remaining", "Fewest left" }, { "distance", "Nearest" } },
+		function() return dc.sort end, function(v) dc.sort = v Drop() end)
+	Check(t, Lt.x, Lt:Next(), "Lock position", function() return dc.locked end, function(v) dc.locked = v end)
+	Cycle(t, Lt.x, Lt:Next(30), "Width:", { { 210, "Narrow" }, { 250, "Normal" }, { 300, "Wide" }, { 360, "Wider" } },
+		function() return dc.width end, function(v) dc.width = v Drop() end)
+	Cycle(t, Lt.x, Lt:Next(30), "Height limit:", { { 240, "Short" }, { 420, "Normal" }, { 600, "Tall" } },
+		function() return dc.maxHeight end, function(v) dc.maxHeight = v Drop() end)
+	Cycle(t, Lt.x, Lt:Next(30), "Background:", { { 0, "None" }, { 0.25, "Light" }, { 0.45, "Medium" }, { 0.75, "Dark" } },
+		function() return dc.bgAlpha end, function(v) dc.bgAlpha = v Drop() end)
+	Cycle(t, Lt.x, Lt:Next(30), "Drops size:", St.SCALES, function() return dc.scale end, function(v) dc.scale = v Drop() end)
 	FitContent(t, Lt, Rt)
 	self.trackerOptions = t
 
@@ -1221,6 +1264,19 @@ function UI:CreateOptions()
 	Check(d, L2.x, L2:Next(), "Coordinates line", function() return not db.arrow.compact end, function(v) db.arrow.compact = not v ns.Nav:Update() end)
 	Check(d, L2.x, L2:Next(), "Arrival time (ETA)", function() return db.arrow.showETA end, function(v) db.arrow.showETA = v end)
 	Check(d, L2.x, L2:Next(), "\"then:\" line for the final target", function() return db.arrow.showThen end, function(v) db.arrow.showThen = v ns.Nav:Update() end)
+	local pl = db.plates
+	local function Plates() ns.Plates:RefreshAll() end
+	Check(d, L2.x, L2:Next(), "Quest icons on nameplates", function() return pl.enabled end, function(v) pl.enabled = v Plates() end,
+		"A small icon on the nameplate of every mob your quests want: a sword to kill, a bag when it drops something you need. Drawn on your screen only; these are not raid markers.")
+	Check(d, L2.x + 16, L2:Next(), "Skull on the mob the guide sends me at", function() return pl.skull end, function(v) pl.skull = v Plates() end)
+	Check(d, L2.x + 16, L2:Next(), "Progress under the icon", function() return pl.count end, function(v) pl.count = v Plates() end)
+	Cycle(d, L2.x + 16, L2:Next(30), "Icon position:", { { "left", "Left" }, { "right", "Right" }, { "top", "Above" } },
+		function() return pl.side end, function(v) pl.side = v Plates() end)
+	Cycle(d, L2.x + 16, L2:Next(30), "Icon size:", { { 0.8, "Small" }, { 1, "Normal" }, { 1.3, "Large" }, { 1.6, "Larger" } },
+		function() return pl.scale end, function(v) pl.scale = v Plates() end)
+	Cycle(d, L2.x, L2:Next(30), "Arrow size:", { { 42, "Small" }, { 54, "Normal" }, { 68, "Large" }, { 88, "Larger" } },
+		function() return db.arrow.size end, function(v) db.arrow.size = v ns.Nav:Update() end,
+		"The arrow art is drawn at 256 pixels, so it stays sharp at every size here.")
 	Check(d, L2.x, L2:Next(), "Sound on arrival", function() return db.arrow.sound end, function(v) db.arrow.sound = v end)
 	Check(d, L2.x, L2:Next(), "Point to my corpse when I die", function() return db.arrow.corpse end,
 		function(v) db.arrow.corpse = v ns.Nav.corpseCheck = nil ns.Nav:Update() end,

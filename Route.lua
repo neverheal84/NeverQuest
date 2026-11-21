@@ -175,7 +175,10 @@ function R:Compute(t)
 	if not t or not t.m then return nil end
 	if UnitOnTaxi("player") then
 		local f = self.flight
-		return { inFlight = true, text = (f and f.to) and ("Flying to " .. f.to.name) or "In flight" }
+		local text = (f and f.to) and ("Flying to " .. f.to.name) or "In flight"
+		local left = self:FlightLeft()
+		if left then text = text .. "  ~" .. ns.Duration(left) .. " left" end
+		return { inFlight = true, text = text, left = left }
 	end
 	-- Ghosts can't take flights or follow quest routes: only cave and building entrances help.
 	if t.src == "corpse" then return R.LinkLeg(t.m) end
@@ -225,12 +228,43 @@ end
 
 ns:RegisterEvent("TAXI_NODE_STATUS_CHANGED", function() wipe(nodeCache) R:Invalidate() end)
 
+-- How long each flight takes isn't something the game tells an addon, so it's timed: the first
+-- time you fly a planned leg it's measured, and from then on the arrow counts it down.
+local function FlightKey(f)
+	return (f and f.from and f.to and f.from.name and f.to.name) and (f.from.name .. ">" .. f.to.name) or nil
+end
+
+function R:FlightLeft()
+	local t = self.airborne
+	if not t then return nil end
+	local known = ns.db.flightTimes[t.key]
+	if not known then return nil end
+	return math.max(0, known - (GetTime() - t.start))
+end
+
+ns:RegisterEvent("PLAYER_CONTROL_LOST", function()
+	ns.After(0.5, function()
+		local f = R.flight
+		local key = FlightKey(f)
+		if key and not f.landed and UnitOnTaxi("player") then
+			R.airborne = { key = key, start = GetTime() }
+		end
+	end)
+end)
+
 -- Landing ends the flight leg; the next leg (or the target itself) takes over.
 ns:RegisterEvent("PLAYER_CONTROL_GAINED", function()
 	ns.After(1, function()
 		local f = R.flight
+		local air = R.airborne
+		R.airborne = nil
 		if f and not f.landed and not UnitOnTaxi("player") and f.to then
 			local d = ns.Nav.Distance(f.to.m, f.to.x, f.to.y)
+			if d and d < 250 and air and air.key == FlightKey(f) then
+				-- Landed where the plan said: that's a clean timing (the 1s is this handler's own delay).
+				local took = math.floor(GetTime() - air.start - 1 + 0.5)
+				if took >= 10 and took <= 1500 then ns.db.flightTimes[air.key] = took end
+			end
 			if d and d < 250 then
 				R.flight = { key = f.key, landed = true }
 				R:Invalidate()

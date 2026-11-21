@@ -26,7 +26,9 @@ function D:Check()
 	Line(out, iface == TOC_INTERFACE and "OK" or "WARN", "Client",
 		string.format("%s (%s), interface %s, NeverQuest built for %d, locale %s", tostring(version), tostring(build), tostring(iface), TOC_INTERFACE, GetLocale()))
 	if GetLocale() ~= "enUS" and GetLocale() ~= "enGB" then
-		Line(out, "WARN", "Language", "mob names for the target button are read from English objective text")
+		Line(out, type(QUEST_MONSTERS_KILLED) == "string" and "OK" or "WARN", "Language",
+			type(QUEST_MONSTERS_KILLED) == "string" and "mob names are read with this client's own objective wording"
+			or "this client doesn't expose its objective wording, so mob names fall back to the English form")
 	end
 
 	-- Position and map

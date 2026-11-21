@@ -25,6 +25,8 @@ Help.TOPICS = {
 		Y .. "Setup wizard" .. E .. ": " .. Y .. "/nq setup" .. E .. " walks through the main settings in a few steps.",
 		Y .. "Options" .. E .. ": " .. Y .. "/nq options" .. E .. ", or Esc > Options > AddOns > NeverQuest. Almost every feature can be turned off.",
 		Y .. "Tooltips" .. E .. ": hover rows, pins and buttons for details and what clicks do.",
+		Y .. "Discord" .. E .. ": the Discord button at the top of the main window, or " .. Y .. "/nq discord" .. E ..
+			", gives you a link you can copy. Bug reports, help and suggestions each have a channel.",
 		"",
 		"Pick a topic on the left to learn more.")
 	end },
@@ -61,6 +63,7 @@ Help.TOPICS = {
 	{ key = "arrow", title = "Arrow and waypoints", text = function() return Lines(
 		Y .. "Waypoint arrow" .. E,
 		"Points at the guide's top step, your own waypoints (they come first), or your corpse after you release. It shows distance, ETA and coordinates, and when a target needs a special path it says what to do (enter a cave, take a tunnel, fly).",
+		"The arrow itself is NeverQuest's own art, drawn well above the size it shows at, so it stays clean at any size and at every angle. Four sizes under Options > Display & Maps, and the whole panel scales separately under Scale & Text.",
 		"",
 		"  Right-click: clear the current waypoint.  Shift+right-click: clear all.  Drag: move it.",
 		"",
@@ -84,6 +87,9 @@ Help.TOPICS = {
 		"",
 		Y .. "Marking spots" .. E,
 		"  Alt+right-click the world map to mark a spawn, an objective, a mob by name or a note.",
+		"",
+		Y .. "Nameplates and tooltips" .. E,
+		"Every mob your quests want gets a small icon on its nameplate: a sword to kill, a bag when it drops something you need, and a skull on the one the guide is sending you at, with your count underneath. They are drawn on your screen only (the game no longer lets addons place raid markers) and need enemy nameplates showing. Hover a mob NeverQuest has learned as a drop source and its tooltip says which quest and how far along; in a party it shows everyone's progress. Items say which quest wants them. Options > Display & Maps and Options > NeverQuest > Tooltips.",
 		"  " .. Y .. "/nq mark" .. E .. " marks your target's spawn where you stand; " .. Y .. "/nq mapnote" .. E .. " leaves a note.",
 		"  Right-click a spot to set a waypoint or forget it; Shift+click removes a mark.",
 		"",
@@ -100,6 +106,19 @@ Help.TOPICS = {
 		"",
 		Y .. "Blizzard's quest list" .. E,
 		"By default it's emptied while NeverQuest's tracker shows. You can keep it in NeverQuest's order or leave it alone instead (Options > Tracker). " .. Y .. "/nq tracker" .. E .. " shows or hides the tracker.")
+	end },
+	{ key = "drops", title = "Drops window", text = function() return Lines(
+		Y .. "Drops window" .. E,
+		"A second, smaller window for the things you still have to collect: quest item drops and anything you pick up off the ground. Each one shows the item, how many you have of how many you need, and under it the mobs you have seen it drop from with the distance to the nearest one NeverQuest knows about. Mobs you only have to kill stay with the TARGET button; this window is for what you are short of.",
+		"",
+		"  Click an item: point the arrow at the nearest spot you know.",
+		"  Shift+click: put the item in chat.",
+		"  Right-click an item: point the arrow, link it, or forget its spots.",
+		"  Right-click the header: sorting, the source line, lock and hide. Drag the header to move it.",
+		"",
+		"It's off until you turn it on, with " .. Y .. "/nq drops" .. E .. ", the key binding, or Options > Tracker > Drops window. " .. Y .. "/nq drops list" .. E .. " prints the same list in chat.",
+		"",
+		"The drop sources are yours, not a shipped database: a mob is listed once you have earned credit from it, so a brand new item shows nothing until the first one drops for you.")
 	end },
 	{ key = "raids", title = "Raid attunements", text = function() return Lines(
 		Y .. "Raid attunements" .. E,
@@ -216,10 +235,22 @@ Help.TOPICS = {
 		"  Open or close NeverQuest",
 		"  Use quest item 1 and quest item 2",
 		"  Target next NPC or mob",
+		"  Open or close the drops window",
 		"  Skip guide step",
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.14.0" .. E,
+		"  New drops window: the quest items you still have to collect, how far along each one is, and the mobs you have seen them drop from. " .. Y .. "/nq drops" .. E .. " opens it.",
+		"  Quest icons on nameplates: a sword on mobs to kill, a bag on mobs that drop something you need, and a skull on the one the guide is sending you at. Drawn on your screen only. " .. Y .. "/nq plates" .. E .. " switches them.",
+		"  Tooltips: mobs learned as a drop source say which quest and how far along, mobs show your party's progress, and items say which quest wants them.",
+		"  The guide tells you when something in your bags beats what you're wearing, and which junk is cheapest when your bags are full.",
+		"  Flights are timed the first time you take them, and counted down on the arrow after that.",
+		"  New option: share each quest with your party as you pick it up (Options > NeverQuest > Party).",
+		"  Kill objectives are read with your client's own wording, so the target button and spawn maps work in every language.",
+		"  The waypoint arrow is NeverQuest's own art now, drawn at 256 pixels instead of borrowing the game's small one, so it stays sharp at any size and while it turns. Options > Display & Maps sets how big it is.",
+		"  NeverQuest has a Discord now: the button at the top of the main window, or " .. Y .. "/nq discord" .. E .. ". Bug reports, help and suggestions each have a channel.",
+		"",
 		Y .. "1.13.2" .. E,
 		"  A finished quest is never hidden for being gray. It was worth its XP when you did the work, so the route sends you to collect it however far you have levelled past it.",
 		"  Once a pile of hand-ins is judged worth the trip, the whole pile goes on the route, instead of one quest at the end of a long walk.",
@@ -259,7 +290,10 @@ Help.TOPICS = {
 		"  A feature stopped: if it hit repeated errors NeverQuest pauses just that feature and tells you; " .. Y .. "/reload" .. E .. " brings it back.",
 		"  Dots or steps point somewhere odd: right-click the spot and forget it; spots improve as you play.",
 		"",
-		Y .. "Settings" .. E .. " are saved per account (" .. Y .. "NeverQuestDB" .. E .. ") and per character (" .. Y .. "NeverQuestCharDB" .. E .. ").")
+		Y .. "Settings" .. E .. " are saved per account (" .. Y .. "NeverQuestDB" .. E .. ") and per character (" .. Y .. "NeverQuestCharDB" .. E .. ").",
+		"",
+		Y .. "Still stuck?" .. E .. " " .. Y .. "/nq discord" .. E .. " gives you a link you can copy. Paste the output of " ..
+			Y .. "/nq report" .. E .. " in the bug reports channel and say what you were doing; that report has your version, client and recent errors in it.")
 	end },
 }
 
@@ -374,5 +408,9 @@ ns.slash.help = function(arg)
 	Help:Open(topic and topic.key or nil)
 end
 table.insert(ns.slashHelp, "/nq help [topic] - how everything works (topics: start, guide, plan, arrow, maps, tracker, raids, party, buttons, automation, upkeep, database, commands, keys, news, trouble)")
+ns:AddSlash("discord", function()
+	if ns.UI and ns.UI.ShowDiscord then ns.UI:ShowDiscord() end
+	ns.Print("Discord: " .. ns.DISCORD)
+end, "/nq discord - the NeverQuest Discord: bug reports, help and suggestions")
 ns:AddSlash("news", function() Help:Open("news") end, "/nq news - what changed in recent versions")
 ns:AddSlash("commands", PrintCommands, "/nq commands - list every command in chat")

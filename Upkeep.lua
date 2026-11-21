@@ -168,8 +168,34 @@ function U:BagState()
 	if c then return c end
 	local food, ammo = self:Supplies()
 	c = { food = food, ammo = ammo, free = self:FreeSlots() }
+	c.upgrade, c.junk = self:BagFinds()
 	self.bagCache = c
 	return c
+end
+
+-- Two things worth knowing about what's in your bags: the gear that beats what you're wearing
+-- most, and the junk that is worth least (the one to throw out when you need a slot now).
+function U:BagFinds()
+	local best, cheap
+	EachBagItem(function(bag, slot, info)
+		local link = info.hyperlink
+		if not link then return end
+		local name = link:match("%[(.-)%]") or "item"
+		if info.quality == 0 then
+			if not info.hasNoValue then
+				local ok, _, _, _, _, _, _, _, _, _, _, price = pcall(C_Item.GetItemInfo, info.itemID)
+				price = ok and ns.Num(price) or nil
+				if price and price > 0 then
+					local value = price * math.max(1, ns.Num(info.stackCount) or 1)
+					if not cheap or value < cheap.value then cheap = { name = name, link = link, value = value } end
+				end
+			end
+		elseif Cfg().upgrades and ns.Rewards and ns.Rewards.Upgrade then
+			local cmp = ns.Rewards:Upgrade(link)
+			if cmp and (not best or cmp.gain > best.cmp.gain) then best = { name = name, link = link, cmp = cmp } end
+		end
+	end)
+	return best, cheap
 end
 
 ns:RegisterEvent("BAG_UPDATE_DELAYED", function()
@@ -195,6 +221,16 @@ function U:Tips(level)
 		end
 	end
 	local bags = self:BagState()
+	if cfg.upgrades and bags.upgrade then
+		local up = bags.upgrade
+		local diff = ns.Rewards.DiffText(up.cmp.diff)
+		local against = up.cmp.against and up.cmp.against:match("%[(.-)%]")
+		table.insert(rows, { kind = "tip", key = "tip:upgrade:" .. up.name,
+			title = "Upgrade in your bags: " .. up.name,
+			sub = (diff ~= "" and (diff .. " ") or "") .. (against and ("over your " .. against .. ".") or "for a slot you have nothing in.")
+				.. " Right-click to hide this.",
+			color = { 0.4, 1, 0.5 } })
+	end
 	if cfg.supplies and (level or 0) >= 5 then
 		local food, ammo = bags.food, bags.ammo
 		if food < (cfg.foodMin or 10) then
@@ -221,6 +257,9 @@ function U:Tips(level)
 				local names = {}
 				for i = 1, math.min(3, #maybe) do names[i] = maybe[i].name end
 				extra = "  Probably leftovers (no quest in your log uses them): " .. table.concat(names, ", ") .. "."
+			end
+			if bags.junk then
+				extra = extra .. "  Need a slot now? Your cheapest junk is " .. bags.junk.name .. " (" .. ns.Money(bags.junk.value) .. ")."
 			end
 			table.insert(rows, { kind = "tip", key = "tip:bags",
 				title = string.format("Bags almost full (%d free)", free),

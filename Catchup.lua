@@ -160,18 +160,29 @@ function C:Note(questID, kind)
 	end
 end
 
-function C:Share(questID)
+function C:Share(questID, quiet)
 	if not questID or not IsInGroup() then return false end
 	if ns.SafeCall(C_QuestLog.IsPushableQuest, questID) ~= true then
-		ns.Print("that quest can't be shared.")
+		if not quiet then ns.Print("that quest can't be shared.") end
 		return false
 	end
 	local index = ns.SafeCall(C_QuestLog.GetLogIndexForQuestID, questID)
 	if not index then return false end
 	QuestLogPushQuest(index)
-	ns.PlaySound(SOUNDKIT.IG_QUEST_LOG_OPEN)
+	if not quiet then ns.PlaySound(SOUNDKIT.IG_QUEST_LOG_OPEN) end
 	return true
 end
+
+-- Offer a quest to the party as you pick it up. Only quests you took from an NPC yourself:
+-- one that was shared to you isn't shared straight back, and nothing is sent in a raid.
+ns:RegisterEvent("QUEST_ACCEPTED", function(_, questID)
+	if not questID or not ns.ready or not ns.db.party.autoShare then return end
+	if not IsInGroup() or IsInRaid() then return end
+	if not ns.Quests:TakenFromNPC(questID) then return end
+	ns.After(1.5, function()
+		if IsInGroup() and not IsInRaid() then C:Share(questID, true) end
+	end)
+end)
 
 ---------------------------------------------------------------------------
 -- Guide rows

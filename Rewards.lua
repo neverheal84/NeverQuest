@@ -187,6 +187,16 @@ function R:Best(count, getLink, getNum)
 end
 
 -- "+8 Agility, +3 Stamina" from a comparison.
+-- Is this item an upgrade over what you're wearing? For loot sitting in your bags. Returns the
+-- Compare result, or nil for anything you can't wear, can't judge yet or that isn't better.
+function R:Upgrade(link)
+	local info = Info(link)
+	if not info or not R.CanUse(info) then return nil end
+	local ok, cmp = pcall(self.Compare, self, link)
+	if ok and cmp and cmp.gain and cmp.gain > 0.5 then return cmp end
+	return nil
+end
+
 function R.DiffText(diff)
 	local parts = {}
 	for _, k in ipairs({ "STR", "AGI", "INT", "SPI", "STA", "AP", "SP", "dps", "armor" }) do
