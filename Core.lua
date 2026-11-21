@@ -80,6 +80,7 @@ local CHAR_DEFAULTS = {
 	trackerPinned = {},                      -- quests pinned to its top
 	trackerZones = {},                       -- [zone] = true collapsed / false expanded
 	trackerUntracked = {},                   -- quests NeverQuest untracked in Blizzard's list, to give back
+	cvarBackup = {},                         -- the player's own auto-watch settings, to hand back when we stop hiding
 	attune = {},                             -- [attunement] = { follow, turned, ticks, unticks }
 	hearth = false,                          -- { name, m, x, y, zone } where you bound your hearthstone
 }

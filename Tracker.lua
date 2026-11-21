@@ -447,6 +447,49 @@ function T:BlizzardMode()
 	return "leave"
 end
 
+-- Blizzard re-watches a quest the moment you accept one or make progress on one, so its
+-- tracker flashes into view before we can untrack it again. Untracking after the fact can
+-- only ever clean up behind that; stopping the auto-watch is what actually prevents it.
+--
+-- The player's own values are kept and handed back when we stop hiding, because a CVar change
+-- outlives the addon: it would otherwise sit on their character after NeverQuest was gone.
+local AUTO_CVARS = { "autoQuestWatch", "autoQuestProgress" }
+
+local function GetCVarValue(name)
+	local v = ns.SafeCall(GetCVar, name)
+	if v == nil and C_CVar and C_CVar.GetCVar then v = ns.SafeCall(C_CVar.GetCVar, name) end
+	return v
+end
+
+local function SetCVarValue(name, value)
+	if ns.SafeCall(SetCVar, name, value) ~= nil then return true end
+	if C_CVar and C_CVar.SetCVar then return ns.SafeCall(C_CVar.SetCVar, name, value) ~= nil end
+	return false
+end
+
+function T:SuppressAutoWatch()
+	local backup = ns.char.cvarBackup
+	for _, name in ipairs(AUTO_CVARS) do
+		local now = GetCVarValue(name)
+		if now ~= nil and now ~= "0" then
+			if backup[name] == nil then backup[name] = now end
+			SetCVarValue(name, "0")
+			ns.Debug("tracker: " .. name .. " off while Blizzard's list is hidden (was " .. tostring(now) .. ")")
+		end
+	end
+end
+
+function T:RestoreAutoWatch()
+	local backup = ns.char.cvarBackup
+	for _, name in ipairs(AUTO_CVARS) do
+		if backup[name] ~= nil then
+			SetCVarValue(name, backup[name])
+			ns.Debug("tracker: " .. name .. " back to " .. tostring(backup[name]))
+			backup[name] = nil
+		end
+	end
+end
+
 local function Watched()
 	local out = {}
 	for i = 1, C_QuestLog.GetNumQuestWatches() do
@@ -471,6 +514,7 @@ function T:ControlBlizzard()
 	if not ns.ready or InCombatLockdown() then return end
 	local mode = self:BlizzardMode()
 	if mode == "hide" then
+		self:SuppressAutoWatch()
 		local watched = Watched()
 		for _, id in ipairs(watched) do
 			ns.char.trackerUntracked[id] = true
@@ -478,6 +522,7 @@ function T:ControlBlizzard()
 		end
 		if #watched > 0 then ns.Debug("tracker: untracked " .. #watched .. " quests in Blizzard's list") end
 	elseif mode == "sort" then
+		self:RestoreAutoWatch()
 		GiveBack()
 		local want = {}
 		for _, e in ipairs(self:Entries("priority")) do
@@ -501,6 +546,7 @@ function T:ControlBlizzard()
 		for _, id in ipairs(want) do C_QuestLog.AddQuestWatch(id) end
 		ns.Debug("tracker: Blizzard's list sorted by NeverQuest priority")
 	else
+		self:RestoreAutoWatch()
 		GiveBack()
 	end
 end
@@ -520,6 +566,10 @@ local function Control(delay)
 	ns.Debounce("trackercontrol", delay or 1, function() T:ControlBlizzard() end)
 end
 ns:RegisterEvent("QUEST_WATCH_LIST_CHANGED", function() Control(1) end)
+-- If a quest is watched despite the above (another addon, or a CVar the client ignores), take
+-- it off on the next frame rather than a second later, so any flash is as short as possible.
+ns:RegisterEvent("QUEST_ACCEPTED", function() if Cfg().blizzard == "hide" then Control(0.05) end end)
+ns:RegisterEvent("QUEST_TURNED_IN", function() if Cfg().blizzard == "hide" then Control(0.05) end end)
 ns:RegisterEvent("PLAYER_REGEN_ENABLED", function() Control(1) end)
 ns:RegisterEvent("PLAYER_ENTERING_WORLD", function() Control(3) end)
 ns:RegisterMessage("GUIDE_UPDATED", function() if Cfg().blizzard == "sort" then Control(3) end end)

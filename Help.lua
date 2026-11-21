@@ -107,7 +107,8 @@ Help.TOPICS = {
 		"  Right-click the tracker header: sorting and quick options. Drag the header to move it.",
 		"",
 		Y .. "Blizzard's quest list" .. E,
-		"By default it's emptied while NeverQuest's tracker shows. You can keep it in NeverQuest's order or leave it alone instead (Options > Tracker). " .. Y .. "/nq tracker" .. E .. " shows or hides the tracker.")
+		"By default it's emptied while NeverQuest's tracker shows. You can keep it in NeverQuest's order or leave it alone instead (Options > Tracker). " .. Y .. "/nq tracker" .. E .. " shows or hides the tracker.",
+		"While it's emptied, NeverQuest also turns off the game's automatic quest watching, so Blizzard's tracker doesn't flash up each time you accept or finish a quest. Your own setting is remembered and handed straight back the moment you stop hiding the list.")
 	end },
 	{ key = "drops", title = "Drops window", text = function() return Lines(
 		Y .. "Drops window" .. E,
