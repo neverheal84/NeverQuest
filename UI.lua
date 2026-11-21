@@ -1168,9 +1168,36 @@ function UI:CreateOptions()
 	Check(p, R.x, R:Next(), "Show known quests on the world map", function() return qd.worldmap end,
 		function(v) qd.worldmap = v ns:SendMessage("MAP_OFFERS_UPDATED") end,
 		"Faded markers for quests you know about that aren't on offer to you yet, with the level they open at.")
+	Check(p, R.x, R:Next(), "Also learn quests I can't take yet", function() return qd.deep end,
+		function(v) qd.deep = v if not v then ns.QuestDB:StopScan() end end,
+		"A quest you can see tells the game which chain it belongs to, so NeverQuest can ask for the names and levels of the rest of that chain, including quests above your level. This is what fills the database in before you have played the zone.")
+	Check(p, R.x, R:Next(), "Share quest starts with my party", function() return qd.share end,
+		function(v) qd.share = v end,
+		"Party members running NeverQuest pass on the quest givers they have stood in front of, and you pass on yours. Places only, nothing about you.")
+	Check(p, R.x, R:Next(), "Share quest starts with my guild", function() return qd.guild end,
+		function(v) qd.guild = v end,
+		"The same, across your guild, where there are far more people at more levels. This is what fills the map in for a new character. Somewhere you have been yourself is never overwritten by someone else's report.")
 	Check(p, R.x, R:Next(), "Hide NeverQuest's quest pins while Questie runs", function() return db.compat.questie end,
 		function(v) db.compat.questie = v ns:SendMessage("MAP_OFFERS_UPDATED") end,
 		"Questie draws quest givers and objectives itself. Your guide, route and arrow stay either way.")
+	local qdRow = R:Next(26)
+	local qdExport = Button(p, "Export starts", 110, function()
+		local text, n = ns.QuestDB:Export()
+		if n == 0 then ns.Print("no quest starts with a place to export yet.") return end
+		UI:ShowIO("export", text, "Export quest starts",
+			n .. " quest starts. Press Ctrl+C to copy. Quests and places only: no character or realm names.")
+	end)
+	qdExport:SetPoint("TOPLEFT", p, "TOPLEFT", R.x, qdRow)
+	local qdAsk = Button(p, "Ask my guild", 110, function()
+		local ok, why = ns.QuestDB:Ask()
+		ns.Print(ok and "asked your guild for quest starts." or ("can't ask: " .. (why or "?")))
+	end)
+	qdAsk:SetPoint("TOPLEFT", p, "TOPLEFT", R.x + 236, qdRow)
+	local qdImport = Button(p, "Import starts", 110, function()
+		UI:ShowIO("import", "", "Import quest starts",
+			"Paste quest start data (it begins with NQQ1~) and press Import.", function(t) return ns.QuestDB:Import(t) end)
+	end)
+	qdImport:SetPoint("TOPLEFT", p, "TOPLEFT", R.x + 118, qdRow)
 
 	R:Next(10)
 	Heading(p, R.x, R:Next(), "Chat")

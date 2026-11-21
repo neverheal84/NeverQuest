@@ -2,7 +2,12 @@
 -- Quests tab and guide can show where everyone is on a shared quest.
 -- Message format (prefix "NeverQuest"): "H" hello, "S!" / "S" snapshot chunks, "U" updates,
 -- "X" removals; entries are questID:state where state is a percent or "c" for complete.
--- "P" carries spawn spots and marks (see Spawns.lua).
+-- "P" carries spawn spots and marks (see Spawns.lua), "Q" quest start locations, "R" a request
+-- for quest starts and "B" a batch answering one (all QuestDB.lua).
+--
+-- Progress sharing ("H", "S", "U", "X") is party only: it's about who is where on a quest you
+-- are doing together. Quest start locations also go to the guild, where there are far more
+-- people at more levels, which is what makes the database fill in.
 
 local ADDON, ns = ...
 local Party = { members = {} }
@@ -20,13 +25,16 @@ local function Active()
 	return ns.ready and ns.db.party.enabled and IsInGroup() and not IsInRaid()
 end
 
-local function Send(msg)
-	local ok, result = pcall(C_ChatInfo.SendAddonMessage, PREFIX, msg, "PARTY")
-	if ok and result ~= nil and result ~= 0 then
+local function SendTo(msg, channel)
+	local ok, result = pcall(C_ChatInfo.SendAddonMessage, PREFIX, msg, channel)
+	if ok and result ~= nil and result ~= 0 and channel == "PARTY" then
 		-- Throttled or locked down (restricted content): try a full resend later.
 		Party.retry = true
 	end
+	return ok
 end
+
+local function Send(msg) return SendTo(msg, "PARTY") end
 
 local function StateOf(e)
 	if e.complete then return "c" end
@@ -52,9 +60,24 @@ function Party:IsActive()
 	return Active() and true or false
 end
 
--- Other modules (spawn sharing) send their own message kinds through here.
-function Party:SendRaw(msg)
-	if Active() then Send(msg) end
+function Party:GuildActive()
+	return (ns.ready and IsInGuild and IsInGuild() and true) or false
+end
+
+-- Other modules (spawn and quest start sharing) send their own message kinds through here.
+-- where: "party" (the default), "guild", or "both".
+function Party:SendRaw(msg, where)
+	where = where or "party"
+	local sent = false
+	if (where == "party" or where == "both") and Active() then
+		Send(msg)
+		sent = true
+	end
+	if (where == "guild" or where == "both") and self:GuildActive() then
+		SendTo(msg, "GUILD")
+		sent = true
+	end
+	return sent
 end
 
 function Party:SendSnapshot()
@@ -102,10 +125,21 @@ local function Apply(member, body)
 end
 
 ns:RegisterEvent("CHAT_MSG_ADDON", function(_, prefix, text, channel, sender)
-	if prefix ~= PREFIX or channel ~= "PARTY" or not ns.ready or not ns.db.party.enabled then return end
+	if prefix ~= PREFIX or not ns.ready then return end
+	if channel ~= "PARTY" and channel ~= "GUILD" then return end
+	if channel == "PARTY" and not ns.db.party.enabled then return end
 	if type(text) ~= "string" or type(sender) ~= "string" or ns.IsSecret(text) or ns.IsSecret(sender) then return end
 	local name = Ambiguate(sender, "short")
 	if name == ns.SafeName("player") then return end
+	-- Guildmates trade quest starts and nothing else: progress belongs to the party you're in.
+	if channel == "GUILD" then
+		if not ns.QuestDB then return end
+		local k, b2 = text:sub(1, 1), text:sub(2)
+		if k == "Q" then ns.QuestDB:FromParty(name, b2, "guild")
+		elseif k == "R" then ns.QuestDB:OnAsked(name)
+		elseif k == "B" then ns.QuestDB:FromBatch(name, b2) end
+		return
+	end
 	local member = Party.members[name] or { quests = {} }
 	Party.members[name] = member
 	member.t = GetTime()
@@ -124,6 +158,8 @@ ns:RegisterEvent("CHAT_MSG_ADDON", function(_, prefix, text, channel, sender)
 		for qid in body:gmatch("%d+") do member.quests[tonumber(qid)] = nil end
 	elseif kind == "P" then
 		if ns.Spawns then ns.Spawns:FromParty(name, body) end
+	elseif kind == "Q" then
+		if ns.QuestDB then ns.QuestDB:FromParty(name, body) end
 	end
 	ns.Debug("party: update from " .. name)
 	ns:SendMessage("PARTY_UPDATED")

@@ -1,16 +1,21 @@
--- NeverQuest quest database: every quest the game has shown you, account-wide.
+-- NeverQuest quest database: every quest the game has shown you, account-wide, over the quest
+-- start data NeverQuest ships.
 --
 -- Built only from the game client itself, nothing copied from other addons or sites:
 --   * a slow background scan asks the game which quests each zone offers (one zone every
 --     couple of seconds, paused in combat), once at login and again after you level;
 --   * quest givers you see on the world map or nearby are added as you play;
---   * quests you accept add their level, giver spot and NPC name.
+--   * quests you accept add their level, giver spot and NPC name;
+--   * party members running NeverQuest pass on the starts they know;
+--   * Data/Starts.lua, gathered the same way by other players and built into the addon.
 -- Every character adds to it, so an alt sees where quests are that it hasn't been offered yet.
--- /nq db <name> searches it, /nq db lists the quests in your zone, and the world map shows
--- known quests that aren't on offer to you right now (faded, with the level they open at).
+-- What your own client learns always beats what NeverQuest ships, field by field.
+-- /nq db <name> searches it, /nq db lists the quests in your zone, /nq db export hands your
+-- own data to a friend or back to us, and the world map shows known quests that aren't on
+-- offer to you right now (faded, with the level they open at).
 
 local ADDON, ns = ...
-local D = { queue = {}, scanning = false }
+local D = { queue = {}, scanning = false, loads = {}, queued = {} }
 ns.QuestDB = D
 
 local SCAN_GAP = 2            -- seconds between zones
@@ -18,6 +23,8 @@ local SCAN_WAIT = 1.5         -- seconds to let the game answer before reading a
 local RESCAN_AFTER = 6 * 3600 -- full rescan per character after this long (or a new level)
 
 local function Store() return ns.db.questDB end
+local EMPTY = {}
+local function Base() return (ns.Starts and type(ns.Starts.q) == "table") and ns.Starts.q or EMPTY end
 local function Faction()
 	local f = UnitFactionGroup("player")
 	return f == "Horde" and "H" or (f == "Alliance" and "A") or "N"
@@ -30,8 +37,15 @@ local function CharKey() return (UnitName("player") or "?") .. "-" .. (GetRealmN
 ---------------------------------------------------------------------------
 -- Adding
 ---------------------------------------------------------------------------
--- spot: "giver" (a real giver position) or nil (title/level only).
-function D:Add(qid, title, level, m, x, y)
+-- origin: "them" when another player passed this on, otherwise your own client saw it.
+--
+-- First-hand beats hearsay, always. Your client either stood at the giver or was offered the
+-- quest; a guildmate's report is good evidence but it is still a report, so it fills gaps and
+-- corrects other reports, and never overwrites a place you have been. q.o records which this
+-- is (2 yours, 1 theirs) and q.n counts how many others have agreed on a shared place.
+local AGREE = 0.02      -- map fractions: reports this close are about the same spot
+
+function D:Add(qid, title, level, m, x, y, origin)
 	qid = ns.Num(qid)
 	if not qid or qid <= 0 then return nil end
 	local s = Store()
@@ -40,19 +54,105 @@ function D:Add(qid, title, level, m, x, y)
 		q = {}
 		s.q[qid] = q
 	end
-	q.t = Text(title) or q.t
+	local theirs = origin == "them"
+	if Text(title) and not (theirs and q.t) then q.t = Text(title) end
 	level = ns.Num(level)
-	if level and level > 0 then q.l = level end
+	if level and level > 0 and not (theirs and q.l) then q.l = level end
 	x, y = ns.Num(x), ns.Num(y)
 	if m and x and y and not (x == 0 and y == 0) and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
-		q.m, q.x, q.y = m, R3(x), R3(y)
+		x, y = R3(x), R3(y)
+		if not theirs then
+			-- Yours: takes the slot whatever was there before.
+			q.m, q.x, q.y, q.o, q.n = m, x, y, 2, nil
+		elseif not q.m then
+			q.m, q.x, q.y, q.o, q.n = m, x, y, 1, 1
+		elseif q.o ~= 2 then
+			-- Theirs against theirs: agreement counts, disagreement defers to the better backed.
+			if q.m == m and math.abs(q.x - x) <= AGREE and math.abs(q.y - y) <= AGREE then
+				q.n = (q.n or 1) + 1
+			elseif (q.n or 1) <= 1 then
+				q.m, q.x, q.y, q.n = m, x, y, 1
+			end
+		end
 	end
-	local f = Faction()
-	if not q.f then q.f = f elseif not q.f:find(f, 1, true) then q.f = q.f .. f end
-	local c = Class()
-	if not q.c then q.c = "," .. c .. "," elseif not q.c:find("," .. c .. ",", 1, true) then q.c = q.c .. c .. "," end
+	-- Faction and class record which of YOUR characters has seen this quest, so they are only
+	-- ever stamped first-hand. Stamping them from a report would claim your class was offered a
+	-- quest it has never seen, and would mark another faction's quest as yours.
+	if not theirs then
+		local f = Faction()
+		if not q.f then q.f = f elseif not q.f:find(f, 1, true) then q.f = q.f .. f end
+		local c = Class()
+		if not q.c then q.c = "," .. c .. "," elseif not q.c:find("," .. c .. ",", 1, true) then q.c = q.c .. c .. "," end
+	end
 	q.s = time()
 	return q
+end
+
+---------------------------------------------------------------------------
+-- Your learned data laid over the data NeverQuest ships.
+--
+-- Yours wins field by field, because your client is the live one: a title, level or position
+-- you have seen replaces the shipped one, and a shipped field fills a gap you don't have yet.
+-- Read through Get and Each rather than a cached copy, so a write anywhere (a profile reset,
+-- saved variables loading, a test) can never leave a stale view behind.
+---------------------------------------------------------------------------
+function D:Get(qid)
+	local mine, base = Store().q[qid], Base()[qid]
+	if not base then return mine end
+	if not mine then return base end
+	local m = { t = mine.t or base.t, l = mine.l or base.l, f = mine.f or base.f,
+		c = mine.c or base.c, z = mine.z or base.z, s = mine.s }
+	if mine.m and mine.x then
+		m.m, m.x, m.y = mine.m, mine.x, mine.y
+	else
+		m.m, m.x, m.y = base.m, base.x, base.y
+	end
+	return m
+end
+
+-- Every known quest, yours first and then the shipped ones you have no entry for. Nothing is
+-- copied unless a shipped entry actually has something to add, so map draws allocate little.
+function D:Each()
+	local store, base = Store().q, Base()
+	local qid, q, mine = nil, nil, true
+	return function()
+		if mine then
+			qid, q = next(store, qid)
+			if qid then
+				local b = base[qid]
+				if b and (not q.t or not q.l or not q.m or not q.x or not q.f) then return qid, D:Get(qid) end
+				return qid, q
+			end
+			mine, qid = false, nil
+		end
+		repeat
+			qid, q = next(base, qid)
+		until qid == nil or store[qid] == nil
+		return qid, q
+	end
+end
+
+-- A plain table of everything, for callers that want one. Built fresh, never cached.
+function D:All()
+	local out = {}
+	for qid, q in self:Each() do out[qid] = q end
+	return out
+end
+
+-- Where this quest's position came from, for the pin tooltip: "learned" when your own
+-- client saw it, "shipped" when it came with the addon, nil when there is no position.
+function D:Source(qid)
+	local mine = Store().q[qid]
+	if mine and mine.m and mine.x then return "learned" end
+	local base = Base()[qid]
+	if base and base.m and base.x then return "shipped" end
+	return nil
+end
+
+function D:ShippedCount()
+	local n = 0
+	for _ in pairs(Base()) do n = n + 1 end
+	return n
 end
 
 -- A zone's quest givers as the game lists them (Quests.lua CollectOffers calls this).
@@ -60,6 +160,8 @@ end
 function D:Record(m, list, full)
 	if not ns.ready or not m or not list then return end
 	for _, o in ipairs(list) do self:Add(o.questID, o.title, o.level, o.m or m, o.x, o.y) end
+	-- One quest you can see opens up its whole chain, including the parts you can't take yet.
+	for _, o in ipairs(list) do self:QueueChain(o.questID, o.m or m) end
 	if full or #list > 0 then
 		local s = Store()
 		s.scan[m] = s.scan[m] or {}
@@ -73,8 +175,14 @@ function D:RecordLog()
 	local npcs = ns.db.npcs
 	for _, e in ipairs(ns.Quests.log) do
 		local at = npcs.giverAt[e.questID]
+		local before = Store().q[e.questID]
+		local hadSpot = before and before.m and before.x
 		local q = self:Add(e.questID, e.title, e.level, at and at.m, at and at.x, at and at.y)
 		if q and e.zone and Text(e.zone) then q.z = e.zone end
+		-- A giver you stood in front of yourself: worth passing to the party.
+		if q and not hadSpot and q.m and q.x then self:Share(e.questID, q) end
+		-- And the rest of the chain you're now in, so you can see what's coming.
+		self:QueueChain(e.questID, at and at.m)
 	end
 end
 
@@ -133,9 +241,14 @@ function D:Step()
 		-- Ask about your own zone again so its quest list is fresh after all that.
 		ns.Debounce("offers", 1, function() ns.Quests:RequestOffers() end)
 		ns:SendMessage("QUESTDB_UPDATED")
-		if self.manual then
-			self.manual = nil
-			ns.Print(string.format("quest database scan done: %d zones, %d quests known.", self.total or 0, self:Count()))
+		-- Always say so, not just for a manual scan: knowing the scan has finished is how you
+		-- know the map is as complete as it's going to get, and when it's safe to export.
+		local manual = self.manual
+		self.manual = nil
+		if manual or not ns.db.quietLogin then
+			ns.Print(string.format("quest database scan done: %d zones, %d quests known.%s",
+				self.total or 0, self:Count(),
+				#self.loads > 0 and string.format(" Asking the game about %d more from your chains.", #self.loads) or ""))
 		end
 		return
 	end
@@ -152,6 +265,102 @@ end
 function D:StopScan()
 	self.scanning = false
 	wipe(self.queue)
+	wipe(self.loads)
+	wipe(self.queued)
+end
+
+---------------------------------------------------------------------------
+-- Deep scan: the quests the game won't offer this character
+--
+-- The zone scan can only see what you could accept right now, which is why a level 5
+-- character's database stays nearly empty however many zones it has looked at. A quest line
+-- knows its whole chain, though, so one quest you can see opens up the rest: the game will
+-- load a quest's title and level on request even for a quest you can't take yet.
+--
+-- This is how the big quest databases came to hold every quest rather than your own, except
+-- that nothing here is copied from them: it's the game answering questions an addon is meant
+-- to ask. Asks are spread out so the server isn't hammered, and paused in combat and while
+-- dead, like the zone scan.
+---------------------------------------------------------------------------
+local LOAD_BATCH = 5       -- quests asked about together, so one wait covers several
+local LOAD_GAP = 0.25      -- seconds between batches
+local LOAD_READ = 0.6      -- time to let the game answer before reading a batch
+local LOAD_CAP = 600       -- most quests waiting to be asked about at once
+
+-- Everything in this quest's chain that we know nothing useful about yet.
+function D:QueueChain(questID, m)
+	if not ns.db.questdb.deep or not ns.Chains or not C_QuestLog.RequestLoadQuestByID then return 0 end
+	local line = ns.Chains:Line(questID)
+	if not line or type(line.quests) ~= "table" then return 0 end
+	local added = 0
+	for _, qid in ipairs(line.quests) do
+		qid = ns.Num(qid)
+		if qid and qid > 0 and not self.queued[qid] and #self.loads < LOAD_CAP then
+			local known = self:Get(qid)
+			-- A title and a level is all we want from this; places come from the zone scan.
+			if not (known and known.t and known.l) then
+				self.queued[qid] = true
+				self.loads[#self.loads + 1] = { qid = qid, m = m }
+				added = added + 1
+			end
+		end
+	end
+	if added > 0 then self:PumpLoads() end
+	return added
+end
+
+-- Reads one quest the game has just loaded. Returns true when something was learned.
+function D:ReadLoaded(job)
+	local title = ns.SafeCall(C_QuestLog.GetTitleForQuestID, job.qid)
+	if type(title) ~= "string" or title == "" or ns.IsSecret(title) then return false end
+	local level = ns.Num(ns.SafeCall(C_QuestLog.GetQuestDifficultyLevel, job.qid))
+	-- A place too, if the line happens to know one for it on that map.
+	local x, y
+	if job.m then
+		local info = ns.SafeCall(C_QuestLine.GetQuestLineInfo, job.qid, job.m)
+		if type(info) == "table" then x, y = ns.Num(info.x), ns.Num(info.y) end
+	end
+	if x and y and (x <= 0 or x > 1 or y <= 0 or y > 1) then x, y = nil, nil end
+	self:Add(job.qid, title, (level and level > 0) and level or nil, (x and job.m) or nil, x, y)
+	return true
+end
+
+function D:PumpLoads()
+	if self.loading or #self.loads == 0 then return end
+	self.loading = true
+	self.deepFound, self.deepTotal = 0, #self.loads
+	local function step()
+		if #self.loads == 0 then
+			self.loading = false
+			ns:SendMessage("QUESTDB_UPDATED")
+			ns:SendMessage("MAP_OFFERS_UPDATED")
+			-- Say so: this is the part that tells you the database is ready to export.
+			if (self.deepFound or 0) > 0 then
+				ns.Print(string.format("learned %d more quest%s from your chains. %d quests known in all.",
+					self.deepFound, self.deepFound == 1 and "" or "s", self:Count()))
+			end
+			return
+		end
+		if InCombatLockdown() or UnitIsDeadOrGhost("player") then
+			ns.After(5, step)
+			return
+		end
+		-- Ask about a handful at once, then read them all after one wait.
+		local batch = {}
+		for _ = 1, LOAD_BATCH do
+			local job = table.remove(self.loads, 1)
+			if not job then break end
+			batch[#batch + 1] = job
+			pcall(C_QuestLog.RequestLoadQuestByID, job.qid)
+		end
+		ns.After(LOAD_READ, function()
+			for _, job in ipairs(batch) do
+				if D:ReadLoaded(job) then D.deepFound = (D.deepFound or 0) + 1 end
+			end
+			ns.After(LOAD_GAP, step)
+		end)
+	end
+	step()
 end
 
 ---------------------------------------------------------------------------
@@ -159,14 +368,14 @@ end
 ---------------------------------------------------------------------------
 function D:Count()
 	local n = 0
-	for _ in pairs(Store().q) do n = n + 1 end
+	for _ in self:Each() do n = n + 1 end
 	return n
 end
 
 -- "done", "log", "available" (the game offers it now), "later" (level), "other" (seen by your
 -- other characters only), or "unknown".
 function D:Status(qid, q)
-	q = q or Store().q[qid]
+	q = q or self:Get(qid)
 	if ns.SafeCall(C_QuestLog.IsQuestFlaggedCompleted, qid) == true then return "done" end
 	if ns.SafeCall(C_QuestLog.IsOnQuest, qid) == true then return "log" end
 	if not q then return "unknown" end
@@ -200,7 +409,7 @@ function D:Search(text, limit)
 	text = (text or ""):lower()
 	local id = tonumber(text)
 	local out = {}
-	for qid, q in pairs(Store().q) do
+	for qid, q in self:Each() do
 		if (id and qid == id) or (not id and q.t and q.t:lower():find(text, 1, true)) then
 			table.insert(out, { qid = qid, q = q })
 		end
@@ -217,7 +426,7 @@ end
 -- Every known quest whose giver is in that zone (or child maps of it).
 function D:InZone(zoneMap)
 	local out = {}
-	for qid, q in pairs(Store().q) do
+	for qid, q in self:Each() do
 		if q.m and (q.m == zoneMap or ns.Nav.GetZoneMap(q.m) == zoneMap) then table.insert(out, { qid = qid, q = q }) end
 	end
 	table.sort(out, function(a, b) return (a.q.l or 0) < (b.q.l or 0) end)
@@ -248,7 +457,7 @@ function D:MapPoints(mapID, offered)
 		return z
 	end
 	local shown = Zone(mapID)
-	for qid, q in pairs(s.q) do
+	for qid, q in self:Each() do
 		if q.m and q.t and not offered[qid] and (q.m == mapID or Zone(q.m) == shown) and (not q.f or q.f:find(mine, 1, true)) then
 			local lv = q.l
 			local okLevel = not lv or (lv <= level + (cfg.ahead or 3) and (ns.db.givers.gray or lv >= level - (cfg.grayBelow or 6)))
@@ -272,13 +481,237 @@ function D:MapPoints(mapID, offered)
 						end
 						local giver = ns.db.npcs.giver[qid]
 						if giver then sub = "From " .. giver .. ". " .. sub end
-						table.insert(out, { qid = qid, q = q, x = x, y = y, status = st, sub = sub })
+						table.insert(out, { qid = qid, q = q, x = x, y = y, status = st, sub = sub,
+							src = self:Source(qid) })
 					end
 				end
 			end
 		end
 	end
 	return out
+end
+
+---------------------------------------------------------------------------
+-- Export / import / party sharing
+--
+-- One text string with the quest starts this account knows, so you can hand them to a friend
+-- or send them back to us to be built into the addon for everybody. It carries quests and
+-- places only: no character names, no realm, nothing about you.
+--
+-- NQQ1~<client build>~<addon version>~record~record...   with records:
+--   <questID>^<title>^<level>^<map>^<x>^<y>^<factions>^<firsthand>
+--
+-- <firsthand> is 1 when your own client saw the place and empty when another player passed it
+-- on. Without it a build would count a relayed copy of one report as a second, independent
+-- one, and read agreement into data that only ever had a single source.
+--
+-- The class list is deliberately left out. In your own database it records which of your
+-- characters have seen a quest, which says nothing about who can take it, so merging it
+-- across people would invent restrictions that aren't real.
+---------------------------------------------------------------------------
+local SEP, REC = "^", "~"
+
+local function Field(v)
+	if v == nil then return "" end
+	v = tostring(v)
+	if ns.IsSecret(v) then return "" end
+	return (v:gsub("[%^~\r\n|]", " "):gsub("%s+$", ""))
+end
+
+local function Split(text)
+	local f = {}
+	for part in (text .. SEP):gmatch("(.-)%" .. SEP) do f[#f + 1] = part end
+	return f
+end
+
+local function Build()
+	return (ns.Starts and ns.Starts.build) or (GetBuildInfo and select(1, GetBuildInfo())) or "?"
+end
+
+-- Only quests with a place, since a title on its own helps nobody find anything.
+function D:Export()
+	local out = { "NQQ1", Field(Build()), Field(ns.version or "?") }
+	local n = 0
+	for qid, q in self:Each() do
+		if q.m and q.x and q.y and q.t then
+			out[#out + 1] = string.format("%d%s%s%s%s%s%d%s%.4f%s%.4f%s%s%s%s", qid, SEP, Field(q.t), SEP,
+				q.l and tostring(q.l) or "", SEP, q.m, SEP, q.x, SEP, q.y, SEP, Field(q.f),
+				SEP, q.o == 2 and "1" or "")
+			n = n + 1
+		end
+	end
+	return table.concat(out, REC), n
+end
+
+function D:Import(text)
+	if type(text) ~= "string" then return nil end
+	text = text:gsub("[\r\n\t]", "")
+	if text:sub(1, 4) ~= "NQQ1" then
+		ns.Print("that isn't NeverQuest quest start data (it starts with NQQ1~).")
+		return nil
+	end
+	local added, updated, skipped, at = 0, 0, 0, 0
+	for record in text:gmatch("[^" .. REC .. "]+") do
+		at = at + 1
+		if at > 3 then                      -- 1 the tag, 2 the client build, 3 the addon version
+			local f = Split(record)
+			local qid = tonumber(f[1])
+			local m, x, y = tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
+			local had = qid and Store().q[qid]
+			if qid and f[2] ~= "" and m and x and y then
+				local q = self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them")
+				if q then
+					if f[7] ~= "" then q.f = f[7] end
+					if had then updated = updated + 1 else added = added + 1 end
+				else
+					skipped = skipped + 1
+				end
+			else
+				skipped = skipped + 1
+			end
+		end
+	end
+	ns.Print(string.format("quest starts imported: %d new, %d updated%s.", added, updated,
+		skipped > 0 and (", " .. skipped .. " skipped") or ""))
+	ns:SendMessage("MAP_OFFERS_UPDATED")
+	ns:SendMessage("QUESTDB_UPDATED")
+	return true
+end
+
+-- Party sharing: one start at a time, rate limited, only places you learned yourself.
+local tokens, lastRefill = 5, 0
+
+local function Record(qid, q)
+	return "Q" .. table.concat({ qid, Field(q.t), q.l or "",
+		q.m, string.format("%.4f", q.x), string.format("%.4f", q.y) }, SEP)
+end
+
+function D:Share(qid, q)
+	local cfg = ns.db.questdb
+	if not (cfg.share or cfg.guild) or not ns.Party then return end
+	if not (q and q.m and q.x and q.t) then return end
+	local now = GetTime()
+	tokens = math.min(5, tokens + (now - lastRefill) * 0.5)
+	lastRefill = now
+	if tokens < 1 then return end
+	local where = (cfg.share and cfg.guild and "both") or (cfg.guild and "guild") or "party"
+	if ns.Party:SendRaw(Record(qid, q), where) then tokens = tokens - 1 end
+end
+
+function D:FromParty(sender, body, via)
+	local cfg = ns.db.questdb
+	if via == "guild" then
+		if not cfg.guild then return end
+	elseif not cfg.share then
+		return
+	end
+	if type(body) ~= "string" then return end
+	local f = Split(body)
+	local qid, m, x, y = tonumber(f[1]), tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
+	if not qid or f[2] == "" or not m or not x or not y then return end
+	if x <= 0 or x > 1 or y <= 0 or y > 1 then return end
+	if self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them") then
+		self.fromOthers = (self.fromOthers or 0) + 1
+		ns.Debounce("questdb:partydraw", 2, function()
+			ns:SendMessage("MAP_OFFERS_UPDATED")
+		end)
+	end
+end
+
+---------------------------------------------------------------------------
+-- Asking the guild
+--
+-- A new character knows nothing, and its guildmates between them know most of the world. One
+-- request gets a bounded answer from each of a few of them: their best backed starts, spread
+-- over a few seconds so nobody's chat is flooded, and nothing is sent twice within the hour.
+---------------------------------------------------------------------------
+local ASK_COOLDOWN = 600      -- seconds before you may ask again
+local ANSWER_COOLDOWN = 300   -- seconds before you answer another request
+local ANSWER_CAP = 120        -- most starts one answer carries
+local ANSWER_GAP = 0.4        -- seconds between the lines of an answer
+local MSG_ROOM = 200          -- characters to fill before starting a new line
+
+function D:Ask()
+	if not ns.db.questdb.guild then return false, "guild sharing is off. /nq db guild turns it on." end
+	if not ns.Party or not ns.Party:GuildActive() then return false, "you aren't in a guild." end
+	local now = GetTime()
+	if self.askedAt and now - self.askedAt < ASK_COOLDOWN then
+		return false, string.format("already asked. Try again in %d seconds.", math.ceil(ASK_COOLDOWN - (now - self.askedAt)))
+	end
+	self.askedAt = now
+	self.fromOthers = 0
+	ns.Party:SendRaw("R", "guild")
+	return true
+end
+
+-- Someone asked. Answer with the starts we are most sure of, in a few lines.
+function D:OnAsked(sender)
+	if not ns.db.questdb.guild or not ns.Party then return end
+	local now = GetTime()
+	if self.answeredAt and now - self.answeredAt < ANSWER_COOLDOWN then return end
+	self.answeredAt = now
+	local picks, base = {}, Base()
+	for qid, q in self:Each() do
+		-- No point sending back the shipped file: they have the same one.
+		local b = base[qid]
+		local same = b and b.m == q.m and b.x == q.x and b.y == q.y
+		if q.m and q.x and q.y and q.t and not same then
+			picks[#picks + 1] = { qid = qid, q = q, rank = (q.o == 2 and 100 or (q.n or 1)) }
+		end
+	end
+	if #picks == 0 then return end
+	table.sort(picks, function(a, b)
+		if a.rank ~= b.rank then return a.rank > b.rank end
+		return a.qid < b.qid
+	end)
+	while #picks > ANSWER_CAP do table.remove(picks) end
+	-- Pack into lines, then send them spread out so one answer isn't a wall of traffic.
+	local lines, cur = {}, {}
+	local len = 0
+	for _, p in ipairs(picks) do
+		local rec = table.concat({ p.qid, Field(p.q.t), p.q.l or "", p.q.m,
+			string.format("%.4f", p.q.x), string.format("%.4f", p.q.y) }, SEP)
+		if len + #rec + 1 > MSG_ROOM and #cur > 0 then
+			lines[#lines + 1] = table.concat(cur, REC)
+			cur, len = {}, 0
+		end
+		cur[#cur + 1] = rec
+		len = len + #rec + 1
+	end
+	if #cur > 0 then lines[#lines + 1] = table.concat(cur, REC) end
+	local i = 0
+	local function nextLine()
+		i = i + 1
+		if not lines[i] then return end
+		ns.Party:SendRaw("B" .. lines[i], "guild")
+		ns.After(ANSWER_GAP, nextLine)
+	end
+	ns.After(1 + math.random() * 4, nextLine)
+end
+
+-- A batch answering a request: the same records, several to a line.
+function D:FromBatch(sender, body)
+	if not ns.db.questdb.guild or type(body) ~= "string" then return end
+	local got = 0
+	for record in body:gmatch("[^" .. REC .. "]+") do
+		local f = Split(record)
+		local qid, m, x, y = tonumber(f[1]), tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
+		if qid and f[2] ~= "" and m and x and y and x > 0 and x <= 1 and y > 0 and y <= 1 then
+			if self:Add(qid, f[2], tonumber(f[3]), m, x, y, "them") then got = got + 1 end
+		end
+	end
+	if got > 0 then
+		self.fromOthers = (self.fromOthers or 0) + got
+		ns.Debounce("questdb:guilddraw", 3, function()
+			ns:SendMessage("MAP_OFFERS_UPDATED")
+			ns:SendMessage("QUESTDB_UPDATED")
+			if (D.fromOthers or 0) > 0 then
+				ns.Print(string.format("%d quest starts from your guild. %d quests known in all.",
+					D.fromOthers, D:Count()))
+				D.fromOthers = 0
+			end
+		end)
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -313,9 +746,14 @@ ns:AddSlash("db", function(arg)
 	if cmd == "" then
 		local m = ns.Quests.offerMap
 		if m then PrintZone(m, true) end
-		ns.Print(string.format("database: %d quests from %d zones%s. /nq db <name> searches it, /nq db way <id> points the arrow.",
+		local shipped = D:ShippedCount()
+		ns.Print(string.format("database: %d quests from %d zones%s%s. /nq db <name> searches it, /nq db way <id> points the arrow.",
 			D:Count(), (function() local n = 0 for _ in pairs(Store().scan) do n = n + 1 end return n end)(),
+			shipped > 0 and string.format(", %d of them shipped with the addon", shipped) or "",
 			D.scanning and string.format(" (scanning, %d zones to go)", #D.queue) or ""))
+		if #D.loads > 0 then
+			ns.Print(string.format("asking the game about %d more quests from your chains.", #D.loads))
+		end
 	elseif cmd == "zone" then
 		local m = rest ~= "" and ns.Nav.FindZone(rest) or ns.Quests.offerMap
 		if not m then ns.Print("no zone called " .. rest .. ".") return end
@@ -327,13 +765,59 @@ ns:AddSlash("db", function(arg)
 		ns.Print(string.format("scanning %d zones in the background (about %d seconds).", D.total or 0, (D.total or 0) * SCAN_GAP))
 	elseif cmd == "way" or cmd == "go" then
 		local qid = tonumber(rest)
-		local q = qid and Store().q[qid]
+		local q = qid and D:Get(qid)
 		if not q or not q.m then ns.Print("no known spot for quest " .. (rest ~= "" and rest or "?") .. ". /nq db <name> shows quest IDs.") return end
 		ns.Nav:AddUser(q.m, q.x, q.y, "Pick up: " .. (q.t or ("Quest " .. qid)))
 	elseif cmd == "map" then
 		ns.db.questdb.worldmap = not ns.db.questdb.worldmap
 		ns.Print("known quests on the world map " .. (ns.db.questdb.worldmap and "on." or "off."))
 		ns:SendMessage("MAP_OFFERS_UPDATED")
+	elseif cmd == "export" then
+		local text, n = D:Export()
+		-- Whether or not there's anything to export yet, outstanding work is the thing you
+		-- need told: it's the reason an export would be short, and the reason to wait.
+		local busy
+		if D.scanning or #D.loads > 0 then
+			busy = string.format("|cffff9933still working|r: %s%s%s.",
+				D.scanning and string.format("%d zones to scan", #D.queue) or "",
+				(D.scanning and #D.loads > 0) and ", " or "",
+				#D.loads > 0 and string.format("%d quests to ask about", #D.loads) or "")
+		end
+		if n == 0 then
+			ns.Print((busy and (busy .. " ") or "")
+				.. "no quest starts with a place to export yet." .. (busy and "" or " /nq db scan fills the database in."))
+			return
+		end
+		if busy then
+			ns.Print(busy .. " Your export will be short of what it could be, so it's worth waiting.")
+		end
+		ns.UI:ShowIO("export", text, "Export quest starts",
+			n .. " quest starts. Press Ctrl+C to copy. Quests and places only: no character or realm names.")
+	elseif cmd == "import" then
+		ns.UI:ShowIO("import", rest ~= "" and rest or "", "Import quest starts",
+			"Paste quest start data (it begins with NQQ1~) and press Import.", function(t) return D:Import(t) end)
+	elseif cmd == "ready" or cmd == "status" then
+		if D.scanning then
+			ns.Print(string.format("zone scan running: %d of %d zones to go (about %d seconds).",
+				#D.queue, D.total or 0, #D.queue * SCAN_GAP))
+		elseif #D.loads > 0 then
+			ns.Print(string.format("asking the game about %d more quests from your chains (about %d seconds).",
+				#D.loads, math.ceil(#D.loads / LOAD_BATCH * (LOAD_READ + LOAD_GAP))))
+		else
+			local _, n = D:Export()
+			ns.Print(string.format("nothing running. %d quests known, %d of them with a place to put on the map.",
+				D:Count(), n))
+		end
+	elseif cmd == "ask" then
+		local ok, why = D:Ask()
+		ns.Print(ok and "asked your guild for quest starts. Answers arrive over the next few seconds."
+			or ("can't ask: " .. (why or "?")))
+	elseif cmd == "guild" then
+		ns.db.questdb.guild = not ns.db.questdb.guild
+		ns.Print("sharing quest starts with your guild " .. (ns.db.questdb.guild and "on." or "off."))
+	elseif cmd == "share" then
+		ns.db.questdb.share = not ns.db.questdb.share
+		ns.Print("sharing quest starts with your party " .. (ns.db.questdb.share and "on." or "off."))
 	else
 		local found, total = D:Search(arg, 8)
 		if #found == 0 then ns.Print("no known quest matches \"" .. arg .. "\".") return end
@@ -343,7 +827,7 @@ ns:AddSlash("db", function(arg)
 			DEFAULT_CHAT_FRAME:AddMessage("   /nq db way " .. found[1].qid .. " points the arrow there.")
 		end
 	end
-end, "/nq db [name|zone <zone>|way <id>|scan|map] - the quest database: search it, list a zone, point the arrow")
+end, "/nq db [name|zone <zone>|way <id>|scan|ready|ask|guild|share|map|export|import] - the quest database: search it, list a zone, point the arrow, check whether it's finished, ask your guild for theirs")
 
 ---------------------------------------------------------------------------
 -- Events

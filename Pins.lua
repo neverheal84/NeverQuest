@@ -320,7 +320,9 @@ function PinMethods:OnMouseEnter()
 	GameTooltip:AddLine(info.title or "", 1, 0.82, 0, true)
 	if info.sub and info.sub ~= "" then GameTooltip:AddLine(info.sub, 1, 1, 1, true) end
 	if info.known then
-		GameTooltip:AddLine("From your quest database.  Click: set a waypoint.", 0.5, 0.8, 1)
+		GameTooltip:AddLine(info.src == "shipped" and "From the quest data NeverQuest ships."
+			or "Your own quest database, learned while playing.", 0.6, 0.6, 0.6)
+		GameTooltip:AddLine("Click: set a waypoint.", 0.5, 0.8, 1)
 	elseif info.user then
 		GameTooltip:AddLine("Click: make active.  Shift+click: remove.", 0.5, 0.8, 1)
 	elseif info.legPin then
@@ -494,7 +496,7 @@ function provider:RefreshAllData()
 				x = k.x, y = k.y, m = k.q.m, wx = k.q.x, wy = k.q.y, known = true, questID = k.qid,
 				atlas = ATLAS.giver, size = 15, alpha = 0.45,
 				label = (givers.levels and k.q.l) and tostring(k.q.l) or "", labelColor = { 0.75, 0.75, 0.75 },
-				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t, sub = k.sub,
+				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t, sub = k.sub, src = k.src,
 			})
 		end
 	end
