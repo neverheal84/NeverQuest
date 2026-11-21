@@ -24,7 +24,8 @@ local DEFAULTS = {
 	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 25 },
 	drops  = { shown = false, locked = false, scale = 1, width = 250, maxHeight = 420, bgAlpha = 0.45,
 	           collapsed = false, showSource = true, sort = "progress" },  -- sort: progress | remaining | distance
-	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest" },  -- reward: suggest | upgrade | value | off
+	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest",  -- reward: suggest | upgrade | value | off
+	           inviteFrom = "off", inviteSend = false, inviteWord = "inv" },  -- group invites: off | known | anyone
 	loot   = { auto = true, junk = true, junkReport = true, repair = true, repairGuild = false },  -- auto loot; sell grays; repair at vendors
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
 	           rested = true, sessionAtLogout = false, upgrades = true, training = true },

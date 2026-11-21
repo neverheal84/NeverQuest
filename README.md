@@ -152,6 +152,7 @@ A leveling guide, raid attunement guides, route planner, quest tracker, waypoint
 | `/nq help [topic]` | In-game help (topics: start, guide, plan, arrow, maps, tracker, drops, raids, class, party, buttons, automation, upkeep, database, commands, keys, news, trouble) |
 | `/nq commands` | List every command in chat |
 | `/nq loot [on \| off]` | Auto loot on or off |
+| `/nq invites [off \| known \| anyone \| send]` | Accept group invites automatically, and invite whoever whispers the keyword |
 | `/nq junk` | Sell gray items now (at a vendor), or see what they're worth |
 | `/nq repair [on \| off \| guild]` | Repair now at a vendor, switch auto repair, or switch guild-funded repairs |
 | `/nq db [name \| zone <zone> \| way <id> \| scan \| ready \| ask \| guild \| share \| map \| export \| import]` | The quest database: your zone's quests, search, another zone, point the arrow, scan again, world map markers, hand your starts to a friend, party sharing |

@@ -1070,6 +1070,25 @@ function UI:CreateOptions()
 	rewardNote:SetWidth(290)
 	rewardNote:SetJustifyH("LEFT")
 	rewardNote:SetText("Upgrades are judged by the stats your class uses against what you wear. Without one, the highest vendor value is picked.")
+	Cycle(p, L.x, L:Next(30), "Accept group invites from:", { { "off", "Nobody" }, { "known", "Guildmates and friends" }, { "anyone", "Anyone" } },
+		function() return db.auto.inviteFrom end, function(v) db.auto.inviteFrom = v end,
+		"An invite is how someone pulls you into an instance, into a raid, or to wherever they are standing, so this is off until you choose otherwise. Hold Shift to let one through manually.")
+	Check(p, L.x, L:Next(), "Invite anyone who whispers the keyword", function() return db.auto.inviteSend end,
+		function(v) db.auto.inviteSend = v end,
+		"A whisper of just the keyword gets that person an invite. At most one per person per minute.")
+	local wordRow = L:Next(26)
+	local wordLabel = p:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	wordLabel:SetPoint("TOPLEFT", L.x + 18, wordRow - 4)
+	wordLabel:SetText("Keyword:")
+	local wordBox = EditBox(p, 80)
+	wordBox:SetPoint("TOPLEFT", L.x + 78, wordRow)
+	wordBox:SetText(db.auto.inviteWord or "inv")
+	wordBox:SetScript("OnEditFocusLost", function(e)
+		local v = (e:GetText() or ""):lower():match("^%s*(%S*)")
+		if not v or v == "" then v = "inv" end
+		db.auto.inviteWord = v
+		e:SetText(v)
+	end)
 	Check(p, L.x, L:Next(), "Auto loot everything", function() return db.loot.auto end, function(v) db.loot.auto = v end,
 		"Takes everything from a loot window at once. Hold Shift (the game's auto-loot key) to look first. Items waiting on a group roll are left alone.")
 	Check(p, L.x, L:Next(), "Sell junk at vendors", function() return db.loot.junk end, function(v) db.loot.junk = v end,

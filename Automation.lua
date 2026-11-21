@@ -345,3 +345,97 @@ ns:AddSlash("loot", function(arg)
 	if arg == "on" or arg == "off" then ns.db.loot.auto = arg == "on" else ns.db.loot.auto = not ns.db.loot.auto end
 	ns.Print("auto loot " .. (ns.db.loot.auto and "on (hold Shift to look first)." or "off."))
 end, "/nq loot [on|off] - auto loot everything at once")
+
+---------------------------------------------------------------------------
+-- Group invites
+--
+-- Accepting an invite is not a small favour to do for a stranger. It is how you get pulled
+-- into an instance, into a raid conversion, or to wherever the inviter happens to be standing.
+-- So this stays off until you turn it on, and "people I know" is offered apart from "anyone"
+-- rather than folded into one switch. Holding Shift skips it, like the rest of Automation.
+---------------------------------------------------------------------------
+local function Short(name)
+	if type(name) ~= "string" or name == "" or ns.IsSecret(name) then return nil end
+	return (Ambiguate and ns.SafeCall(Ambiguate, name, "short")) or name:gsub("%-.*$", "")
+end
+
+-- Guildmate or friend. Anything we can't check counts as unknown, so a failed lookup errs
+-- towards not accepting rather than towards letting anyone in.
+local function Known(name)
+	local short = Short(name)
+	if not short then return false end
+	if ns.SafeCall(IsInGuild) then
+		local total = ns.Num(ns.SafeCall(GetNumGuildMembers)) or 0
+		for i = 1, math.min(total, 600) do
+			local n = ns.SafeCall(GetGuildRosterInfo, i)
+			if n and Short(n) == short then return true end
+		end
+	end
+	if C_FriendList then
+		local n = ns.Num(ns.SafeCall(C_FriendList.GetNumFriends)) or 0
+		for i = 1, n do
+			local info = ns.SafeCall(C_FriendList.GetFriendInfoByIndex, i)
+			if info and Short(info.name) == short then return true end
+		end
+	end
+	return false
+end
+
+ns:RegisterEvent("PARTY_INVITE_REQUEST", function(_, inviter)
+	local cfg = ns.db.auto
+	if cfg.inviteFrom ~= "known" and cfg.inviteFrom ~= "anyone" then return end
+	if Skip() then return end
+	local who = Short(inviter)
+	if not who then return end
+	if cfg.inviteFrom == "known" and not Known(inviter) then
+		ns.Debug("invite from " .. who .. " left alone: not a guildmate or friend")
+		return
+	end
+	if not pcall(AcceptGroup) then return end
+	-- The popup stays up behind the accept unless it is told to go.
+	ns.After(0.1, function() pcall(StaticPopup_Hide, "PARTY_INVITE") end)
+	ns.Print("accepted a group invite from " .. who .. ".")
+end)
+
+-- Inviting people who ask. One per person per minute, so nobody can spam you into a loop.
+local lastInvite = {}
+local INVITE_GAP = 60
+
+ns:RegisterEvent("CHAT_MSG_WHISPER", function(_, text, sender)
+	local cfg = ns.db.auto
+	if not cfg.inviteSend then return end
+	if type(text) ~= "string" or ns.IsSecret(text) then return end
+	local who = Short(sender)
+	if not who then return end
+	local word = tostring(cfg.inviteWord or ""):lower()
+	if word == "" then return end
+	local said = text:lower():match("^%s*(.-)%s*$")
+	if said ~= word and said:sub(1, #word + 1) ~= word .. " " then return end
+	local now = GetTime()
+	if lastInvite[who] and now - lastInvite[who] < INVITE_GAP then return end
+	if C_PartyInfo and C_PartyInfo.CanInvite and ns.SafeCall(C_PartyInfo.CanInvite) == false then
+		ns.Debug("asked for an invite by " .. who .. " but you can't invite right now")
+		return
+	end
+	lastInvite[who] = now
+	local invite = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit
+	if invite and pcall(invite, sender) then
+		ns.Print("invited " .. who .. ".")
+	end
+end)
+
+ns:AddSlash("invites", function(arg)
+	arg = (arg or ""):lower():match("^%s*(%S*)")
+	local cfg = ns.db.auto
+	if arg == "off" or arg == "known" or arg == "anyone" then
+		cfg.inviteFrom = arg
+	elseif arg == "send" then
+		cfg.inviteSend = not cfg.inviteSend
+	elseif arg ~= "" then
+		ns.Print("invites: off, known, anyone, or send.")
+		return
+	end
+	ns.Print(string.format("group invites accepted from: %s. Inviting whoever whispers \"%s\": %s.",
+		cfg.inviteFrom == "anyone" and "anyone" or (cfg.inviteFrom == "known" and "guildmates and friends" or "nobody"),
+		tostring(cfg.inviteWord or "inv"), cfg.inviteSend and "on" or "off"))
+end, "/nq invites [off|known|anyone|send] - auto accept group invites, and invite whoever whispers the keyword")
