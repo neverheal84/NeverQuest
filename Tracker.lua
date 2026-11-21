@@ -143,7 +143,7 @@ function T:QuestMenu(owner, e)
 	local qid = e.questID
 	MenuUtil.CreateContextMenu(owner, function(_, root)
 		root:CreateTitle(e.title or "Quest")
-		if e.pos then root:CreateButton("Point the arrow here", function() T:Point(e) end) end
+		if T.Target(e) then root:CreateButton("Point the arrow here", function() T:Point(e) end) end
 		if QuestMapFrame_OpenToQuestDetails then
 			root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(qid) end)
 		end
@@ -162,10 +162,19 @@ function T:QuestMenu(owner, e)
 	end)
 end
 
+-- Where clicking a quest points the arrow: its marker, or for a finished quest its hand-in.
+function T.Target(e)
+	if e.pos then return e.pos end
+	local t = e.complete and e.turnin
+	if t and t.m then return t end
+end
+
 function T:Point(e)
-	if not e.pos then return end
-	ns.Guide:Pin({ key = (e.complete and "turnin:" or "objective:") .. e.questID, m = e.pos.m, x = e.pos.x, y = e.pos.y,
-		title = (e.complete and "Turn in: " or "") .. (e.title or ""), questID = e.questID })
+	local p = T.Target(e)
+	if not p then return end
+	local who = e.complete and e.turnin and e.turnin.npc
+	ns.Guide:Pin({ key = (e.complete and "turnin:" or "objective:") .. e.questID, m = p.m, x = p.x, y = p.y,
+		title = (e.complete and "Turn in: " or "") .. (e.title or "") .. (who and (" (" .. who .. ")") or ""), questID = e.questID })
 end
 
 local function InsertLink(questID)

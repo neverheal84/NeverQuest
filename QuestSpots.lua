@@ -80,6 +80,9 @@ end
 function QS:Spot(e)
 	local entry = e and self:Find(e.title)
 	if not entry then return nil end
+	-- Short names like "Scramble" could belong to other quests: these entries are all
+	-- text-only quests, so a quest with objectives isn't one of them.
+	if e.noObjectives == false then return nil end
 	local t = entry.turnin
 	local m = QS.MapID(t.zone)
 	if not m then return nil end

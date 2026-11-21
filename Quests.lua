@@ -34,6 +34,11 @@ local function UpdatePath(e)
 	else
 		e.dist = nil
 	end
+	-- Finished, no marker, but the hand-in is known (not just a guess or a whole zone).
+	local t = e.turnin
+	if not e.dist and e.complete and t and t.m and (t.source == "learned" or t.source == "npc") then
+		e.dist = ns.Nav.Distance(t.m, t.x, t.y)
+	end
 end
 
 -- Known spawn spots (Spawns.lua) for quests still in progress: the arrow goes to whichever
@@ -350,11 +355,14 @@ end
 ---------------------------------------------------------------------------
 local lastNPC
 
+-- The NPC (or object) in the quest window. A party member sharing a quest isn't a quest giver.
 local function NoteNPC()
+	if UnitExists("npc") and UnitIsPlayer("npc") then return nil end
 	local name = ns.SafeName("npc")
 	if name then lastNPC = { name = name, t = GetTime() } end
 	return name
 end
+local lastDetail, lastComplete   -- { questID, t }: the quest you last read from, or handed to, an NPC
 
 function Q:LastNPC(window)
 	if lastNPC and GetTime() - lastNPC.t <= (window or 30) then return lastNPC.name end
@@ -365,11 +373,17 @@ function Q:TurnInName(questID) return questID and ns.db.npcs.turnin[questID] or 
 
 ns:RegisterEvent("QUEST_DETAIL", function()
 	local name, questID = NoteNPC(), GetQuestID()
-	if name and questID and questID > 0 then ns.db.npcs.giver[questID] = name end
+	if name and questID and questID > 0 then
+		ns.db.npcs.giver[questID] = name
+		lastDetail = { questID = questID, t = GetTime() }
+	end
 end)
 local function NoteTurnIn()
 	local name, questID = NoteNPC(), GetQuestID()
-	if name and questID and questID > 0 then ns.db.npcs.turnin[questID] = name end
+	if name and questID and questID > 0 then
+		ns.db.npcs.turnin[questID] = name
+		lastComplete = { questID = questID, t = GetTime() }
+	end
 end
 ns:RegisterEvent("QUEST_PROGRESS", NoteTurnIn)
 ns:RegisterEvent("QUEST_COMPLETE", NoteTurnIn)
@@ -384,12 +398,20 @@ local function Spot()
 	return { m = m, x = math.floor(x * 10000 + 0.5) / 10000, y = math.floor(y * 10000 + 0.5) / 10000 }
 end
 
+-- Spots are only kept when you were actually at that quest's NPC: not for quests shared by a
+-- party member, started from an item, or handed in remotely (a pop-up turn-in, a shared
+-- completion), where where you stood says nothing about where the NPC is.
+local SPOT_WINDOW = 90
 ns:RegisterEvent("QUEST_ACCEPTED", function(_, questID)
-	if questID and Q:LastNPC(10) then ns.db.npcs.giverAt[questID] = Spot() end
+	if questID and lastDetail and lastDetail.questID == questID and GetTime() - lastDetail.t <= SPOT_WINDOW then
+		ns.db.npcs.giverAt[questID] = Spot()
+	end
 	Q:NPCsChanged()
 end)
 ns:RegisterEvent("QUEST_TURNED_IN", function(_, questID)
-	if questID then ns.db.npcs.turninAt[questID] = Spot() end
+	if questID and lastComplete and lastComplete.questID == questID and GetTime() - lastComplete.t <= SPOT_WINDOW then
+		ns.db.npcs.turninAt[questID] = Spot()
+	end
 	Q:NPCsChanged()
 	if questID then Q:ForgetText(questID) end
 end)
@@ -504,10 +526,10 @@ local function TextInfo(e)
 	if not info then
 		info = {}
 		local ok, _, objectives = pcall(GetQuestLogQuestText, e.logIndex)
-		if ok and type(objectives) == "string" and not ns.IsSecret(objectives) then
+		if ok and type(objectives) == "string" and not ns.IsSecret(objectives) and objectives ~= "" then
 			info.objNpc, info.objZone = Q.NPCInText(objectives), Q.ZoneInText(objectives)
+			textInfo[qid] = info   -- kept only once the text has loaded; right after accepting it may not have
 		end
-		textInfo[qid] = info
 	end
 	if e.complete and info.doneRead == nil and GetQuestLogCompletionText then
 		local ok, done = pcall(GetQuestLogCompletionText, e.logIndex)
@@ -549,17 +571,24 @@ function Q:NPCsChanged() npcDirty = true end
 function Q:ResolveTurnin(e)
 	local qid = e.questID
 	local npcs = ns.db.npcs
-	local at = npcs.turninAt[qid]
-	if at then return { m = at.m, x = at.x, y = at.y, source = "learned", npc = npcs.turnin[qid] } end
 	if e.complete and e.pos and not e.pos.waypoint then
 		return { m = e.pos.m, x = e.pos.x, y = e.pos.y, source = e.knownSpot and "known" or "game", npc = npcs.turnin[qid] }
 	end
 	local info = TextInfo(e)
 	local npc = (e.complete and info.doneNpc) or info.objNpc
 	local zone = (e.complete and info.doneZone) or info.objZone
+	local function InZone(spot)
+		if not zone then return true end
+		local z = ns.Nav.MapName(ns.Nav.GetZoneMap(spot.m))
+		return not z or (ns.Profiles and ns.Profiles.SameZone(zone, z)) or z == zone
+	end
+	-- Where you handed it in before, unless the quest text says it's somewhere else (a spot
+	-- saved by an older version from a remote turn-in).
+	local at = npcs.turninAt[qid]
+	if at and InZone(at) then return { m = at.m, x = at.x, y = at.y, source = "learned", npc = npcs.turnin[qid] } end
 	if npc then
 		local spot = NPCSpot(npc)
-		if spot then return { m = spot.m, x = spot.x, y = spot.y, source = "npc", npc = npc } end
+		if spot and InZone(spot) then return { m = spot.m, x = spot.x, y = spot.y, source = "npc", npc = npc } end
 	end
 	local giver, giverName = npcs.giverAt[qid], npcs.giver[qid]
 	local sameNPC = npc and giverName and npc:lower() == giverName:lower()
