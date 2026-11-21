@@ -1,0 +1,76 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<!-- World map pin used by Pins.lua (NeverQuestMapPinMixin is defined there). -->
+	<Frame name="NeverQuestMapPinTemplate" enableMouse="true" enableMouseClicks="true" mixin="NeverQuestMapPinMixin" virtual="true">
+		<Size x="22" y="22"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Icon">
+					<Size x="22" y="22"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Label" inherits="NumberFontNormal">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="5" y="-3"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Highlight" atlas="Waypoint-MapPin-Highlight" alphaMode="ADD">
+					<Size x="24" y="24"/>
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- Spawn, objective, mark and rare pins (NeverQuestSpawnPinMixin in Pins.lua). Dot and Ring
+	     are white circles tinted in Lua; Icon holds an atlas for notes and rares. -->
+	<Frame name="NeverQuestSpawnPinTemplate" enableMouse="true" enableMouseClicks="true" mixin="NeverQuestSpawnPinMixin" virtual="true">
+		<Size x="10" y="10"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture parentKey="Ring">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-1" y="1"/>
+						<Anchor point="BOTTOMRIGHT" x="1" y="-1"/>
+					</Anchors>
+					<Color r="1" g="1" b="1" a="1"/>
+				</Texture>
+				<MaskTexture parentKey="RingMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeKey="$parent.Ring"/>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.Ring"/>
+					</Anchors>
+					<MaskedTextures>
+						<MaskedTexture childKey="Ring"/>
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<Texture parentKey="Dot" setAllPoints="true">
+					<Color r="1" g="1" b="1" a="1"/>
+				</Texture>
+				<Texture parentKey="Icon" setAllPoints="true" hidden="true"/>
+			</Layer>
+			<Layer level="HIGHLIGHT">
+				<Texture parentKey="Highlight" setAllPoints="true" alphaMode="ADD">
+					<Color r="1" g="1" b="1" a="0.35"/>
+				</Texture>
+			</Layer>
+			<Layer level="OVERLAY">
+				<MaskTexture parentKey="DotMask" file="Interface\CharacterFrame\TempPortraitAlphaMask" setAllPoints="true" hWrapMode="CLAMPTOBLACKADDITIVE" vWrapMode="CLAMPTOBLACKADDITIVE">
+					<MaskedTextures>
+						<MaskedTexture childKey="Dot"/>
+						<MaskedTexture childKey="Highlight"/>
+					</MaskedTextures>
+				</MaskTexture>
+			</Layer>
+		</Layers>
+	</Frame>
+</Ui>

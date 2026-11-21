@@ -1,0 +1,26 @@
+-- NeverQuest bundled guides.
+--
+-- Guides are plain text, one step per line. The easiest way to make one is to record it:
+--   /nq record Human Warrior 1-10     (then just play)
+--   /nq note Buy 6-slot bags here     (adds a note at your position)
+--   /nq stop                          (saves it; it shows up in the Guides tab on every character)
+-- Use Export in the Guides tab to get the text, then paste it into a file like this one to ship it:
+--
+-- NeverQuest.RegisterGuide([[
+-- QMG1~Guide name~Race~Class~Faction~1~10
+-- A~questID~mapID~x~y~Quest title      accept a quest (x and y are 0-100 map coordinates)
+-- C~questID~mapID~x~y~Quest title      finish its objectives
+-- T~questID~mapID~x~y~Quest title      turn it in
+-- G~mapID~x~y~Note                     go to a spot
+-- F~mapID~x~y~Note                     take a flight (x, y = where you land)
+-- R~mapID~x~y~Note                     hearth, portal or other travel
+-- N~mapID~x~y~Note                     a note (use 0~0~0 for no position)
+-- K~mapID~x~y~Note~NPC                 visit a trainer   (V = vendor, H = set hearth, M = flight master)
+-- L~level                              reach a level
+-- X~level~percent~mapID~x~y~Note       grind here until that level and percent
+--
+-- Quest lines (A, T, C) can end with ~NPC name; it powers the "target" button.
+-- ]])
+--
+-- Quest steps tick off automatically. Notes, flights and travel tick off when you arrive
+-- or move on to later steps, or with the Skip button.

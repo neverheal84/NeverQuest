@@ -1,0 +1,14 @@
+<Bindings>
+	<Binding name="NEVERQUEST_TOGGLE" header="NEVERQUEST" category="ADDONS">
+		NeverQuest.UI:Toggle()
+	</Binding>
+	<Binding name="CLICK NeverQuestItemButton1:LeftButton" category="ADDONS"/>
+	<Binding name="CLICK NeverQuestItemButton2:LeftButton" category="ADDONS"/>
+	<Binding name="CLICK NeverQuestTargetButton:LeftButton" category="ADDONS"/>
+	<Binding name="NEVERQUEST_SKIPSTEP" category="ADDONS">
+		NeverQuest.Guide:StepSkip()
+	</Binding>
+	<Binding name="NEVERQUEST_MARKSPAWN" category="ADDONS">
+		NeverQuest.Spawns:MarkHere()
+	</Binding>
+</Bindings>

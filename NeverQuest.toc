@@ -1,0 +1,35 @@
+## Interface: 16001
+## Title: NeverQuest
+## Notes: Leveling guide, raid attunements, waypoint arrow, spawn and objective maps, quest buttons and XP tracker for WoW Forever.
+## Version: 1.9.0
+## SavedVariables: NeverQuestDB
+## SavedVariablesPerCharacter: NeverQuestCharDB
+## OptionalDeps: QuestMax
+## IconTexture: Interface\Icons\INV_Misc_Map_01
+## AddonCompartmentFunc: NeverQuest_OnAddonCompartmentClick
+
+Core.lua
+Style.lua
+Nav.lua
+Route.lua
+XP.lua
+Quests.lua
+Profiles.lua
+Spawns.lua
+Chains.lua
+Planner.lua
+Automation.lua
+Guide.lua
+Party.lua
+Catchup.lua
+Attunements.lua
+Announce.lua
+Journal.lua
+Pins.lua
+MapPins.xml
+Buttons.lua
+Tracker.lua
+MinimapButton.lua
+UI.lua
+Diagnostics.lua
+Guides\Guides.lua
