@@ -67,6 +67,8 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 43. **1.13 checks.** Right-click a reminder row in the guide (for example "Bags almost full"): it disappears until your next login. Learn a new flight path: its "Get the flight path" step goes away at once. After updating, chat says "updated to 1.13.0. /nq news shows what's new" once, and `/nq news` opens that page. During the first minutes after login (while the quest database scans), the guide and tracker should not flicker or stutter; say so if they do.
 
+44. **Finished quests you have levelled past (1.13.2).** Carry a few completed quests whose turn-in is in a zone you have left, far enough that they have gone gray in your log, and leave "Include gray quests" off. `/nq route` should list every one of them, the guide should show the trip, and the tracker should agree. One gray hand-in on its own, with nothing else near it, should stay off the route and be listed as "later" instead. An unfinished gray quest should still be hidden while that option is off.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

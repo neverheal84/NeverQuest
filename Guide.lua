@@ -212,7 +212,7 @@ function G:BuildPlanned(steps, plan)
 	end
 	-- Quests the route leaves out: too far, another continent, or too little XP for the time.
 	for _, e in ipairs(ns.Quests.log) do
-		if not onRoute[e] and not e.failed and (cfg.showGray or not e.trivial) then
+		if not onRoute[e] and not e.failed and (cfg.showGray or e.complete or not e.trivial) then
 			local s = self:MakeStep(e.complete and "turnin" or "objective", e)
 			s.later = true
 			s.sub = "|cff999999later:|r " .. (s.sub or "")

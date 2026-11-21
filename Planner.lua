@@ -131,7 +131,9 @@ function P:Bundles(cont)
 	self.avgXP = avg
 
 	for _, e in ipairs(ns.Quests.log) do
-		if not e.failed and (cfg.showGray or not e.trivial) then
+		-- A finished quest is never dropped for being gray. Its XP was earned at the level you
+		-- did the work at, and all that's left is to walk over and collect it.
+		if not e.failed and (cfg.showGray or e.complete or not e.trivial) then
 			local xp = (e.xp and e.xp > 0) and e.xp or avg
 			local chain, ups = 0, 0
 			if ns.Chains then chain, ups = ns.Chains:Value(e.questID, avg) end
@@ -303,21 +305,45 @@ end
 
 -- Finished quests handed in near each other are one trip, and that is how they have to be
 -- judged: a single turn-in across the map never pays for the walk on its own, while the ten
--- sitting in the same town clearly do. Returns the rate for going there and clearing them all.
-local function RunRate(bundles, used, b, d, speed)
+-- sitting in the same town clearly do. The other finished quests handed in within reach of
+-- this one, or nil if it stands alone.
+local function Cluster(bundles, used, b)
 	local s = b.stops[1]
 	if not s or #b.stops > 1 or s.kind ~= "turnin" then return nil end
-	local value, work, inner, n = b.value, b.work, 0, 1
+	local out
 	for _, o in ipairs(bundles) do
-		if o ~= b and not used[o] and #o.stops == 1 and o.stops[1].kind == "turnin" then
-			local dd = D(s, o.stops[1])
-			if dd <= TURNIN_RUN then
-				value, work, inner, n = value + o.value, work + o.work, inner + dd, n + 1
-			end
+		if o ~= b and not used[o] and #o.stops == 1 and o.stops[1].kind == "turnin"
+			and D(s, o.stops[1]) <= TURNIN_RUN then
+			out = out or {}
+			table.insert(out, o)
 		end
 	end
-	if n < 2 then return nil end
-	return value / max(5, (d + inner) * DETOUR / speed + work), n
+	return out
+end
+
+-- Rate for making that trip once and clearing the whole pile: the walk out, the shortest
+-- nearest-first path around the stops, and the time spent talking to each NPC.
+local function RunRate(cluster, b, d, speed)
+	local value, work, inner = b.value, b.work, 0
+	local at, left, n = b.stops[1], {}, #cluster
+	for i, o in ipairs(cluster) do
+		value, work = value + o.value, work + o.work
+		left[i] = o.stops[1]
+	end
+	for _ = 1, n do
+		local bestD, bestI = math.huge, nil
+		for i = 1, n do
+			local s = left[i]
+			if s then
+				local dd = D(at, s)
+				if dd < bestD then bestD, bestI = dd, i end
+			end
+		end
+		if not bestI then break end
+		inner, at = inner + bestD, left[bestI]
+		left[bestI] = nil
+	end
+	return value / max(5, (d + inner) * DETOUR / speed + work)
 end
 
 local function Build(bundles, start, forced)
@@ -327,7 +353,7 @@ local function Build(bundles, start, forced)
 	-- Bar for leaving quests out: a share of the best unfinished quest's XP per second.
 	local bestRate = 0
 	for _, b in ipairs(bundles) do
-		if not b.pickup and b.stops[1].kind == "objective" then
+		if not b.pickup and not b.e.complete and b.stops[1].kind == "objective" then
 			local d = Insertion(route, start, b)
 			bestRate = max(bestRate, b.value / max(5, d * DETOUR / speed + b.work))
 		end
@@ -343,20 +369,35 @@ local function Build(bundles, start, forced)
 	end
 
 	while #route < MAX_STOPS do
-		local best, bestR, bi, bj
+		local best, bestR, bi, bj, bestRun
 		for _, b in ipairs(bundles) do
 			if not used[b] then
 				local d, i, j = Insertion(route, start, b)
 				local rate = b.value / max(5, d * DETOUR / speed + b.work)
-				local run = RunRate(bundles, used, b, d, speed)
-				if run and run > rate then rate = run end
-				if not bestR or rate > bestR then best, bestR, bi, bj = b, rate, i, j end
+				local cluster = Cluster(bundles, used, b)
+				local run = cluster and RunRate(cluster, b, d, speed)
+				local asRun = run and run > rate
+				if asRun then rate = run end
+				if not bestR or rate > bestR then
+					best, bestR, bi, bj, bestRun = b, rate, i, j, asRun and cluster or nil
+				end
 			end
 		end
 		if not best or bestR < bar then break end
 		Apply(route, best, bi, bj)
 		used[best] = true
 		value, work = value + best.value, work + best.work
+		-- Judged as one trip, so it goes in as one trip: every quest in the pile helps pay for
+		-- the walk, and stopping after the first would waste it.
+		if bestRun then
+			for _, o in ipairs(bestRun) do
+				if #route >= MAX_STOPS then break end
+				local d, i = Insertion(route, start, o)
+				Apply(route, o, i)
+				used[o] = true
+				value, work = value + o.value, work + o.work
+			end
+		end
 		if Travel(route, start) * DETOUR / speed + work > HORIZON then break end
 	end
 
