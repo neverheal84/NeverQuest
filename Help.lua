@@ -220,6 +220,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.13.1" .. E,
+		"  Finished quests waiting in another zone are now judged as one trip, so a pile of them gets you sent back to hand them in. One on its own still waits its turn.",
+		"  A finished quest moves up the list the further you out-level it, because its XP shrinks as you go.",
+		"",
 		Y .. "1.13" .. E,
 		"  Reminders in the guide (full log, supplies, bags, flight paths, hearth) can be right-clicked away until you log in again.",
 		"  Two-handed weapons are compared with your main hand and off-hand together.",

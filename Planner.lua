@@ -9,7 +9,9 @@
 --      and costs the extra travel to fit it into the route plus the time to do it.
 --   3. Bundles go in one at a time, best XP per second first, each at the place in the route
 --      where it adds the least travel (the objective always before its turn-in). Quests worth
---      much less than the best quest on offer are left out ("not on this route").
+--      much less than the best quest on offer are left out ("not on this route"). Finished
+--      quests handed in near each other are judged as one trip: alone, none of them pays for
+--      the walk across the map, while the pile of them sitting in one town plainly does.
 --   4. The order is then tightened (segments reversed where that shortens the trip).
 --   5. The current first stop is kept unless a new plan is clearly better, so the arrow
 --      doesn't flip back and forth.
@@ -30,6 +32,9 @@ local WORKING_YARDS = 60    -- this close to the current objective, you're worki
 local REPLAN_MOVE = 120     -- yards moved before planning again
 local REPLAN_EVERY = 8      -- seconds between plans
 local MAX_STOPS = 30
+local TURNIN_RUN = 600      -- yards: finished quests handed in this close to each other are one trip
+local BANKED_PER_LEVEL = 0.06  -- finished quests lose XP as you out-level them, so they move up the list
+local BANKED_MAX = 1.5
 local STOP_WORK = 8         -- seconds to talk to an NPC
 local PICKUP_SHARE = 0.4    -- a pickup is worth part of its quest's XP: the rest comes later
 -- Seconds per objective unit, by objective type.
@@ -135,6 +140,13 @@ function P:Bundles(cont)
 			b.value = b.value * StyleWeight(e.questID, ns.Quests:ZoneOf(e), focus, e.complete)
 			if ns.Catchup then b.value = b.value * ns.Catchup:Weight(e.questID, e.complete, false) end
 			if e.complete then
+				-- Banked XP: a finished quest is worth less every level you gain past its level,
+				-- so the longer it sits the sooner it should be done.
+				local qlevel = ns.Num(e.level)
+				if qlevel and qlevel > 0 then
+					local over = (UnitLevel("player") or qlevel) - qlevel
+					if over > 0 then b.value = b.value * min(BANKED_MAX, 1 + over * BANKED_PER_LEVEL) end
+				end
 				-- Party catch-up: back to the objective to help whoever hasn't finished, then hand in.
 				local help = ns.Catchup and ns.Catchup:HelpFor(e, avg)
 				local h = help and help.spot and Stop("objective", e.questID, e, help.spot, cont, 60, { help = help.names, key = "help:" .. e.questID })
@@ -289,6 +301,25 @@ local function Speed()
 	return max(7, (ns.Route and ns.Route.speed) or 7)
 end
 
+-- Finished quests handed in near each other are one trip, and that is how they have to be
+-- judged: a single turn-in across the map never pays for the walk on its own, while the ten
+-- sitting in the same town clearly do. Returns the rate for going there and clearing them all.
+local function RunRate(bundles, used, b, d, speed)
+	local s = b.stops[1]
+	if not s or #b.stops > 1 or s.kind ~= "turnin" then return nil end
+	local value, work, inner, n = b.value, b.work, 0, 1
+	for _, o in ipairs(bundles) do
+		if o ~= b and not used[o] and #o.stops == 1 and o.stops[1].kind == "turnin" then
+			local dd = D(s, o.stops[1])
+			if dd <= TURNIN_RUN then
+				value, work, inner, n = value + o.value, work + o.work, inner + dd, n + 1
+			end
+		end
+	end
+	if n < 2 then return nil end
+	return value / max(5, (d + inner) * DETOUR / speed + work), n
+end
+
 local function Build(bundles, start, forced)
 	local speed = Speed()
 	local route, used, value, work = {}, {}, 0, 0
@@ -317,6 +348,8 @@ local function Build(bundles, start, forced)
 			if not used[b] then
 				local d, i, j = Insertion(route, start, b)
 				local rate = b.value / max(5, d * DETOUR / speed + b.work)
+				local run = RunRate(bundles, used, b, d, speed)
+				if run and run > rate then rate = run end
 				if not bestR or rate > bestR then best, bestR, bi, bj = b, rate, i, j end
 			end
 		end
