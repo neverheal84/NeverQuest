@@ -29,3 +29,22 @@ Record your route, then replay it on alts. Share guides with Export and Import.
 ## Options: reminders, travel, alerts and the quest database
 
 ![Options: reminders, travel, alerts and quest database](options-reminders-database.png)
+
+## Options: quest tracker and drops window
+
+![Options: quest tracker and drops window](options-quest-tracker.png)
+
+## Options: display and maps
+The XP panel, the waypoint arrow, nameplate icons, minimap and world map pins.
+
+![Options: display and maps](options-display-maps.png)
+
+## Options: spawns and objectives
+NeverQuest learns where quest mobs and objectives are while you play. You can mark spots yourself too.
+
+![Options: spawns and objectives](options-spawns-objectives.png)
+
+## Options: scale and text
+Font, text size and the size of every NeverQuest panel.
+
+![Options: scale and text](options-scale-text.png)
