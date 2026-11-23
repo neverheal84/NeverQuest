@@ -1,6 +1,11 @@
 # NeverQuest screenshots
 
-Taken in WoW Forever with NeverQuest 1.21.4.
+Taken in WoW Forever with NeverQuest 1.21.4 and 1.21.7.
+
+## Guide & Routes options and choosing dungeons
+Tick the dungeons you want quests for. Their quests and pre-quests get picked up a couple of levels before you're ready to run them.
+
+![Guide & Routes options and the dungeon list](guide-routes-dungeons.png)
 
 ## Class quests
 What your class has coming and when, plus class quests already in your log. Click a row to point the arrow at it.
