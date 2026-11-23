@@ -41,6 +41,7 @@ local AHEAD_SHARE = 0.8     -- a pickup in the zone you're heading to, planned b
 local AHEAD_MAX = 6         -- of those, at most this many per zone, nearest first
 local DUNGEON_SHARE = 1.0   -- a dungeon quest, or the pre-quest that opens it: worth the dungeon quest's XP
 local PREP_BOOST = 2.0      -- and doubled, so they're done before the dungeon (Dungeons.lua)
+local GOBACK = 6            -- a quest you chose to go back for from the missed list (Advisor.lua): next, unless something is right beside you
 -- Seconds per objective unit, by objective type.
 local WORK = { monster = 22, item = 30, object = 15, event = 30, log = 20, progressbar = 150 }
 
@@ -127,6 +128,20 @@ function P:Bundles(cont)
 	local bundles = {}
 	local focus = ns.Guide and ns.Guide:Focus()
 	self.focus = focus
+	-- Advisor.lua: quests you skipped stay off the route, ones you're going back for count for
+	-- a lot more, and Zone by zone is completionist: every quest in its zone, gray ones too.
+	local AD = ns.Advisor
+	local complete = AD and AD:Completionist() or false
+	self.completionist = complete
+	local function Skipped(qid) return AD and AD:IsSkipped(qid) end
+	local function Back(qid) return AD and AD:IsGoingBack(qid) end
+	local function InFocus(zoneName)
+		if not (focus and zoneName) then return false end
+		for name in pairs(focus.zones or {}) do
+			if ns.Profiles.SameZone(name, zoneName) then return true end
+		end
+		return false
+	end
 	local sum, n = 0, 0
 	for _, e in ipairs(ns.Quests.log) do
 		if e.xp and e.xp > 0 then sum, n = sum + e.xp, n + 1 end
@@ -145,7 +160,8 @@ function P:Bundles(cont)
 		-- A finished quest is never dropped for being gray. Its XP was earned at the level you
 		-- did the work at, and all that's left is to walk over and collect it.
 		-- A dungeon quest waits for the dungeon: the route doesn't send you to its entrance alone.
-		if not e.failed and (cfg.showGray or e.complete or not e.trivial) and not WaitsForDungeon(e) then
+		local gray = e.trivial and not (cfg.showGray or e.complete or (complete and InFocus(ns.Quests:ZoneOf(e))))
+		if not e.failed and not gray and not WaitsForDungeon(e) and not Skipped(e.questID) then
 			local xp = (e.xp and e.xp > 0) and e.xp or avg
 			local chain, ups = 0, 0
 			if ns.Chains then chain, ups = ns.Chains:Value(e.questID, avg) end
@@ -155,6 +171,7 @@ function P:Bundles(cont)
 			if ns.Catchup then b.value = b.value * ns.Catchup:Weight(e.questID, e.complete, false) end
 			-- A quest that opens a dungeon quest you're gathering: done first.
 			if dplan and dplan.prep[e.questID] then b.value = b.value * PREP_BOOST end
+			if Back(e.questID) then b.value = b.value * GOBACK end
 			if e.complete then
 				-- Banked XP: a finished quest is worth less every level you gain past its level,
 				-- so the longer it sits the sooner it should be done.
@@ -206,13 +223,21 @@ function P:Bundles(cont)
 
 	if cfg.planPickups then
 		for _, o in ipairs(ns.Quests.offers) do
-			if ns.Quests:OfferShown(o, true) then
+			-- Zone by zone takes the gray ones in its zone too; red (too high) ones wait either way.
+			local shown = ns.Quests:OfferShown(o, true)
+				or (complete and (o.trivial or o.difficulty == 0) and o.difficulty ~= 4 and InFocus(ns.Quests:ZoneOf(o)))
+			if shown and not Skipped(o.questID) then
 				local chain, ups = 0, 0
 				if ns.Chains then chain, ups = ns.Chains:Value(o.questID, avg) end
 				local s = Stop("pickup", o.questID, o, o, cont, STOP_WORK)
 				if s then
-					local b = { questID = o.questID, e = o, value = ((o.xp or avg) + chain) * PICKUP_SHARE, chainCount = ups,
+					-- Worth taking by what the whole quest is worth for the time it takes (Advisor.lua),
+					-- not only by its XP: a quest whose work is across the map counts for less.
+					local xp = o.xp or (AD and AD:XP(o.questID)) or avg
+					local fit = AD and AD:PickupFactor(o.questID) or 1
+					local b = { questID = o.questID, e = o, value = (xp + chain) * PICKUP_SHARE * fit, chainCount = ups,
 						stops = { s }, work = STOP_WORK, pickup = true }
+					if Back(o.questID) then b.value = b.value * GOBACK end
 					b.value = b.value * StyleWeight(o.questID, ns.Quests:ZoneOf(o), focus, false)
 					if ns.Catchup then b.value = b.value * ns.Catchup:Weight(o.questID, false, true) end
 					s.bundle, s.order = b, 1
@@ -223,7 +248,34 @@ function P:Bundles(cont)
 		self:AheadBundles(bundles, cont, focus, avg)
 	end
 	if dplan then self:DungeonBundles(bundles, cont, avg, dplan) end
+	self:BackBundles(bundles, cont, avg)
 	return bundles
+end
+
+-- Quests from the missed list you chose to go back for and haven't picked up again: a stop at
+-- their giver, worth a lot, so the route takes you there. One on another continent is left to
+-- the guide's own "Go back for" step (Advisor.lua).
+function P:BackBundles(bundles, cont, avg)
+	local AD = ns.Advisor
+	if not AD then return end
+	local have = {}
+	for _, b in ipairs(bundles) do have[b.questID] = true end
+	for qid in pairs(ns.char.goBack or {}) do
+		if not have[qid] and not ns.Quests.byID[qid] then
+			local q = ns.QuestDB and ns.QuestDB:Get(qid)
+			if q and q.m and q.x and ns.QuestDB:Status(qid, q) == "available" then
+				local o = { questID = qid, title = q.t or AD.Title(qid), level = q.l, m = q.m, x = q.x, y = q.y,
+					dist = ns.Nav.Distance(q.m, q.x, q.y), back = true }
+				local s = Stop("pickup", qid, o, o, cont, STOP_WORK)
+				if s then
+					local b = { questID = qid, e = o, value = (AD:XP(qid) or avg) * GOBACK, chainCount = 0,
+						stops = { s }, work = STOP_WORK, pickup = true, back = true }
+					s.bundle, s.order = b, 1
+					table.insert(bundles, b)
+				end
+			end
+		end
+	end
 end
 
 -- Dungeon quests and the pre-quests that open them (Dungeons.lua), for the dungeons you've ticked
@@ -234,6 +286,7 @@ function P:DungeonBundles(bundles, cont, avg, dplan)
 	local byQuest = {}
 	for _, b in ipairs(bundles) do if b.pickup then byQuest[b.questID] = b end end
 	for _, pick in ipairs(dplan.picks) do
+		if not (ns.Advisor and ns.Advisor:IsSkipped(pick.qid)) then
 		local xp = ns.Num(GetQuestLogRewardXP(pick.forQid))
 		if not (xp and xp > 0) and not dungeonRequested[pick.forQid] then
 			dungeonRequested[pick.forQid] = true
@@ -259,6 +312,7 @@ function P:DungeonBundles(bundles, cont, avg, dplan)
 				end
 			end
 		end
+		end
 	end
 end
 
@@ -277,6 +331,7 @@ function P:AheadBundles(bundles, cont, focus, avg)
 	local taken = {}
 	for _, o in ipairs(ns.Quests.offers) do taken[o.questID] = true end
 	for _, b in ipairs(bundles) do taken[b.questID] = true end
+	for qid in pairs(ns.char.skipped or {}) do taken[qid] = true end
 	local doneZone = {}
 	for _, zid in ipairs(targets) do
 		if zid ~= ns.Quests.offerMap and not doneZone[zid] then
@@ -336,15 +391,16 @@ local function BestSpot(route, start, ins, insAt, stop, from, len)
 	return best, bestK
 end
 
--- Extra yards to fit a bundle into the route, and where its stops go.
-local function Insertion(route, start, b, forceFirst)
+-- Extra yards to fit a bundle into the route, and where its stops go. from: the first place a
+-- stop may go (2 keeps a forced first stop first).
+local function Insertion(route, start, b, forceFirst, from)
 	local s1, s2 = b.stops[1], b.stops[2]
 	local d1, i
 	if forceFirst then
 		local nxt = route[1]
 		d1, i = D(start, s1) + (nxt and (D(s1, nxt) - D(start, nxt)) or 0), 1
 	else
-		d1, i = BestSpot(route, start, nil, nil, s1, 1, #route)
+		d1, i = BestSpot(route, start, nil, nil, s1, math.min(from or 1, #route + 1), #route)
 	end
 	if not s2 then return d1, i end
 	local d2, j = BestSpot(route, start, s1, i, s2, i + 1, #route + 1)
@@ -366,12 +422,13 @@ local function Travel(route, start)
 end
 
 -- Reverse segments while that shortens the route, never putting a turn-in before its objective.
-local function Tighten(route, start)
+-- first: the first position that may move (2 keeps a forced first stop where it is).
+local function Tighten(route, start, first)
 	local n = #route
 	if n < 3 then return end
 	for _ = 1, 40 do
 		local improved = false
-		for i = 1, n - 1 do
+		for i = first or 1, n - 1 do
 			for j = i + 1, n do
 				-- Segment i..j must not hold both stops of one quest.
 				local ok, seen = true, {}
@@ -464,6 +521,9 @@ local function Build(bundles, start, forced)
 	end
 	local style = P.focus and P.focus.style or "none"
 	local bar = bestRate * (MIN_SHARE[style] or 0.3)
+	-- Zone by zone, completionist: nothing is left out for being slow, only for not fitting
+	-- in the next half hour.
+	if P.completionist and style == "zone" then bar = 0 end
 
 	if forced then
 		local d, i, j = Insertion(route, start, forced, true)
@@ -472,11 +532,13 @@ local function Build(bundles, start, forced)
 		value, work = value + forced.value, work + forced.work
 	end
 
+	-- A forced first stop stays first: everything else goes in after it.
+	local from = forced and 2 or 1
 	while #route < MAX_STOPS do
 		local best, bestR, bi, bj, bestRun
 		for _, b in ipairs(bundles) do
 			if not used[b] then
-				local d, i, j = Insertion(route, start, b)
+				local d, i, j = Insertion(route, start, b, false, from)
 				local rate = b.value / max(5, d * DETOUR / speed + b.work)
 				local cluster = Cluster(bundles, used, b)
 				local run = cluster and RunRate(cluster, b, d, speed)
@@ -496,7 +558,7 @@ local function Build(bundles, start, forced)
 		if bestRun then
 			for _, o in ipairs(bestRun) do
 				if #route >= MAX_STOPS then break end
-				local d, i = Insertion(route, start, o)
+				local d, i = Insertion(route, start, o, false, from)
 				Apply(route, o, i)
 				used[o] = true
 				value, work = value + o.value, work + o.work
@@ -505,7 +567,7 @@ local function Build(bundles, start, forced)
 		if Travel(route, start) * DETOUR / speed + work > HORIZON then break end
 	end
 
-	Tighten(route, start)
+	Tighten(route, start, from)
 	local yards = Travel(route, start)
 	local secs = yards * DETOUR / speed + work
 	local skipped = {}
@@ -524,9 +586,19 @@ function P:Make()
 	if not cont then return nil end
 	local start = { cx = cx, cy = cy, key = "start" }
 	local bundles = self:Bundles(cont)
-	local plan = Build(bundles, start)
+	-- A quest you chose to go back for (Advisor.lua) is where you go next: the nearest one is
+	-- the first stop, wherever cheapest insertion would have put it.
+	local back
+	for _, b in ipairs(bundles) do
+		if b.back then
+			local d = D(start, b.stops[1])
+			if not back or d < back.d then back = { b = b, d = d } end
+		end
+	end
+	local plan = Build(bundles, start, back and back.b)
 
-	-- Keep the current first stop unless the new plan is clearly better.
+	-- Keep the current first stop unless the new plan is clearly better. Going back for a quest
+	-- waits only for an objective you're standing in.
 	local old = self.plan and self.plan.stops[1]
 	local first = plan.stops[1]
 	if old and first and old.key ~= first.key then
@@ -537,7 +609,7 @@ function P:Make()
 		if keep then
 			local held = Build(bundles, start, keep)
 			local working = keep.stops[1].kind == "objective" and D(start, keep.stops[1]) <= WORKING_YARDS
-			if working or plan.rate <= held.rate * KEEP_MARGIN then plan = held end
+			if working or (not back and plan.rate <= held.rate * KEEP_MARGIN) then plan = held end
 		end
 	end
 

@@ -320,6 +320,20 @@ function UI:Create()
 	self.btnClassQ:SetPoint("RIGHT", self.btnProfs, "LEFT", -4, 0)
 	self.btnProfs:Hide()
 	self.btnClassQ:Hide()
+	-- Quests tab: your log, or the quests you skipped, dropped or left behind (Advisor.lua).
+	self.btnMissed = Button(f, "Missed", 80, function()
+		ns.db.window.questsView = (ns.db.window.questsView == "missed") and "log" or "missed"
+		UI.list.offset = 0
+		UI:Refresh()
+	end)
+	self.btnMissed:SetPoint("BOTTOMRIGHT", -10, 10)
+	self.btnMissed:Hide()
+	self.btnMissedGray = Button(f, "Gray: off", 80, function()
+		UI.missedGray = not UI.missedGray
+		UI:Refresh()
+	end)
+	self.btnMissedGray:SetPoint("RIGHT", self.btnMissed, "LEFT", -4, 0)
+	self.btnMissedGray:Hide()
 	self.btnLive:SetPoint("BOTTOMRIGHT", -10, 10)
 	self.btnSkip:SetPoint("RIGHT", self.btnLive, "LEFT", -4, 0)
 	self.btnBack:SetPoint("RIGHT", self.btnSkip, "LEFT", -4, 0)
@@ -455,7 +469,37 @@ function UI:CyclePlanClass(dir)
 	self:Refresh()
 end
 
+-- Right-click on a quest anywhere in the window: open it, skip it, drop it, go back for it.
+function UI:QuestMenu(item)
+	local qid = item.questID or item.missedQuest
+	if not (qid and MenuUtil and MenuUtil.CreateContextMenu) then return false end
+	MenuUtil.CreateContextMenu(self.frame, function(_, root)
+		root:CreateTitle(ns.Advisor and ns.Advisor.Title(qid) or (item.title or "Quest"))
+		local inLog = ns.SafeCall(C_QuestLog.IsOnQuest, qid) == true
+		if inLog and QuestMapFrame_OpenToQuestDetails then
+			root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(qid) end)
+		end
+		if item.m and item.x then
+			root:CreateButton("Point the arrow here", function() ns.Guide:Pin(item) end)
+		end
+		if item.missedQuest and ns.Advisor then
+			root:CreateButton("Take it off the missed list", function() ns.Advisor:Hide(qid) end)
+		end
+		if ns.Advisor then ns.Advisor:MenuItems(root, qid) end
+	end)
+	return true
+end
+
 function UI:OnItemClick(item, button)
+	if item.openMissed and button ~= "RightButton" then
+		ns.db.window.questsView = "missed"
+		self:SetTab("quests")
+		return
+	end
+	if item.missedQuest and button == "RightButton" then
+		self:QuestMenu(item)
+		return
+	end
 	if item.shareQuest and button ~= "RightButton" then
 		ns.Catchup:Share(item.shareQuest)
 		return
@@ -523,6 +567,8 @@ function UI:OnItemClick(item, button)
 		end
 	end
 	if button == "RightButton" then
+		-- A quest: a menu with Skip and Drop, falling back to the quest log where menus aren't there.
+		if item.questID and ns.Advisor and self:QuestMenu(item) then return end
 		if item.questID and C_QuestLog.IsOnQuest(item.questID) and QuestMapFrame_OpenToQuestDetails then
 			QuestMapFrame_OpenToQuestDetails(item.questID)
 		end
@@ -567,13 +613,15 @@ function UI:Refresh()
 	self.btnHistory:Hide()
 	self.btnProfs:Hide()
 	self.btnClassQ:Hide()
+	self.btnMissed:Hide()
+	self.btnMissedGray:Hide()
 	self.btnPlan:Hide()
 	self.btnRace:Hide()
 	self.btnClass:Hide()
 	self.btnMine:Hide()
 	self.btnStyle:Hide()
 	self.header:SetPoint("RIGHT", -14, 0)
-	self.list.hint = "Click: point the arrow here.  Right-click: open in quest log.  Shift-click: link in chat."
+	self.list.hint = "Click: point the arrow here.  Right-click a quest: skip it, drop it, or open it in your quest log.  Shift-click: link in chat."
 
 	if tab == "guide" and self.planView then
 		local P = ns.Profiles
@@ -618,13 +666,31 @@ function UI:Refresh()
 			self.footer:SetText("")
 		else
 			local zone = G:CurrentZoneLevels()
+			-- Skip the step the arrow is on: a quest goes on the missed list.
+			self.btnSkip:Show()
 			self.header:SetText((G:IsRecording() and ("|cffff5555Recording (" .. #ns.char.recorder.steps .. ")|r  ") or "") ..
 				"Live guide: best next steps" ..
 				(zone and string.format("  (|cffffffff%s %d-%d|r)", zone.name, zone.min, zone.max) or ""))
 			self.footer:SetText("")
 		end
 		self.list:SetItems(GuideItems())
+	elseif tab == "quests" and ns.db.window.questsView == "missed" and ns.Advisor then
+		local AD = ns.Advisor
+		self.btnMissed:Show()
+		self.btnMissed:SetText("Quest log")
+		self.btnMissedGray:Show()
+		self.btnMissedGray:SetText(self.missedGray and "Gray: on" or "Gray: off")
+		self.header:SetText("Quests you skipped, dropped or left behind in zones you've moved on from.")
+		self.list.hint = "Click: point the arrow at the quest giver.  Right-click: go back for it, take it back, or take it off the list."
+		local items = AD:Items(self.missedGray or AD:Completionist())
+		local n = (items[1] and items[1].missedQuest) and #items or 0
+		self.footer:SetText(n .. (n == 1 and " quest" or " quests") .. "  ·  /nq missed lists them in chat")
+		self.list:SetItems(items)
 	elseif tab == "quests" then
+		self.btnMissed:Show()
+		local missedN = ns.Advisor and ns.Advisor:MissedCount() or 0
+		self.btnMissed:SetText(missedN > 0 and ("Missed (" .. missedN .. ")") or "Missed")
+		self.list.hint = "Click: point the arrow here.  Right-click: skip, drop or open in quest log.  Shift-click: link in chat."
 		local n, ready, readyXP, totalXP = 0, 0, 0, 0
 		for _, e in ipairs(ns.Quests.log) do
 			n = n + 1
@@ -1262,7 +1328,7 @@ function UI:CreateOptions()
 	Heading(g, L1.x, L1:Next(), "Guide")
 	Cycle(g, L1.x, L1:Next(30), "Leveling style:", ns.Profiles.STYLES, function() return ns.Profiles:Style() end,
 		function(v) db.guide.style = v ns.Guide.focusKey = nil ns.Planner.dirty = true Guide() end,
-		"Optimized 1-60: hop zones the way current leveling guides do, leaving a zone when its level window ends (and coming back for leftovers later). Zone by zone: stay in a zone until its quests run out, then move to the next one in your plan.")
+		"Optimized 1-60: go where the XP per hour is best, from the quest data, with your plan's zones as the fallback; slow quests are left out and you're told which to drop. Zone by zone: the completionist way, every quest in a zone (gray ones too) before the next one in your plan.")
 	Check(g, L1.x, L1:Next(), "Guide steers the arrow", function() return db.guide.autoTrack end, function(v) db.guide.autoTrack = v Guide() end,
 		"The arrow follows the top guide step. Your own /way waypoints always come first.")
 	Check(g, L1.x, L1:Next(), "Include gray quests", function() return db.guide.showGray end, function(v) db.guide.showGray = v Guide() end)
@@ -1283,6 +1349,18 @@ function UI:CreateOptions()
 	local dqRow = L1:Next(26)
 	local dqPick = Button(g, "Choose dungeons...", 150, function() ns.Dungeons:OpenPicker() end)
 	dqPick:SetPoint("TOPLEFT", g, "TOPLEFT", L1.x + 16, dqRow)
+	Check(g, L1.x + 16, L1:Next(), "Optimized: choose zones from the quest data", function() return db.guide.smartZones ~= false end,
+		function(v) db.guide.smartZones = v ns.Guide.focusKey = nil ns.Planner.dirty = true Guide() end,
+		"Sends you to the zone with the most XP per hour for you right now, worked out from every quest you can take there (its XP, where its work is, where it's handed in, and the trip). Your 1-60 plan breaks ties and takes over when too little is known. /nq zones lists the zones.")
+	Check(g, L1.x + 16, L1:Next(), "Optimized: suggest quests to drop", function() return db.guide.dropAdvice ~= false end,
+		function(v) db.guide.dropAdvice = v Guide() end,
+		"A note in the guide names quests in your log that aren't worth finishing: gray, too slow for their XP, or in a zone you've outleveled. Never finished quests, class or profession quests, your attunement or dungeon quests you're gathering. Nothing is dropped unless you confirm it.")
+	Check(g, L1.x + 16, L1:Next(), "Zone by zone: finish every quest in a zone", function() return db.guide.completionist ~= false end,
+		function(v) db.guide.completionist = v ns.Guide.focusKey = nil ns.Planner.dirty = true Guide() end,
+		"The completionist way: every quest in the zone goes on the route, gray ones included, nothing is left out for being slow, and the zone is done before you move on (unless you're four levels past it).")
+	Check(g, L1.x, L1:Next(), "Keep a list of quests I skip, drop or leave behind", function() return db.guide.missedList ~= false end,
+		function(v) db.guide.missedList = v Guide() end,
+		"Quests tab > Missed. Right-click any quest in the guide or tracker to skip it; right-click one on the list to go back for it.")
 	Check(g, L1.x, L1:Next(), "Tell me when to move to the next zone", function() return db.guide.zoneAdvice end, function(v) db.guide.zoneAdvice = v Guide() end)
 	Check(g, L1.x, L1:Next(), "Tell me when I've outleveled a zone", function() return db.guide.outleveledTip end, function(v) db.guide.outleveledTip = v Guide() end)
 	Check(g, L1.x, L1:Next(), "Rested XP reminder", function() return db.guide.restedTip end, function(v) db.guide.restedTip = v Guide() end)

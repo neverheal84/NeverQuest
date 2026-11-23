@@ -490,7 +490,10 @@ local function SameZone(a, b)
 end
 P.SameZone = SameZone
 
-function P:Focus(plan, level, zoneWork)
+-- zoneWorkAll, when given, counts gray quests too: Zone by zone's completionist way stays in a
+-- zone until those are done as well, up to COMPLETE_SLACK levels past the zone's top level.
+local COMPLETE_SLACK = 4
+function P:Focus(plan, level, zoneWork, zoneWorkAll)
 	local here = HereZoneName()
 	local f = { style = self:Style(), zones = {}, here = here }
 	if f.style == "optimized" then
@@ -522,13 +525,20 @@ function P:Focus(plan, level, zoneWork)
 		-- Stay where you are while it's one of your plan's zones for now (or the band before),
 		-- you haven't outleveled it and it still has quests for you.
 		local stay
+		local work, slack = zoneWorkAll or zoneWork, zoneWorkAll and COMPLETE_SLACK or 1
 		for _, b in ipairs({ band, prev }) do
 			for _, name in ipairs(b and b.zones or {}) do
 				if not stay and SameZone(here, name) then
 					local _, maxL = self.ZoneLevels(name)
-					if (not maxL or maxL >= level - 1) and zoneWork(name) > 0 then stay = name end
+					if (not maxL or maxL >= level - slack) and work(name) > 0 then stay = name end
 				end
 			end
+		end
+		-- Completionist: the zone you're in still has quests for you, and you haven't left it
+		-- far behind. Stay, even if your plan's band has moved on.
+		if not stay and zoneWorkAll and here and P.ZONES[here] then
+			local _, maxL = self.ZoneLevels(here)
+			if maxL and maxL >= level - COMPLETE_SLACK and maxL <= level + 10 and zoneWorkAll(here) > 0 then stay = here end
 		end
 		f.from, f.to, f.note = band.from, band.to, band.note
 		if stay then
@@ -556,7 +566,7 @@ function P:Focus(plan, level, zoneWork)
 		f.nextZone = f.nextZone or (nextBand and nextBand.zones[1])
 		f.nearEnd = level >= band.to - 1
 		f.moveOn = not SameZone(here, f.primary)
-		f.reason = stay and string.format("Zone by zone: finishing %s.", stay)
+		f.reason = stay and string.format(zoneWorkAll and "Zone by zone: finishing every quest in %s." or "Zone by zone: finishing %s.", stay)
 			or string.format("Zone by zone: %s is next in your plan (levels %d-%d).", f.primary, band.from, band.to)
 	end
 	f.primaryID = self.ZoneID(f.primary)

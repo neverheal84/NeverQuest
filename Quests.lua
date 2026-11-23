@@ -498,21 +498,29 @@ function Q:ZoneOf(e)
 	if e.m then return ns.Nav.MapName(ns.Nav.GetZoneMap(e.m)) end
 end
 
--- Useful quests in a zone: ones to do (not gray), to hand in, or to pick up.
-function Q:ZoneWork(name)
+-- Useful quests in a zone: ones to do (not gray), to hand in, or to pick up. With all, gray
+-- ones count too (Zone by zone's completionist way). Quests you skipped (Advisor.lua) don't.
+function Q:ZoneWork(name, all)
 	if not name then return 0 end
 	local same = ns.Profiles and ns.Profiles.SameZone or function(a, b) return a == b end
+	local AD = ns.Advisor
 	local n = 0
 	for _, e in ipairs(self.log) do
-		if not e.failed and (e.complete or not e.trivial) and same(self:ZoneOf(e), name) then n = n + 1 end
+		if not e.failed and (e.complete or all or not e.trivial) and same(self:ZoneOf(e), name)
+			and not (AD and AD:IsSkipped(e.questID)) then n = n + 1 end
 	end
 	for _, o in ipairs(self.offers) do
-		if not o.trivial and o.difficulty ~= 4 and same(self:ZoneOf(o), name) then n = n + 1 end
+		if (all or not o.trivial) and o.difficulty ~= 4 and same(self:ZoneOf(o), name)
+			and not (AD and AD:IsSkipped(o.questID)) then n = n + 1 end
 	end
 	-- The game reports quests on offer only for the map you are on. For any other zone, count
 	-- what NeverQuest knows is open to you there.
 	local id = ns.Profiles and ns.Profiles.ZoneID(name)
-	if id and id ~= self.offerMap and ns.QuestDB then n = n + ns.QuestDB:OpenCount(id) end
+	if id and id ~= self.offerMap and ns.QuestDB then
+		for _, k in ipairs(ns.QuestDB:OpenIn(id, all)) do
+			if not (AD and AD:IsSkipped(k.qid)) then n = n + 1 end
+		end
+	end
 	return n
 end
 

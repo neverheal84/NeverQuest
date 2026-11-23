@@ -16,7 +16,7 @@ local DEFAULTS = {
 	hud    = { shown = true, locked = false, scale = 1, showRested = true, showRate = true, showToLevel = true, showFooter = true },
 	arrow  = { shown = true, locked = false, arrival = 10, alwaysShow = false, scale = 1, compact = false,
 	           size = 54, showETA = true, showThen = true, sound = true, corpse = true },
-	window = { tab = "guide", journalView = "history", classView = "class", scale = 1 },
+	window = { tab = "guide", journalView = "history", classView = "class", questsView = "log", scale = 1 },
 	style  = { font = "default", textScale = 1, outline = "", shadow = true },
 	tracker = { shown = true, blizzard = "hide", hideFrame = true, locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
@@ -42,7 +42,8 @@ local DEFAULTS = {
 	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true,
 	           nearbyFirst = true, zoneAdvice = true, outleveledTip = true, restedTip = true,
 	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
-	           classTab = true, profQuests = true, profMine = true },
+	           classTab = true, profQuests = true, profMine = true,
+	           smartZones = true, dropAdvice = true, completionist = true, missedList = true },  -- Advisor.lua
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
 	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, sources = false,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 1, wmScale = 1 },
@@ -87,6 +88,11 @@ local CHAR_DEFAULTS = {
 	cvarBackup = {},                         -- the player's own auto-watch settings, to hand back when we stop hiding
 	attune = {},                             -- [attunement] = { follow, turned, ticks, unticks }
 	hearth = false,                          -- { name, m, x, y, zone } where you bound your hearthstone
+	skipped = {},                            -- [quest] = { at, t, l, m } quests you skipped (Advisor.lua)
+	dropped = {},                            -- [quest] = { at, t, l, m } quests you abandoned
+	goBack = {},                             -- [quest] = true quests from the missed list you're going back for
+	visited = {},                            -- [zone map] = highest level you quested there at
+	missedHidden = {},                       -- [quest] = true taken off the missed list
 }
 
 local function Merge(dst, src)

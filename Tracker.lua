@@ -161,6 +161,7 @@ function T:QuestMenu(owner, e)
 		if (e.elite or e.group) and not e.complete and ns.Upkeep then
 			root:CreateButton("Ask for a group (LFG message)", function() ns.Upkeep:AskForGroup(e) end)
 		end
+		if ns.Advisor then ns.Advisor:MenuItems(root, qid) end
 		root:CreateButton("Hide from the tracker", function()
 			ns.char.trackerHidden[qid] = true
 			T:Refresh()

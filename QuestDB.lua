@@ -1062,8 +1062,8 @@ end
 -- What is open to you, zone by zone
 --
 -- Every quest NeverQuest knows of (its own, the shipped file and QuestieDB) whose giver stands
--- in a zone, that this character can take now, that is not
--- gray and is not already in your log. The route uses it for zones you are not standing in: the
+-- in a zone, that this character can take now and is not already in your log. Gray ones are
+-- kept too, marked gray, for Zone by zone's completionist route; everyone else leaves them out. The route uses it for zones you are not standing in: the
 -- game only reports quests on offer for the map you are on, so for every other zone this is
 -- all there is to go on. Built once and kept until something changes.
 ---------------------------------------------------------------------------
@@ -1091,7 +1091,7 @@ function D:OpenByZone()
 	local zones, zoneOf, gray = {}, {}, GrayBelow(level)
 	local inLog = ns.Quests and ns.Quests.byID or {}
 	for qid, q in self:Each() do
-		if q.m and q.x and q.t and not inLog[qid] and not (q.l and q.l < gray) then
+		if q.m and q.x and q.t and not inLog[qid] then
 			if self:Status(qid, q) == "available" then
 				local z = zoneOf[q.m]
 				if z == nil then
@@ -1103,7 +1103,7 @@ function D:OpenByZone()
 					list = {}
 					zones[z] = list
 				end
-				list[#list + 1] = { qid = qid, q = q }
+				list[#list + 1] = { qid = qid, q = q, gray = (q.l and q.l < gray) or nil }
 			end
 		end
 	end
@@ -1111,12 +1111,17 @@ function D:OpenByZone()
 	return zones
 end
 
-function D:OpenIn(zoneMap)
-	return zoneMap and self:OpenByZone()[zoneMap] or {}
+-- Quests open to you in a zone; gray ones only when asked for.
+function D:OpenIn(zoneMap, withGray)
+	local all = zoneMap and self:OpenByZone()[zoneMap] or {}
+	if withGray then return all end
+	local out = {}
+	for _, k in ipairs(all) do if not k.gray then out[#out + 1] = k end end
+	return out
 end
 
-function D:OpenCount(zoneMap)
-	return #self:OpenIn(zoneMap)
+function D:OpenCount(zoneMap, withGray)
+	return #self:OpenIn(zoneMap, withGray)
 end
 
 ---------------------------------------------------------------------------

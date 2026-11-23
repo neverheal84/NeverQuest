@@ -121,6 +121,14 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *New races.* On one of the new WoW Forever races, your starting zone and capital should show quest markers as on any other race.
     - *Dungeons.* `/nq dungeons` near level 28 should count Gnomeregan quests in the twenties, not two or three.
     - *The wizard.* `/nq setup`, Quest database page: a green line says QuestieDB is installed, with its version.
+60. **Smarter zones, skipping and the missed list (1.23.0).**
+    - *Zones by XP per hour.* At level 10 or above in the Optimized style, `/nq zones` should list zones that fit your level and side with an XP per hour, quest count and travel time. Your own zone should say "(you're here)", and zones on the other continent should say "by boat or zeppelin". No other race's starting zone and no zone you've outleveled should appear. The guide's "Time to move on" step should name the top zone, and the reason should mention XP/hour.
+    - *Staying put.* Quest in a zone with plenty left: the guide shouldn't send you elsewhere unless `/nq zones` shows another zone far ahead (about twice yours).
+    - *Skip.* Click Skip on a quest step: the step goes, the next one takes the arrow, and `/nq missed` lists the quest as skipped. In Quests tab > Missed, right-click it and choose Go back for it: the guide should open with "Go back for:" and the arrow should point there. `/nq missed unskip <id>` takes a skipped quest back.
+    - *Drop.* Abandon a quest from the quest log: it should show on the missed list as dropped. Pick it up again: it should leave the list.
+    - *Left behind.* Leave a zone with a quest still open there: in the next zone, the missed list should show it as left behind with its zone.
+    - *Drop advice.* In the Optimized style with a gray or failed quest in your log, the guide should show a reminder once and `/nq drop` should list the quest with a reason. Right-click a quest in the guide or tracker: the menu should have Skip, Drop and Go back for it. A class quest or a dungeon quest should never be suggested.
+    - *Zone by zone.* Switch to Zone by zone (`/nq style zone`): gray quests in your zone should show on the route, `/nq drop` should say this style doesn't suggest drops, and the guide should keep you in the zone until its quests are done. Untick "Zone by zone: finish every quest in a zone" under Options > Guide & Routes: gray quests should drop off the route.
 
 ## Afterwards, send
 

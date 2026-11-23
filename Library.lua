@@ -37,6 +37,7 @@ local layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 local nextCache = {}
 local ancestors = {}
 local zoneTable, dungeonOf
+local xpTable, objCache = nil, {}
 
 function L:Reset()
 	ancestors = {}
@@ -45,6 +46,7 @@ function L:Reset()
 	layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 	nextCache = {}
 	zoneTable, dungeonOf = nil, nil
+	xpTable, objCache = nil, {}
 end
 
 -- QuestieDB's API when it is installed and this version of NeverQuest can read it, whatever
@@ -298,6 +300,165 @@ end
 function L:FinishName(questID)
 	local e = self:Ends(questID)
 	return e and e.finish.name or nil
+end
+
+---------------------------------------------------------------------------
+-- What a quest is worth, and where its work is done (Advisor.lua plans with these)
+---------------------------------------------------------------------------
+local function XPTable()
+	if xpTable ~= nil then return xpTable or nil end
+	xpTable = false
+	local l = L:Get()
+	local support = l and l.Support
+	if type(support) == "table" and type(support.Get) == "function" then
+		local ok, mod = pcall(support.Get, "QuestXP")
+		local db = ok and type(mod) == "table" and mod.db
+		if type(db) == "table" then xpTable = db end
+	end
+	return xpTable or nil
+end
+
+-- The share of a quest's XP you get at your level: full until you are five levels past it,
+-- then 80, 60, 40 and 20%, and a tenth from ten levels on. The classic rule.
+function L.XPShare(questLevel, level)
+	local over = (ns.Num(level) or 1) - (ns.Num(questLevel) or ns.Num(level) or 1)
+	if over <= 5 then return 1 end
+	if over == 6 then return 0.8 end
+	if over == 7 then return 0.6 end
+	if over == 8 then return 0.4 end
+	if over == 9 then return 0.2 end
+	return 0.1
+end
+
+-- The XP a quest gives at a level (yours unless given), by QuestieDB's table, and the quest's
+-- own level. Nil when QuestieDB doesn't know it. The game's figure, for a quest in your log,
+-- is better and is used before this wherever there is one.
+function L:QuestXP(questID, level)
+	local t = self:Get() and XPTable()
+	local row = t and t[ns.Num(questID) or 0]
+	if type(row) ~= "table" then return nil end
+	local qlevel, xp = ns.Num(row[1]), ns.Num(row[2])
+	if not xp or xp <= 0 then return nil end
+	return math.floor(xp * L.XPShare(qlevel, level or UnitLevel("player") or 1) + 0.5), qlevel
+end
+
+local SPAWN_CAP = 40    -- places read per mob or object
+local DROP_SOURCES = 6  -- mobs or objects read per item
+
+local function SpawnPoints(kind, id, out)
+	local spawns = Field(kind, id, "spawns")
+	if type(spawns) ~= "table" then return end
+	for areaID, list in pairs(spawns) do
+		if type(list) == "table" then
+			for i = 1, math.min(#list, SPAWN_CAP) do
+				local s = list[i]
+				local x, y = type(s) == "table" and ns.Num(s[1]), type(s) == "table" and ns.Num(s[2])
+				if x and y and x > 0 and y > 0 and x <= 100 and y <= 100 then
+					out[#out + 1] = { a = areaID, x = x / 100, y = y / 100 }
+				end
+			end
+		end
+	end
+end
+
+-- The middle of the area with the most of these places in it, on a map NeverQuest knows:
+-- { m, x, y, n }. Where a mob lives in two zones, the one with more of them wins.
+local function Centre(points)
+	local count = {}
+	for _, p in ipairs(points) do count[p.a] = (count[p.a] or 0) + 1 end
+	local order = {}
+	for a, n in pairs(count) do order[#order + 1] = { a = a, n = n } end
+	table.sort(order, function(a, b) return a.n > b.n end)
+	for _, o in ipairs(order) do
+		local m = L:AreaMap(o.a)
+		if m then
+			local sx, sy = 0, 0
+			for _, p in ipairs(points) do
+				if p.a == o.a then sx, sy = sx + p.x, sy + p.y end
+			end
+			return { m = m, x = sx / o.n, y = sy / o.n, n = o.n }
+		end
+	end
+end
+
+local function IdOf(entry)
+	if type(entry) == "number" then return entry end
+	return type(entry) == "table" and ns.Num(entry[1]) or nil
+end
+
+-- What a quest asks you to do, and where: { spots = { { m, x, y, n, kind } }, count = number
+-- of objectives, units = things to kill or collect }, false for a quest with no objectives
+-- (talk to someone, take something somewhere), or nil when QuestieDB isn't in use. Kept for
+-- the session. A mob, an object, or for an item the mobs and objects it comes from.
+function L:Objectives(questID)
+	questID = ns.Num(questID)
+	if not questID or not self:Get() then return nil end
+	local known = objCache[questID]
+	if known ~= nil then return known end
+	local res = false
+	local ob = Field("Quest", questID, "objectives")
+	if type(ob) == "table" then
+		local spots, count = {}, 0
+		local function Add(kind, points)
+			count = count + 1
+			local c = Centre(points)
+			if c then c.kind = kind spots[#spots + 1] = c end
+		end
+		for _, c in ipairs(type(ob[1]) == "table" and ob[1] or {}) do
+			local id, pts = IdOf(c), {}
+			if id then SpawnPoints("Npc", id, pts) end
+			Add("monster", pts)
+		end
+		for _, c in ipairs(type(ob[2]) == "table" and ob[2] or {}) do
+			local id, pts = IdOf(c), {}
+			if id then SpawnPoints("Object", id, pts) end
+			Add("object", pts)
+		end
+		for _, c in ipairs(type(ob[3]) == "table" and ob[3] or {}) do
+			local id, pts = IdOf(c), {}
+			if id then
+				local npcs, objs = Field("Item", id, "npcDrops"), Field("Item", id, "objectDrops")
+				for i = 1, math.min(type(npcs) == "table" and #npcs or 0, DROP_SOURCES) do
+					local n = ns.Num(npcs[i]) if n then SpawnPoints("Npc", n, pts) end
+				end
+				for i = 1, math.min(type(objs) == "table" and #objs or 0, DROP_SOURCES) do
+					local o = ns.Num(objs[i]) if o then SpawnPoints("Object", o, pts) end
+				end
+			end
+			Add("item", pts)
+		end
+		-- Kill credit: any of several mobs counts ({ { ids }, base mob, text }).
+		for _, c in ipairs(type(ob[5]) == "table" and ob[5] or {}) do
+			local pts = {}
+			local ids = type(c) == "table" and c[1]
+			for i = 1, math.min(type(ids) == "table" and #ids or 0, DROP_SOURCES) do
+				local n = ns.Num(ids[i]) if n then SpawnPoints("Npc", n, pts) end
+			end
+			Add("monster", pts)
+		end
+		if count > 0 then
+			-- How many: the numbers in the objective text ("Kill 10 Kobold Vermin").
+			local units = 0
+			local text = Field("Quest", questID, "objectivesText")
+			for _, line in ipairs(type(text) == "table" and text or { text }) do
+				if type(line) == "string" and not ns.IsSecret(line) then
+					for n in line:gmatch("(%d+)%s+%a") do
+						n = tonumber(n)
+						if n and n >= 2 and n <= 40 then units = units + n end
+					end
+				end
+			end
+			res = { spots = spots, count = count, units = math.min(60, math.max(units, count)) }
+		end
+	end
+	objCache[questID] = res
+	return res
+end
+
+-- Only what has been worked out already, so a caller in a hurry never pays for it: the
+-- answer, false (no objectives), or nil (not yet; Advisor.lua works these out in the background).
+function L:ObjectivesKnown(questID)
+	return objCache[ns.Num(questID) or 0]
 end
 
 ---------------------------------------------------------------------------

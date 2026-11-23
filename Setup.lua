@@ -33,7 +33,7 @@ Setup.PAGES = {
 	},
 	{
 		key = "leveling", title = "Leveling",
-		text = "|cffffd100Optimized 1-60|r hops between zones at the right levels, the way current leveling guides do. |cffffd100Zone by zone|r stays in a zone until its quests run out.",
+		text = "|cffffd100Optimized 1-60|r goes where the XP per hour is best for you, worked out from the quest data, and suggests quests to drop. |cffffd100Zone by zone|r is the completionist way: every quest in a zone, gray ones too, before moving on.\n\nEither way, right-click a quest to skip it. Skipped, dropped and left-behind quests go on a list (Quests tab > Missed) you can go back to.",
 		build = function(p, U, row)
 			local db = Cfg()
 			U.Cycle(p, 0, row(30), "Leveling style:", ns.Profiles.STYLES, function() return ns.Profiles:Style() end,

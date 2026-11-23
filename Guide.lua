@@ -109,15 +109,19 @@ function G:BuildSimple(steps)
 	local cfg = ns.db.guide
 	local near = cfg.nearbyYards or 200
 	local turnins, objectives, pickups = {}, {}, {}
+	local AD = ns.Advisor
+	local function Skipped(qid) return AD and AD:IsSkipped(qid) end
 	for _, e in ipairs(ns.Quests.log) do
-		if e.complete then
+		if Skipped(e.questID) then
+			-- Skipped: on the missed list, not in the guide.
+		elseif e.complete then
 			table.insert(turnins, e)
 		elseif not e.failed then
 			table.insert(objectives, e)
 		end
 	end
 	for _, o in ipairs(ns.Quests.offers) do
-		if ns.Quests:OfferShown(o, true) then table.insert(pickups, o) end
+		if ns.Quests:OfferShown(o, true) and not Skipped(o.questID) then table.insert(pickups, o) end
 	end
 
 	local function ByDistance(a, b) return (a.dist or 1e9) < (b.dist or 1e9) end
@@ -229,8 +233,10 @@ function G:BuildPlanned(steps, plan)
 		hereZone = hereMap and ns.Nav.MapName(hereMap) or nil
 	end
 	local waiting = {}
+	local AD = ns.Advisor
 	for _, e in ipairs(ns.Quests.log) do
-		if not onRoute[e] and not e.failed and (cfg.showGray or e.complete or not e.trivial) then
+		if not onRoute[e] and not e.failed and (cfg.showGray or e.complete or not e.trivial)
+			and not (AD and AD:IsSkipped(e.questID)) then
 			local s = self:MakeStep(e.complete and "turnin" or "objective", e)
 			if e.complete then
 				-- MakeStep already explains what is known (who to hand it to, which zone), so
@@ -279,7 +285,7 @@ function G:BuildPlanned(steps, plan)
 	-- A few more quest givers nearby that aren't on the route.
 	local offers = {}
 	for _, o in ipairs(ns.Quests.offers) do
-		if not onRoute[o] and ns.Quests:OfferShown(o, true) then table.insert(offers, o) end
+		if not onRoute[o] and ns.Quests:OfferShown(o, true) and not (AD and AD:IsSkipped(o.questID)) then table.insert(offers, o) end
 	end
 	table.sort(offers, function(a, b) return (a.dist or 1e9) < (b.dist or 1e9) end)
 	for i = 1, math.min(#offers, cfg.maxOffers or 4) do
@@ -349,6 +355,8 @@ function G:BuildLive()
 	if ns.Upkeep then
 		for _, row in ipairs(ns.Upkeep:Tips(level)) do table.insert(steps, row) end
 	end
+	-- Quests you chose to go back for, ones worth dropping, the missed list and the best zones.
+	if ns.Advisor then ns.Advisor:GuideRows(steps, plan) end
 
 	-- Rested reminder.
 	local rested = ns.Num(GetXPExhaustion())
@@ -381,7 +389,10 @@ function G:Focus()
 	local key = string.format("%d:%s:%d:%d", level, ns.Profiles:Style(), ns.Quests.offerMap or 0, self.focusTick or 0)
 	if self.focusKey ~= key then
 		self.focusKey = key
-		self.focus = ns.Profiles:Focus(ns.Profiles:Mine(), level, function(name) return ns.Quests:ZoneWork(name) end)
+		local all = ns.Advisor and ns.Advisor:Completionist() and function(name) return ns.Quests:ZoneWork(name, true) end or nil
+		self.focus = ns.Profiles:Focus(ns.Profiles:Mine(), level, function(name) return ns.Quests:ZoneWork(name) end, all)
+		-- Optimized: the zone with the most XP per hour for you, from the quest data.
+		if ns.Advisor then ns.Advisor:ApplyZones(self.focus, level) end
 	end
 	return self.focus
 end
@@ -681,9 +692,28 @@ function G:StepBack()
 	self:Refresh(true)
 end
 
+-- Skip: in a scripted guide, the next step. In the live guide, the step the arrow is on: a
+-- quest is skipped (off the route, onto the missed list; Advisor.lua) and anything else is
+-- dismissed from the arrow, which moves on to the next step.
 function G:StepSkip()
 	local guide = self:GetScript()
-	if not guide then return end
+	if not guide then
+		local key = ns.Nav.guideTarget and ns.Nav.guideTarget.key
+		local step
+		for _, s in ipairs(self.steps) do
+			if s.key == key then step = s break end
+		end
+		step = step or self.steps[1]
+		if not step then return end
+		self.pinnedKey = nil
+		if step.questID and ns.Advisor then
+			ns.Advisor:Skip(step.questID)
+		else
+			ns.Nav.dismissedKey = step.key
+			self:Refresh(true)
+		end
+		return
+	end
 	ns.char.script.step = math.min(#guide.steps + 1, (ns.char.script.step or 1) + 1)
 	self.hold = nil
 	self:Refresh(true)
@@ -1137,7 +1167,7 @@ ns:AddSlash("grind", function(rest)
 end, "/nq grind [note] - while recording, mark that you ground here up to your current XP")
 ns:AddSlash("live", function() G:UseLive() ns.Print("using the live guide.") end, "/nq live - switch to the live guide")
 ns:AddSlash("load", function(rest) G:LoadScript(rest) end, "/nq load <name> - load a saved guide")
-ns:AddSlash("skip", function() G:StepSkip() end, "/nq skip - skip the current scripted guide step")
+ns:AddSlash("skip", function() G:StepSkip() end, "/nq skip - skip the step the arrow is on (a quest goes on your missed list)")
 
 ns:OnInit(function()
 	if ns.char.recorder.active then
