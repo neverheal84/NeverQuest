@@ -197,7 +197,7 @@ local function RowEnter(row)
 	if d.spot then GameTooltip:AddLine("Nearest spot you know: " .. ns.Yards(d.spot.dist), 0.5, 1, 0.5) end
 	GameTooltip:AddLine(d.spot and "Click: point the arrow.  Shift+click: link.  Right-click: options."
 		or "Shift+click: link.  Right-click: options.", 0.5, 0.8, 1, true)
-	GameTooltip:Show()
+	ns.TipShow()
 end
 
 local function OpenSettings()
@@ -310,7 +310,7 @@ function D:Create()
 	f:SetSize(cfg.width or 250, 60)
 	f:SetFrameStrata("LOW")
 	f.rows = {}
-	ns.MakeMovable(f, "drops", function() return Cfg().locked end, { "TOPRIGHT", UIParent, "TOPRIGHT", -40, -520 })
+	ns.MakeMovable(f, "drops", function() return Cfg().locked end, { "TOPRIGHT", UIParent, "TOPRIGHT", -40, -520 }, { top = true })
 
 	local header = CreateFrame("Button", nil, f)
 	header:SetPoint("TOPLEFT", PAD, -PAD + 2)
@@ -336,7 +336,7 @@ function D:Create()
 		GameTooltip:AddLine("NeverQuest drops")
 		GameTooltip:AddLine("What you still have to collect, and what drops it.", 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine("Click: collapse or expand.  Right-click: options.  Drag: move.", 0.5, 0.8, 1, true)
-		GameTooltip:Show()
+		ns.TipShow(false)
 	end)
 	header:SetScript("OnLeave", GameTooltip_Hide)
 	f.header = header
@@ -440,6 +440,7 @@ function D:Refresh()
 	f.empty:SetPoint("RIGHT", f.content, "RIGHT", 0, 0)
 	f.content:SetHeight(math.max(1, y + noteH))
 	f:SetHeight(PAD + headerH + 4 + y + noteH + PAD)
+	if f.KeepTop then f:KeepTop() end
 end
 
 ---------------------------------------------------------------------------

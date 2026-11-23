@@ -444,7 +444,8 @@ local function CreateArrow()
 		GameTooltip:AddLine("Right-click: clear this waypoint", 1, 1, 1)
 		GameTooltip:AddLine("Shift+Right-click: clear all /way waypoints", 1, 1, 1)
 		GameTooltip:AddLine("Drag: move (unless locked)", 1, 1, 1)
-		GameTooltip:Show()
+		-- The arrow already shows where it points; in one-line mode hovering shows nothing.
+		ns.TipShow(false)
 	end)
 	f:SetScript("OnLeave", GameTooltip_Hide)
 

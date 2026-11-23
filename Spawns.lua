@@ -1383,6 +1383,15 @@ ns:OnInit(function()
 		done.spawnsMinimapOff = true
 		ns.db.spawns.minimap = false
 	end
+	-- 1.24.0: the minimap shows tiny dots for where your quests' mobs and objects are (only
+	-- those, not every spot learned), and NeverQuest's minimap pins are tiny by default. The
+	-- tracker lists every quest and scrolls.
+	if not done.minimapTiny then
+		done.minimapTiny = true
+		ns.db.spawns.minimap = true
+		if (ns.db.pins.mmScale or 1) == 1 then ns.db.pins.mmScale = 0.6 end
+		if ns.db.tracker.maxQuests == 25 then ns.db.tracker.maxQuests = 35 end
+	end
 end)
 
 ns:AddSlash("mark", function(rest) S:MarkHere(rest) end,

@@ -129,6 +129,13 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Left behind.* Leave a zone with a quest still open there: in the next zone, the missed list should show it as left behind with its zone.
     - *Drop advice.* In the Optimized style with a gray or failed quest in your log, the guide should show a reminder once and `/nq drop` should list the quest with a reason. Right-click a quest in the guide or tracker: the menu should have Skip, Drop and Go back for it. A class quest or a dungeon quest should never be suggested.
     - *Zone by zone.* Switch to Zone by zone (`/nq style zone`): gray quests in your zone should show on the route, `/nq drop` should say this style doesn't suggest drops, and the guide should keep you in the zone until its quests are done. Untick "Zone by zone: finish every quest in a zone" under Options > Guide & Routes: gray quests should drop off the route.
+61. **Dropdowns, resizing and quieter tooltips (1.24.0).**
+    - *Dropdowns.* In the plan view (Guide tab > 1-60 plan), click the style, Race and Class buttons: each opens a menu, and nothing changes until you pick something. Do the same with Gray in the Nearby tab, the view button in the Quests tab, the faction button in the Raids tab, and a few settings in Options and the setup wizard.
+    - *Main window.* Drag its bottom right corner: the list shows more rows as it grows. Close and reopen it, and log out and in: the size is kept. `/nq reset` puts it back.
+    - *Tracker.* With ten or more quests, drag the tracker's bottom corner up to make it short: the quests scroll with the mouse wheel and a thin bar shows where you are. Click the "Quests" header to fold it: it shrinks up towards its top edge, not from the middle. Fold a zone too.
+    - *Tracker right-click.* Right-click a quest: Share with party is greyed out when you're alone and works in a group, Abandon quest asks with the game's own box, and Link in chat and Show on the map work.
+    - *Tooltips.* Hover the arrow: nothing shows. Hover a guide step: one line. Set Options > Display & Maps > Hover tooltips to Full: the old detail comes back. Set it to Off: nothing anywhere.
+    - *Minimap.* With a kill quest in your log near its mobs, tiny dots show on the minimap where they've been seen. Rares and other spots don't.
 
 ## Afterwards, send
 

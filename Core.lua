@@ -16,12 +16,13 @@ local DEFAULTS = {
 	hud    = { shown = true, locked = false, scale = 1, showRested = true, showRate = true, showToLevel = true, showFooter = true },
 	arrow  = { shown = true, locked = false, arrival = 10, alwaysShow = false, scale = 1, compact = false,
 	           size = 54, showETA = true, showThen = true, sound = true, corpse = true },
-	window = { tab = "guide", journalView = "history", classView = "class", questsView = "log", scale = 1 },
+	window = { tab = "guide", journalView = "history", classView = "class", questsView = "log", scale = 1,
+	           tips = "line" },  -- hover tooltips: off | line (one line) | full; w, h: the size you dragged it to
 	style  = { font = "default", textScale = 1, outline = "", shadow = true },
 	tracker = { shown = true, blizzard = "hide", hideFrame = true, locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
 	            showObjectives = true, hideDoneObjectives = false, finishedFirst = true, showNumbers = true,
-	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 25 },
+	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 35 },
 	drops  = { shown = false, locked = false, scale = 1, width = 250, maxHeight = 420, bgAlpha = 0.45,
 	           collapsed = false, showSource = true, sort = "progress" },  -- sort: progress | remaining | distance
 	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest",  -- reward: suggest | upgrade | value | off
@@ -46,7 +47,7 @@ local DEFAULTS = {
 	           smartZones = true, dropAdvice = true, completionist = true, missedList = true },  -- Advisor.lua
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
 	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, sources = false,
-	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 1, wmScale = 1 },
+	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 0.6, wmScale = 1 },
 	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
 	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false },
 	tooltips = { units = true, items = true, party = true, npcs = true },   -- quest lines on mob and item tooltips
@@ -54,7 +55,7 @@ local DEFAULTS = {
 	flightTimes = {},   -- seconds each flight took, learned from your own flights
 	minimapButton = { shown = true, locked = false, angle = 210 },
 	givers = { worldmap = true, otherZones = true, gray = false, red = false, dailies = true, levels = true, turnins = false },
-	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = false, dotSize = 1,
+	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = true, dotSize = 1,
 	           showAll = false, aim = true, markClick = true, levelFilter = true, levelBand = 8 },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
 	dungeonLearned = {}, dungeonChecked = {},   -- Dungeons.lua: quests known to belong to a dungeon, and quests already asked about
@@ -581,7 +582,9 @@ function ns.ApplyBackdrop(frame, alpha)
 end
 
 -- Makes a frame draggable and remembers where it was left.
-function ns.MakeMovable(frame, key, isLocked, defaultPoint)
+-- opts.top: keep the frame's top edge where it is when its height changes (lists that fold),
+-- so it grows and shrinks downwards instead of from the middle.
+function ns.MakeMovable(frame, key, isLocked, defaultPoint, opts)
 	frame:SetMovable(true)
 	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
@@ -589,10 +592,17 @@ function ns.MakeMovable(frame, key, isLocked, defaultPoint)
 	frame:SetScript("OnDragStart", function(self)
 		if not (isLocked and isLocked()) then self:StartMoving() end
 	end)
+	frame.SavePosition = function(self)
+		if opts and opts.top then
+			local ok, point, x, y = ns.AnchorTop(self)
+			if ok then ns.db.positions[key] = { point, point, x, y } return end
+		end
+		local point, _, relPoint, x, y = self:GetPoint(1)
+		if point then ns.db.positions[key] = { point, relPoint, x, y } end
+	end
 	frame:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
-		local point, _, relPoint, x, y = self:GetPoint(1)
-		ns.db.positions[key] = { point, relPoint, x, y }
+		self:SavePosition()
 	end)
 	frame.RestorePosition = function(self)
 		self:ClearAllPoints()
@@ -603,7 +613,133 @@ function ns.MakeMovable(frame, key, isLocked, defaultPoint)
 			self:SetPoint(unpack(defaultPoint))
 		end
 	end
+	-- A position saved before 1.24 may hang from the middle of an edge. Once the frame has its
+	-- height, it is pinned by its top edge where it stands.
+	frame.KeepTop = function(self)
+		if self.topChecked or not (opts and opts.top) then return end
+		local p = ns.db.positions[key]
+		if p and p[1] ~= "TOPLEFT" and p[1] ~= "TOPRIGHT" then
+			if not self:GetTop() then return end
+			self:SavePosition()
+		end
+		self.topChecked = true
+	end
 	frame:RestorePosition()
+end
+
+-- Pins a frame by its top edge (top left or top right, whichever side of the screen it is on)
+-- without moving it. Returns true, point, x, y; false when the frame has no position yet.
+function ns.AnchorTop(frame)
+	local l, r, t = frame:GetLeft(), frame:GetRight(), frame:GetTop()
+	if not (l and r and t) then return false end
+	local k = (UIParent:GetEffectiveScale() or 1) / (frame:GetEffectiveScale() or 1)
+	local pw, ph = (UIParent:GetWidth() or 0) * k, (UIParent:GetHeight() or 0) * k
+	local point, x
+	if (l + r) / 2 > pw / 2 then
+		point, x = "TOPRIGHT", r - pw
+	else
+		point, x = "TOPLEFT", l
+	end
+	frame:ClearAllPoints()
+	frame:SetPoint(point, UIParent, point, x, t - ph)
+	return true, point, x, t - ph
+end
+
+-- A drag corner for resizing. opts: minW, minH, maxW, maxH; locked() to refuse; corner()
+-- returning "BOTTOMRIGHT" or "BOTTOMLEFT" (default: the corner facing the middle of the
+-- screen); onSize(w, h) while dragging; onDone(w, h) after.
+function ns.MakeResizable(frame, opts)
+	frame:SetResizable(true)
+	if frame.SetResizeBounds then
+		frame:SetResizeBounds(opts.minW, opts.minH, opts.maxW, opts.maxH)
+	else
+		if frame.SetMinResize then frame:SetMinResize(opts.minW, opts.minH) end
+		if frame.SetMaxResize then frame:SetMaxResize(opts.maxW, opts.maxH) end
+	end
+	local grip = CreateFrame("Button", nil, frame)
+	grip:SetSize(14, 14)
+	grip:SetFrameLevel((frame:GetFrameLevel() or 1) + 10)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+	function grip:Place()
+		if frame.sizing then return end
+		local corner = opts.corner and opts.corner() or nil
+		if not corner then
+			local l, r = frame:GetLeft(), frame:GetRight()
+			local mid = (UIParent:GetWidth() or 0) * (UIParent:GetEffectiveScale() or 1) / (frame:GetEffectiveScale() or 1) / 2
+			corner = (l and r and (l + r) / 2 > mid) and "BOTTOMLEFT" or "BOTTOMRIGHT"
+		end
+		if self.corner == corner then return end
+		self.corner = corner
+		self:ClearAllPoints()
+		self:SetPoint(corner, corner == "BOTTOMLEFT" and 2 or -2, 2)
+		-- The game's grabber points at the bottom right; mirror it for the left corner.
+		local a, b = 0, 1
+		if corner == "BOTTOMLEFT" then a, b = 1, 0 end
+		for _, tex in ipairs({ self:GetNormalTexture(), self:GetPushedTexture(), self:GetHighlightTexture() }) do
+			if tex then tex:SetTexCoord(a, b, 0, 1) end
+		end
+	end
+	grip:SetScript("OnMouseDown", function(self, button)
+		if button ~= "LeftButton" or (opts.locked and opts.locked()) then return end
+		self:Place()
+		frame.sizing = true
+		frame:StartSizing(self.corner)
+	end)
+	grip:SetScript("OnMouseUp", function(self)
+		if not frame.sizing then return end
+		frame:StopMovingOrSizing()
+		frame.sizing = false
+		local w, h = math.floor((frame:GetWidth() or 0) + 0.5), math.floor((frame:GetHeight() or 0) + 0.5)
+		if frame.SavePosition then frame:SavePosition() end
+		if opts.onDone then opts.onDone(w, h) end
+		self:Place()
+	end)
+	frame:HookScript("OnSizeChanged", function(_, w, h)
+		if opts.onSize then opts.onSize(w, h) end
+	end)
+	frame.resizeGrip = grip
+	grip:Place()
+	return grip
+end
+
+---------------------------------------------------------------------------
+-- Hover tooltips
+---------------------------------------------------------------------------
+-- How much NeverQuest's own tooltips show (Options > Display & Maps): "off", "line" (one line,
+-- the default) or "full".
+function ns.TipMode()
+	local m = ns.db and ns.db.window and ns.db.window.tips
+	return (m == "off" or m == "full") and m or "line"
+end
+
+-- Shows GameTooltip as built, cut to what the setting allows. One-line mode keeps the first
+-- line, or `short` instead when it's text, or shows nothing when `short` is false. `keep`
+-- leaves a game tooltip (an item's) whole in one-line mode.
+function ns.TipShow(short, keep)
+	local tt = GameTooltip
+	local mode = ns.TipMode()
+	if mode == "off" then tt:Hide() return false end
+	if mode == "line" and not keep then
+		if short == false then tt:Hide() return false end
+		local text, r, g, b
+		if type(short) == "string" then
+			text, r, g, b = short, 1, 1, 1
+		else
+			local name = tt.GetName and tt:GetName()
+			local fs = name and _G[name .. "TextLeft1"]
+			text = fs and fs:GetText()
+			if text then r, g, b = fs:GetTextColor() end
+		end
+		local lines = tt.NumLines and tt:NumLines() or 0
+		if text and (type(short) == "string" or lines > 1) then
+			tt:ClearLines()
+			tt:AddLine(text, r or 1, g or 0.82, b or 0, true)
+		end
+	end
+	tt:Show()
+	return true
 end
 
 -- Alert text in the upper middle of the screen.
@@ -680,8 +816,9 @@ end)
 ns:AddSlash("reset", function()
 	wipe(ns.db.positions)
 	ns:SendMessage("POSITIONS_RESET")
-	ns.Print("frame positions reset.")
-end, "/nq reset - move all NeverQuest frames back to their default spots")
+	if ns.UI and ns.UI.ResetSize then ns.UI:ResetSize() end
+	ns.Print("frame positions and the main window's size reset.")
+end, "/nq reset - move all NeverQuest frames back to their default spots, and the main window to its standard size")
 
 ns:AddSlash("debug", function()
 	ns.db.debug = not ns.db.debug

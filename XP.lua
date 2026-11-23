@@ -179,7 +179,7 @@ local function CreateHUD()
 		GameTooltip:AddLine(" ")
 		GameTooltip:AddLine("Rested XP doubles XP from kills only, not quest turn-ins.", 0.6, 0.8, 1, true)
 		GameTooltip:AddLine("Right-click: open NeverQuest. Drag: move.", 0.7, 0.7, 0.7)
-		GameTooltip:Show()
+		ns.TipShow("Session XP: " .. ns.Comma(XP.session.total) .. (s.perHour and ("  ·  " .. ns.Comma(s.perHour) .. " XP/hour") or ""))
 	end)
 	f:SetScript("OnLeave", GameTooltip_Hide)
 	return f

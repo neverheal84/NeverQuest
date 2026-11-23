@@ -141,32 +141,56 @@ function T:HeaderMenu(owner)
 	end)
 end
 
+local InsertLink
+
+-- What other trackers offer on right-click, plus NeverQuest's own: arrow, map, quest log,
+-- link, share, abandon, then pin, skip, go back and hide.
 function T:QuestMenu(owner, e)
 	if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
 	local qid = e.questID
 	MenuUtil.CreateContextMenu(owner, function(_, root)
 		root:CreateTitle(e.title or "Quest")
-		if T.Target(e) then root:CreateButton("Point the arrow here", function() T:Point(e) end) end
+		local target = T.Target(e)
+		if target then root:CreateButton("Point the arrow here", function() T:Point(e) end) end
 		if QuestMapFrame_OpenToQuestDetails then
 			root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(qid) end)
 		end
+		if target and target.m and OpenWorldMap then
+			root:CreateButton("Show on the map", function() OpenWorldMap(target.m) end)
+		end
+		root:CreateButton("Link in chat", function() InsertLink(qid) end)
+		-- Share stays in the menu when it can't be used (not in a group, or a quest the game
+		-- won't share), greyed out, so it's always where you expect it.
+		local share = root:CreateButton("Share with party", function() if ns.Catchup then ns.Catchup:Share(qid) end end)
+		if not (IsInGroup() and ns.SafeCall(C_QuestLog.IsPushableQuest, qid) == true) and share and share.SetEnabled then
+			share:SetEnabled(false)
+		end
+		root:CreateButton("Abandon quest...", function() T:Abandon(qid) end)
+		root:CreateDivider()
 		local pinned = ns.char.trackerPinned
 		root:CreateButton(pinned[qid] and "Unpin" or "Pin to the top", function()
 			pinned[qid] = (not pinned[qid]) or nil
 			T:Refresh()
 		end)
-		if IsInGroup() and ns.SafeCall(C_QuestLog.IsPushableQuest, qid) == true then
-			root:CreateButton("Share with party", function() ns.Catchup:Share(qid) end)
-		end
 		if (e.elite or e.group) and not e.complete and ns.Upkeep then
 			root:CreateButton("Ask for a group (LFG message)", function() ns.Upkeep:AskForGroup(e) end)
 		end
-		if ns.Advisor then ns.Advisor:MenuItems(root, qid) end
+		if ns.Advisor then ns.Advisor:MenuItems(root, qid, true) end
 		root:CreateButton("Hide from the tracker", function()
 			ns.char.trackerHidden[qid] = true
 			T:Refresh()
 		end)
 	end)
+end
+
+-- The game's own abandon confirmation.
+function T:Abandon(qid)
+	if ns.Advisor then return ns.Advisor:Abandon(qid) end
+	if InCombatLockdown() then return false end
+	if C_QuestLog.SetSelectedQuest then ns.SafeCall(C_QuestLog.SetSelectedQuest, qid) end
+	if C_QuestLog.SetAbandonQuest then ns.SafeCall(C_QuestLog.SetAbandonQuest) end
+	if StaticPopup_Show then StaticPopup_Show("ABANDON_QUEST") end
+	return true
 end
 
 -- Where clicking a quest points the arrow: its marker, or for a finished quest its hand-in.
@@ -184,7 +208,7 @@ function T:Point(e)
 		title = (e.complete and "Turn in: " or "") .. (e.title or "") .. (who and (" (" .. who .. ")") or ""), questID = e.questID })
 end
 
-local function InsertLink(questID)
+function InsertLink(questID)
 	local link = GetQuestLink and GetQuestLink(questID)
 	if not link then return end
 	if ChatFrameUtil and ChatFrameUtil.InsertLink then
@@ -231,7 +255,7 @@ local function RowEnter(row)
 	if chain then GameTooltip:AddLine(chain, 0.78, 0.64, 1) end
 	if e.trackRank then GameTooltip:AddLine("Guide order: " .. e.trackRank, 0.6, 0.85, 1) end
 	GameTooltip:AddLine("Click: point the arrow.  Shift+click: link.  Right-click: options.", 0.5, 0.8, 1, true)
-	GameTooltip:Show()
+	ns.TipShow()
 end
 
 function T:Row(i)
@@ -265,7 +289,7 @@ function T:Create()
 	f:SetSize(cfg.width or 270, 60)
 	f:SetFrameStrata("LOW")
 	f.rows = {}
-	ns.MakeMovable(f, "tracker", function() return Cfg().locked end, { "TOPRIGHT", UIParent, "TOPRIGHT", -40, -250 })
+	ns.MakeMovable(f, "tracker", function() return Cfg().locked end, { "TOPRIGHT", UIParent, "TOPRIGHT", -40, -250 }, { top = true })
 
 	local header = CreateFrame("Button", nil, f)
 	header:SetPoint("TOPLEFT", PAD, -PAD + 2)
@@ -289,21 +313,78 @@ function T:Create()
 	header:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
 		GameTooltip:AddLine("NeverQuest quests")
-		GameTooltip:AddLine("Click: collapse or expand.  Right-click: sort and options.  Drag: move.", 0.5, 0.8, 1, true)
-		GameTooltip:Show()
+		GameTooltip:AddLine("Click: collapse or expand.  Right-click: sort and options.  Drag: move.  Drag the bottom corner: resize.", 0.5, 0.8, 1, true)
+		ns.TipShow(false)
 	end)
 	header:SetScript("OnLeave", GameTooltip_Hide)
 	f.header = header
 
-	f.content = CreateFrame("Frame", nil, f)
-	f.content:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
-	f.content:SetPoint("RIGHT", -PAD, 0)
-	f.content:SetHeight(1)
+	-- The quests scroll inside a clipped area: set a size and every quest is still a scroll away.
+	f.scroll = CreateFrame("ScrollFrame", nil, f)
+	f.scroll:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
+	f.scroll:SetPoint("RIGHT", -PAD, 0)
+	f.scroll:SetHeight(1)
+	f.content = CreateFrame("Frame", nil, f.scroll)
+	f.content:SetSize((cfg.width or 270) - PAD * 2, 1)
+	f.scroll:SetScrollChild(f.content)
+	f.offset = 0
+	f:SetScript("OnMouseWheel", function(_, delta)
+		T:Scroll(-delta * ns.Style:LineHeight("NeverQuestFontHighlight") * 3)
+	end)
+	f.thumb = f:CreateTexture(nil, "OVERLAY")
+	f.thumb:SetColorTexture(1, 0.82, 0, 0.45)
+	f.thumb:SetWidth(3)
+	f.thumb:Hide()
 
 	f.more = f:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmallGray")
 	f.more:SetPoint("BOTTOMLEFT", PAD, PAD - 2)
 	self.frame = f
+
+	-- Drag the bottom corner (the one facing the middle of the screen) to resize. The height
+	-- you drag to is the most the tracker grows to; with fewer quests it is shorter.
+	ns.MakeResizable(f, { minW = 180, minH = 60, maxW = 600, maxH = 1400,
+		locked = function() return Cfg().locked end,
+		onSize = function() if f.sizing then T:Fit() end end,
+		onDone = function(w, h)
+			local c = Cfg()
+			c.width, c.maxHeight, c.collapsed = w, h, false
+			T:Refresh()
+		end })
 	return f
+end
+
+-- Fits the scroll area to the frame and keeps the scroll position in range.
+function T:Fit()
+	local f = self.frame
+	if not f then return end
+	local w = f:GetWidth() or Cfg().width or 270
+	f.content:SetWidth(math.max(50, w - PAD * 2))
+	if f.sizing then
+		-- While the corner is dragged the view follows the frame.
+		f.viewH = math.max(0, (f:GetHeight() or 0) - (f.headerH or 14) - PAD * 2 - 4 - (f.bottomH or 0))
+		f.scroll:SetHeight(math.max(1, f.viewH))
+	end
+	local view, total = f.viewH or 0, f.contentH or 0
+	local maxScroll = math.max(0, total - view)
+	f.offset = math.min(maxScroll, math.max(0, f.offset or 0))
+	f.scroll:SetVerticalScroll(f.offset)
+	f:EnableMouseWheel(maxScroll > 0)
+	if maxScroll > 0 and view > 0 then
+		local th = math.max(12, view * view / total)
+		f.thumb:SetHeight(th)
+		f.thumb:ClearAllPoints()
+		f.thumb:SetPoint("TOPRIGHT", f.scroll, "TOPRIGHT", PAD / 2 + 1, -(f.offset / maxScroll) * (view - th))
+		f.thumb:Show()
+	else
+		f.thumb:Hide()
+	end
+end
+
+function T:Scroll(dy)
+	local f = self.frame
+	if not f then return end
+	f.offset = (f.offset or 0) + dy
+	self:Fit()
 end
 
 ---------------------------------------------------------------------------
@@ -378,7 +459,7 @@ function T:Refresh()
 	end
 	local f = self:Create()
 	f:SetScale(cfg.scale or 1)
-	f:SetWidth(cfg.width or 270)
+	if not f.sizing then f:SetWidth(cfg.width or 270) end
 	local alpha = cfg.bgAlpha or 0.45
 	if f.appliedAlpha ~= alpha then
 		f.appliedAlpha = alpha
@@ -395,33 +476,28 @@ function T:Refresh()
 	f.header.count:SetText(string.format("%d/%d", C_QuestLog.GetNumQuestLogEntries and select(2, C_QuestLog.GetNumQuestLogEntries()) or total,
 		(C_QuestLog.GetMaxNumQuestsCanAccept and C_QuestLog.GetMaxNumQuestsCanAccept()) or 35))
 
+	-- Every line is laid out; the scroll area shows as much as the height allows.
 	local y, used = 0, 0
-	local maxH = (cfg.maxHeight or 520) - headerH - PAD * 2 - 16
-	local hiddenLines = 0
 	if not cfg.collapsed then
 		for _, line in ipairs(lines) do
 			local h = St:LineHeight(FONT[line.kind])
 			if line.kind == "zone" and used > 0 then y = y + 4 end
-			if y + h > maxH then
-				hiddenLines = hiddenLines + 1
-			else
-				used = used + 1
-				local row = self:Row(used)
-				row.data = line
-				row.text:SetFontObject(FONT[line.kind])
-				row.right:SetFontObject("NeverQuestFontSmall")
-				row.text:SetText(line.text or "")
-				local c = line.color
-				if c then row.text:SetTextColor(c[1], c[2], c[3]) elseif line.kind == "zone" then row.text:SetTextColor(1, 0.82, 0) end
-				row.right:SetText(line.right or "")
-				row:ClearAllPoints()
-				local indent = (line.kind == "objective" or line.kind == "info") and INDENT or ((line.kind == "quest" and cfg.groupByZone) and 4 or 0)
-				row:SetPoint("TOPLEFT", f.content, "TOPLEFT", indent, -y)
-				row:SetPoint("RIGHT", f.content, "RIGHT", 0, 0)
-				row:SetHeight(h)
-				row:Show()
-				y = y + h
-			end
+			used = used + 1
+			local row = self:Row(used)
+			row.data = line
+			row.text:SetFontObject(FONT[line.kind])
+			row.right:SetFontObject("NeverQuestFontSmall")
+			row.text:SetText(line.text or "")
+			local c = line.color
+			if c then row.text:SetTextColor(c[1], c[2], c[3]) elseif line.kind == "zone" then row.text:SetTextColor(1, 0.82, 0) end
+			row.right:SetText(line.right or "")
+			row:ClearAllPoints()
+			local indent = (line.kind == "objective" or line.kind == "info") and INDENT or ((line.kind == "quest" and cfg.groupByZone) and 4 or 0)
+			row:SetPoint("TOPLEFT", f.content, "TOPLEFT", indent, -y)
+			row:SetPoint("RIGHT", f.content, "RIGHT", 0, 0)
+			row:SetHeight(h)
+			row:Show()
+			y = y + h
 		end
 	end
 	for i = used + 1, #f.rows do
@@ -429,14 +505,22 @@ function T:Refresh()
 		f.rows[i].data = nil
 	end
 	local moreQuests = math.max(0, total - shown)
-	local moreText = ""
-	if hiddenLines > 0 or moreQuests > 0 then
-		moreText = moreQuests > 0 and ("+" .. moreQuests .. " more quests") or "more below (raise the height)"
-	end
-	f.more:SetText(cfg.collapsed and "" or moreText)
-	local bottom = (moreText ~= "" and not cfg.collapsed) and (St:LineHeight("NeverQuestFontSmallGray") + 2) or 0
+	local moreText = (moreQuests > 0 and not cfg.collapsed) and ("+" .. moreQuests .. " more quests (Options: Quests shown)") or ""
+	f.more:SetText(moreText)
+	local bottom = moreText ~= "" and (St:LineHeight("NeverQuestFontSmallGray") + 2) or 0
+	local maxView = math.max(0, (cfg.maxHeight or 520) - headerH - PAD * 2 - 4 - bottom)
+	local view = cfg.collapsed and 0 or math.min(y, maxView)
+	f.headerH, f.bottomH, f.contentH, f.viewH = headerH, bottom, y, view
 	f.content:SetHeight(math.max(1, y))
-	f:SetHeight(PAD + headerH + 4 + y + bottom + PAD)
+	f.scroll:SetShown(not cfg.collapsed)
+	if not f.sizing then
+		f.scroll:SetHeight(math.max(1, view))
+		f:SetHeight(PAD + headerH + 4 + view + bottom + PAD)
+	end
+	self:Fit()
+	-- Folding (the header, or a zone) shrinks the tracker up towards its top edge.
+	if f.KeepTop then f:KeepTop() end
+	if f.resizeGrip then f.resizeGrip:Place() end
 end
 
 ---------------------------------------------------------------------------

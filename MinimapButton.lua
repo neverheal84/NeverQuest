@@ -61,7 +61,7 @@ function B:Tooltip(owner)
 	tt:AddLine(" ")
 	tt:AddLine("Click: open NeverQuest.  Shift+click: show or hide the tracker.", 0.5, 0.8, 1, true)
 	tt:AddLine("Right-click: quick settings.  Drag: move.", 0.5, 0.8, 1, true)
-	tt:Show()
+	ns.TipShow()
 end
 
 function B:Menu(owner)

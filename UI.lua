@@ -21,12 +21,13 @@ function UI.CreateList(parent, numRows, rowHeight, width)
 	local list = CreateFrame("Frame", nil, parent)
 	list:SetSize(width, numRows * rowHeight)
 	list.rows, list.items, list.offset, list.numRows = {}, {}, 0, numRows
-	list.baseHeight, list.visibleRows = numRows * rowHeight, numRows
+	list.baseHeight, list.visibleRows, list.rowH, list.width = numRows * rowHeight, numRows, rowHeight, width
 
-	for i = 1, numRows do
+	-- Rows are made as they're needed, so the list can grow with its window.
+	local function MakeRow(i)
 		local row = CreateFrame("Button", nil, list)
-		row:SetSize(width, rowHeight)
-		row:SetPoint("TOPLEFT", 0, -(i - 1) * rowHeight)
+		row:SetSize(list.width, list.rowH)
+		row:SetPoint("TOPLEFT", 0, -(i - 1) * list.rowH)
 		row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
 		row.sel = row:CreateTexture(nil, "BACKGROUND")
@@ -68,11 +69,13 @@ function UI.CreateList(parent, numRows, rowHeight, width)
 			if self.item.sub and self.item.sub ~= "" then GameTooltip:AddLine(self.item.sub, 1, 1, 1, true) end
 			if self.item.right and self.item.right ~= "" then GameTooltip:AddLine(self.item.right, 0.8, 0.8, 0.8) end
 			if list.hint then GameTooltip:AddLine(list.hint, 0.5, 0.8, 1, true) end
-			GameTooltip:Show()
+			ns.TipShow()
 		end)
 		row:SetScript("OnLeave", GameTooltip_Hide)
 		list.rows[i] = row
+		return row
 	end
+	for i = 1, numRows do MakeRow(i) end
 
 	list.more = list:CreateFontString(nil, "OVERLAY", "NeverQuestFontSmallGray")
 	list.more:SetPoint("TOPRIGHT", list, "BOTTOMRIGHT", -4, -2)
@@ -117,14 +120,23 @@ function UI.CreateList(parent, numRows, rowHeight, width)
 
 	-- Taller rows for bigger text; fewer of them fit in the same space.
 	function list:Relayout(h)
-		h = math.max(rowHeight, math.floor(h + 0.5))
-		self.visibleRows = math.max(1, math.min(self.numRows, math.floor(self.baseHeight / h)))
+		h = math.max(rowHeight, math.floor((h or self.rowH) + 0.5))
+		self.rowH = h
+		self.visibleRows = math.max(1, math.floor(self.baseHeight / h))
+		for i = #self.rows + 1, self.visibleRows do MakeRow(i) end
 		for i, row in ipairs(self.rows) do
-			row:SetHeight(h)
+			row:SetSize(self.width, h)
 			row:ClearAllPoints()
 			row:SetPoint("TOPLEFT", 0, -(i - 1) * h)
 		end
 		self:SetItems(self.items)
+	end
+
+	-- A new size from its window: as many rows as fit.
+	function list:Resize(w, h)
+		self.width, self.baseHeight = math.floor(w), math.max(rowHeight, math.floor(h))
+		self:SetSize(self.width, self.baseHeight)
+		self:Relayout(self.rowH)
 	end
 
 	return list
@@ -137,6 +149,66 @@ local function Button(parent, text, width, onClick)
 	b:SetScript("OnClick", onClick)
 	return b
 end
+
+-- Dropdowns. A button with choices opens a menu of them; it never steps through them on click.
+local function AddArrow(b)
+	if b.nqArrow then return end
+	local a = b:CreateTexture(nil, "OVERLAY")
+	a:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+	a:SetSize(12, 12)
+	a:SetPoint("RIGHT", -6, -2)
+	b.nqArrow = a
+	local fs = b.GetFontString and b:GetFontString()
+	if fs then
+		fs:ClearAllPoints()
+		fs:SetPoint("LEFT", 8, 0)
+		fs:SetPoint("RIGHT", -18, 0)
+		fs:SetWordWrap(false)
+	end
+end
+UI.AddArrow = AddArrow
+
+-- A menu of { value, label } choices at the cursor; picking one calls set(value). Without the
+-- game's menu system it falls back to the next choice.
+function UI.Choose(owner, title, values, get, set)
+	if MenuUtil and MenuUtil.CreateContextMenu then
+		MenuUtil.CreateContextMenu(owner, function(_, root)
+			if title and title ~= "" then root:CreateTitle(title) end
+			for _, v in ipairs(values) do
+				root:CreateRadio(v[2], function() return get() == v[1] end, function() set(v[1]) end)
+			end
+		end)
+		return true
+	end
+	local cur, nextIndex = get(), 1
+	for i, v in ipairs(values) do
+		if v[1] == cur then nextIndex = (i % #values) + 1 end
+	end
+	set(values[nextIndex][1])
+	return false
+end
+
+-- A dropdown button. values: a list, or a function returning one (choices that change).
+-- text(value) gives the button's label; by default the chosen value's label.
+local function Dropdown(parent, width, title, values, get, set, text)
+	local b = Button(parent, "", width, nil)
+	AddArrow(b)
+	local function Values() return type(values) == "function" and values() or values end
+	function b:Update()
+		local cur = get()
+		if text then self:SetText(text(cur)) return end
+		for _, v in ipairs(Values()) do
+			if v[1] == cur then self:SetText(v[2]) return end
+		end
+		self:SetText("")
+	end
+	b:SetScript("OnClick", function(self)
+		UI.Choose(self, title, Values(), get, function(v) set(v) self:Update() end)
+	end)
+	b:Update()
+	return b
+end
+UI.Dropdown = Dropdown
 
 local function EditBox(parent, width)
 	local e = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
@@ -237,7 +309,8 @@ local TABS = { { "guide", "Guide" }, { "quests", "Quests" }, { "nearby", "Nearby
 
 function UI:Create()
 	local f = CreateFrame("Frame", "NeverQuestFrame", UIParent, "BackdropTemplate")
-	f:SetSize(WIDTH, 92 + ROWS * ROW_H + 46)
+	local win = ns.db.window
+	f:SetSize(win.w or WIDTH, win.h or (92 + ROWS * ROW_H + 46))
 	f:SetFrameStrata("MEDIUM")
 	f:SetToplevel(true)
 	ns.ApplyBackdrop(f, 0.95)
@@ -295,21 +368,17 @@ function UI:Create()
 	self.btnBack = Button(f, "< Back", 70, function() ns.Guide:StepBack() end)
 	self.btnSkip = Button(f, "Skip >", 70, function() ns.Guide:StepSkip() end)
 	self.btnLive = Button(f, "Live guide", 90, function() ns.Guide:UseLive() end)
-	self.btnFaction = Button(f, "Horde", 90, function()
-		local mine = UnitFactionGroup("player")
-		local now = UI.attuneFaction or mine
-		UI.attuneFaction = (now == "Alliance") and "Horde" or "Alliance"
-		UI.list.offset = 0
-		UI:Refresh()
-	end)
+	self.btnFaction = Dropdown(f, 130, "Attunement chain for", { { "Alliance", "Alliance" }, { "Horde", "Horde" } },
+		function() return UI.attuneFaction or UnitFactionGroup("player") end,
+		function(v) UI.attuneFaction = v UI.list.offset = 0 UI:Refresh() end,
+		function(v) return "Faction: " .. (v or "?") end)
 	self.btnFaction:SetPoint("BOTTOMRIGHT", -10, 10)
 	self.btnFaction:Hide()
 
-	self.btnGray = Button(f, "Gray: off", 90, function()
-		ns.db.guide.showGray = not ns.db.guide.showGray
-		ns.Guide:Refresh()
-		UI:Refresh()
-	end)
+	local GRAY = { { false, "Hide gray quests" }, { true, "Show gray quests" } }
+	local function GrayText(v) return v and "Gray: shown" or "Gray: hidden" end
+	self.btnGray = Dropdown(f, 110, "Gray (low level) quests", GRAY, function() return ns.db.guide.showGray and true or false end,
+		function(v) ns.db.guide.showGray = v ns.Guide:Refresh() UI:Refresh() end, GrayText)
 	self.btnSplits = Button(f, "Splits", 70, function() ns.db.window.journalView = "splits" UI:Refresh() end)
 	self.btnHistory = Button(f, "History", 70, function() ns.db.window.journalView = "history" UI:Refresh() end)
 	self.btnSplits:SetPoint("BOTTOMRIGHT", -10, 10)
@@ -321,17 +390,23 @@ function UI:Create()
 	self.btnProfs:Hide()
 	self.btnClassQ:Hide()
 	-- Quests tab: your log, or the quests you skipped, dropped or left behind (Advisor.lua).
-	self.btnMissed = Button(f, "Missed", 80, function()
-		ns.db.window.questsView = (ns.db.window.questsView == "missed") and "log" or "missed"
-		UI.list.offset = 0
-		UI:Refresh()
-	end)
+	local function MissedN() return ns.Advisor and ns.Advisor:MissedCount() or 0 end
+	self.btnMissed = Dropdown(f, 130, "Show",
+		function()
+			local n = MissedN()
+			return { { "log", "Your quest log" }, { "missed", n > 0 and ("Missed list (" .. n .. ")") or "Missed list" } }
+		end,
+		function() return ns.db.window.questsView == "missed" and "missed" or "log" end,
+		function(v) ns.db.window.questsView = v UI.list.offset = 0 UI:Refresh() end,
+		function(v)
+			if v == "missed" then return "Missed list" end
+			local n = MissedN()
+			return n > 0 and ("Quest log (" .. n .. " missed)") or "Quest log"
+		end)
 	self.btnMissed:SetPoint("BOTTOMRIGHT", -10, 10)
 	self.btnMissed:Hide()
-	self.btnMissedGray = Button(f, "Gray: off", 80, function()
-		UI.missedGray = not UI.missedGray
-		UI:Refresh()
-	end)
+	self.btnMissedGray = Dropdown(f, 110, "Gray (low level) quests", GRAY, function() return UI.missedGray and true or false end,
+		function(v) UI.missedGray = v UI:Refresh() end, GrayText)
 	self.btnMissedGray:SetPoint("RIGHT", self.btnMissed, "LEFT", -4, 0)
 	self.btnMissedGray:Hide()
 	self.btnLive:SetPoint("BOTTOMRIGHT", -10, 10)
@@ -342,39 +417,51 @@ function UI:Create()
 	-- 1-60 plan view (Guide tab) and its race/class browser.
 	self.btnPlan = Button(f, "1-60 plan", 90, function() UI:TogglePlan() end)
 	self.btnPlan:SetPoint("BOTTOMLEFT", 10, 10)
-	self.btnRace = Button(f, "", 140, nil)
-	self.btnRace:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	self.btnRace:SetScript("OnClick", function(_, b) UI:CyclePlanRace(b == "RightButton" and -1 or 1) end)
-	self.btnClass = Button(f, "", 90, nil)
-	self.btnClass:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	self.btnClass:SetScript("OnClick", function(_, b) UI:CyclePlanClass(b == "RightButton" and -1 or 1) end)
+	local P = ns.Profiles
+	self.btnRace = Dropdown(f, 140, "Race",
+		function()
+			local out = {}
+			for i, r in ipairs(P.RACE_LIST) do out[#out + 1] = { i, P.RaceName(r.token, r.faction) .. "  |cff999999" .. r.faction .. "|r" } end
+			return out
+		end,
+		function() return (UI:PlanSelection()) end,
+		function(i) UI:SelectPlanRace(i) end,
+		function(i) local r = P.RACE_LIST[i] return r and P.RaceName(r.token, r.faction) or "?" end)
+	self.btnClass = Dropdown(f, 100, "Class",
+		function()
+			local idx = UI:PlanSelection()
+			local r, out = P.RACE_LIST[idx], {}
+			for _, c in ipairs(P.CLASS_ORDER) do
+				if r and P.IsPlayable(r.token, r.faction, c) then out[#out + 1] = { c, P.CLASS_NAMES[c] or c } end
+			end
+			return out
+		end,
+		function() return select(2, UI:PlanSelection()) end,
+		function(c) UI:SelectPlanClass(c) end,
+		function(c) return P.CLASS_NAMES[c] or "?" end)
 	self.btnMine = Button(f, "Mine", 52, function() UI.planSel = nil UI.planScrollPending = true UI:Refresh() end)
 	-- Leveling style switch, top right of the plan view.
-	self.btnStyle = Button(f, "", 150, function() UI:SetStyle(ns.Profiles:Style() == "optimized" and "zone" or "optimized") end)
+	self.btnStyle = Dropdown(f, 150, "Leveling style", P.STYLES, function() return P:Style() end, function(v) UI:SetStyle(v) end)
 	self.btnStyle:SetPoint("TOPRIGHT", -10, -58)
 	self.btnStyle:SetScript("OnEnter", function(btn)
 		GameTooltip:SetOwner(btn, "ANCHOR_TOP")
 		GameTooltip:AddLine("Leveling style")
-		GameTooltip:AddLine("Optimized 1-60: hop zones the way current leveling guides do, leaving each zone when its level window ends.", 1, 1, 1, true)
-		GameTooltip:AddLine("Zone by zone: stay in a zone until its quests run out, then move to the next one in your plan.", 1, 1, 1, true)
-		GameTooltip:AddLine("Click to switch.", 0.5, 0.8, 1)
-		GameTooltip:Show()
+		GameTooltip:AddLine("Optimized 1-60: the zone with the most XP per hour, with your plan as the fallback.", 1, 1, 1, true)
+		GameTooltip:AddLine("Zone by zone: every quest in a zone, then the next one in your plan.", 1, 1, 1, true)
+		ns.TipShow(false)
 	end)
 	self.btnStyle:SetScript("OnLeave", GameTooltip_Hide)
 	self.btnRace:SetPoint("LEFT", self.btnPlan, "RIGHT", 4, 0)
 	self.btnClass:SetPoint("LEFT", self.btnRace, "RIGHT", 4, 0)
 	self.btnMine:SetPoint("LEFT", self.btnClass, "RIGHT", 4, 0)
-	for _, b in ipairs({ self.btnRace, self.btnClass }) do
-		b:SetScript("OnEnter", function(btn)
-			GameTooltip:SetOwner(btn, "ANCHOR_TOP")
-			GameTooltip:AddLine("Browse plans")
-			GameTooltip:AddLine("Click: next.  Right-click: previous.", 1, 1, 1)
-			GameTooltip:Show()
-		end)
-		b:SetScript("OnLeave", GameTooltip_Hide)
-	end
 
 	self:CreateGuidesPanel()
+	-- Drag the bottom right corner to resize; the list shows as many rows as fit.
+	ns.MakeResizable(f, { minW = WIDTH, minH = 92 + 6 * ROW_H + 46, maxW = 900, maxH = 1200,
+		corner = function() return "BOTTOMRIGHT" end,
+		onSize = function(w, h) UI:Layout(w, h) end,
+		onDone = function(w, h) ns.db.window.w, ns.db.window.h = w, h UI:Refresh() end })
+	self:Layout()
 	f:SetScript("OnShow", function() UI:Refresh() end)
 	self:SetTab(ns.db.window.tab or "guide")
 end
@@ -452,6 +539,29 @@ function UI:CyclePlanRace(dir)
 	self:Refresh()
 end
 
+-- The plan view's Race and Class dropdowns.
+function UI:SelectPlanRace(idx)
+	local P = ns.Profiles
+	local r = P.RACE_LIST[idx]
+	if not r then return end
+	local _, class = self:PlanSelection()
+	if not P.IsPlayable(r.token, r.faction, class) then
+		for _, c in ipairs(P.CLASS_ORDER) do
+			if P.IsPlayable(r.token, r.faction, c) then class = c break end
+		end
+	end
+	self.planSel = { race = idx, class = class }
+	self.planScrollPending = true
+	self:Refresh()
+end
+
+function UI:SelectPlanClass(class)
+	local idx = self:PlanSelection()
+	self.planSel = { race = idx, class = class }
+	self.planScrollPending = true
+	self:Refresh()
+end
+
 function UI:CyclePlanClass(dir)
 	local P = ns.Profiles
 	local idx, class = self:PlanSelection()
@@ -478,6 +588,12 @@ function UI:QuestMenu(item)
 		local inLog = ns.SafeCall(C_QuestLog.IsOnQuest, qid) == true
 		if inLog and QuestMapFrame_OpenToQuestDetails then
 			root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(qid) end)
+		end
+		if inLog then
+			local share = root:CreateButton("Share with party", function() if ns.Catchup then ns.Catchup:Share(qid) end end)
+			if not (IsInGroup() and ns.SafeCall(C_QuestLog.IsPushableQuest, qid) == true) and share and share.SetEnabled then
+				share:SetEnabled(false)
+			end
 		end
 		if item.m and item.x then
 			root:CreateButton("Point the arrow here", function() ns.Guide:Pin(item) end)
@@ -630,7 +746,7 @@ function UI:Refresh()
 		self.btnRace:Show()
 		self.btnClass:Show()
 		self.btnStyle:Show()
-		self.btnStyle:SetText(P:StyleName())
+		self.btnStyle:Update()
 		self.header:SetPoint("RIGHT", -166, 0)
 		local plan, mine
 		if self.planSel then
@@ -677,9 +793,9 @@ function UI:Refresh()
 	elseif tab == "quests" and ns.db.window.questsView == "missed" and ns.Advisor then
 		local AD = ns.Advisor
 		self.btnMissed:Show()
-		self.btnMissed:SetText("Quest log")
+		self.btnMissed:Update()
 		self.btnMissedGray:Show()
-		self.btnMissedGray:SetText(self.missedGray and "Gray: on" or "Gray: off")
+		self.btnMissedGray:Update()
 		self.header:SetText("Quests you skipped, dropped or left behind in zones you've moved on from.")
 		self.list.hint = "Click: point the arrow at the quest giver.  Right-click: go back for it, take it back, or take it off the list."
 		local items = AD:Items(self.missedGray or AD:Completionist())
@@ -688,8 +804,7 @@ function UI:Refresh()
 		self.list:SetItems(items)
 	elseif tab == "quests" then
 		self.btnMissed:Show()
-		local missedN = ns.Advisor and ns.Advisor:MissedCount() or 0
-		self.btnMissed:SetText(missedN > 0 and ("Missed (" .. missedN .. ")") or "Missed")
+		self.btnMissed:Update()
 		self.list.hint = "Click: point the arrow here.  Right-click: skip, drop or open in quest log.  Shift-click: link in chat."
 		local n, ready, readyXP, totalXP = 0, 0, 0, 0
 		for _, e in ipairs(ns.Quests.log) do
@@ -704,7 +819,7 @@ function UI:Refresh()
 		local m = ns.Quests.offerMap
 		self.header:SetText("Quests you can pick up in " .. (m and ns.Nav.MapName(m) or "this zone") .. ", nearest first.")
 		self.btnGray:Show()
-		self.btnGray:SetText(ns.db.guide.showGray and "Gray: on" or "Gray: off")
+		self.btnGray:Update()
 		local items = OfferItems()
 		self.footer:SetText(#items .. " available")
 		self.list:SetItems(items)
@@ -713,7 +828,7 @@ function UI:Refresh()
 		local mine = UnitFactionGroup("player")
 		local faction = self.attuneFaction or mine
 		self.btnFaction:Show()
-		self.btnFaction:SetText(faction == "Alliance" and "Show Horde" or "Show Alliance")
+		self.btnFaction:Update()
 		self.header:SetText("Raid attunements for " .. faction .. (faction ~= mine and " (browsing)" or "") .. ". Steps tick off as you go.")
 		self.list.hint = "Raid row: click to follow it in the guide.  Step: click to point the arrow there; right-click to mark done or not done."
 		local items = A:Items(faction)
@@ -786,6 +901,31 @@ function UI:SetStyle(style)
 	ns.Guide:Refresh()
 	self:Refresh()
 	ns.Print("leveling style: " .. ns.Profiles:StyleName() .. ".")
+end
+
+-- Fits the list (and the Guides tab) to the window's size.
+function UI:Layout(w, h)
+	local f = self.frame
+	if not (f and self.list) then return end
+	w, h = w or f:GetWidth(), h or f:GetHeight()
+	if not (w and h) then return end
+	local listH = h - 92 - 46
+	self.list:Resize(w - 20, listH)
+	local p = self.guidesPanel
+	if p then
+		p:SetSize(w - 20, listH + 30)
+		if p.list then p.list:Resize(w - 20, p.list.baseHeight) end
+	end
+end
+
+-- Back to the standard size.
+function UI:ResetSize()
+	ns.db.window.w, ns.db.window.h = nil, nil
+	if self.frame then
+		self.frame:SetSize(WIDTH, 92 + ROWS * ROW_H + 46)
+		self:Layout()
+		self:Refresh()
+	end
 end
 
 function UI:ApplyScale()
@@ -1013,7 +1153,7 @@ local function Check(parent, x, y, label, get, set, tooltip)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:AddLine(label)
 			GameTooltip:AddLine(tooltip, 1, 1, 1, true)
-			GameTooltip:Show()
+			ns.TipShow(tooltip)
 		end)
 		cb:SetScript("OnLeave", GameTooltip_Hide)
 	end
@@ -1021,35 +1161,36 @@ local function Check(parent, x, y, label, get, set, tooltip)
 	return cb
 end
 
--- A label and a button that steps through values.
+-- A label and a dropdown of values.
 local function Cycle(parent, x, y, label, values, get, set, tooltip)
 	local fs = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	fs:SetPoint("TOPLEFT", x + 4, y - 4)
 	fs:SetText(label)
 	local b = Button(parent, "", 150, nil)
 	b:SetPoint("TOPLEFT", x + 140, y)
+	AddArrow(b)
 	local function Label()
+		local cur = get()
 		for _, v in ipairs(values) do
-			if v[1] == get() then return v[2] end
+			if v[1] == cur then return v[2] end
+		end
+		-- A size dragged with a window's corner, or a value from an older version.
+		if type(cur) == "number" then
+			return cur < 5 and string.format("%d%%", math.floor(cur * 100 + 0.5)) or ("Custom (" .. math.floor(cur + 0.5) .. ")")
 		end
 		return values[1][2]
 	end
 	b:SetText(Label())
 	b:SetScript("OnShow", function(self) self:SetText(Label()) end)
 	b:SetScript("OnClick", function(self)
-		local cur, nextIndex = get(), 1
-		for i, v in ipairs(values) do
-			if v[1] == cur then nextIndex = (i % #values) + 1 end
-		end
-		set(values[nextIndex][1])
-		self:SetText(Label())
+		UI.Choose(self, (label:gsub(":$", "")), values, get, function(v) set(v) self:SetText(Label()) end)
 	end)
 	if tooltip then
 		b:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 			GameTooltip:AddLine(label)
 			GameTooltip:AddLine(tooltip, 1, 1, 1, true)
-			GameTooltip:Show()
+			ns.TipShow(tooltip)
 		end)
 		b:SetScript("OnLeave", GameTooltip_Hide)
 	end
@@ -1477,6 +1618,11 @@ function UI:CreateOptions()
 	local _, d = Page("display", "Display & Maps", "Display & Maps", "The XP panel, the waypoint arrow, quest buttons and map pins.")
 	local L2, R2 = Column(16), Column(330)
 
+	Heading(d, L2.x, L2:Next(), "Tooltips")
+	Cycle(d, L2.x, L2:Next(30), "Hover tooltips:", { { "line", "One line" }, { "off", "Off" }, { "full", "Full" } },
+		function() return ns.TipMode() end, function(v) db.window.tips = v end,
+		"What NeverQuest's own tooltips show when you hover the arrow, the guide, the tracker, pins and buttons: one line, nothing, or every detail.")
+
 	Heading(d, L2.x, L2:Next(), "XP panel")
 	Check(d, L2.x, L2:Next(), "Show XP panel", function() return db.hud.shown end, function(v) db.hud.shown = v ns.XP:Refresh() end)
 	Check(d, L2.x, L2:Next(), "Rested XP line", function() return db.hud.showRested end, function(v) db.hud.showRested = v ns.XP:Refresh() end)
@@ -1609,7 +1755,7 @@ function UI:CreateOptions()
 	Heading(sp, R3.x, R3:Next(), "Maps")
 	Check(sp, R3.x, R3:Next(), "Show on the world map", function() return sc.worldmap end, function(v) sc.worldmap = v ns.Pins:Refresh(true) end)
 	Check(sp, R3.x, R3:Next(), "Show on the minimap", function() return sc.minimap end, function(v) sc.minimap = v ns.Pins:Refresh(true) end,
-		"Off by default, to keep the minimap clear.")
+		"Tiny dots for where your quests' mobs and objects are, and your own marks. Other learned spots and rares stay on the world map.")
 	Cycle(sp, R3.x, R3:Next(30), "Dot size:", { { 0.75, "Tiny" }, { 1, "Small" }, { 1.4, "Medium" }, { 1.8, "Large" } },
 		function() return sc.dotSize end, function(v) sc.dotSize = v ns.Pins:Refresh(true) end)
 	Check(sp, R3.x, R3:Next(), "Show every known spawn, not just my quests", function() return sc.showAll end, function(v) sc.showAll = v Redraw() end,
@@ -1684,7 +1830,8 @@ function UI:CreateOptions()
 	Cycle(st, R4.x, R4:Next(30), "XP panel:", St.SCALES, function() return db.hud.scale end, function(v) db.hud.scale = v ns.XP:Refresh() end)
 	Cycle(st, R4.x, R4:Next(30), "Waypoint arrow:", St.SCALES, function() return db.arrow.scale end, function(v) db.arrow.scale = v ns.Nav:Update() end)
 	Cycle(st, R4.x, R4:Next(30), "Quest buttons:", St.SCALES, function() return db.buttons.scale end, function(v) db.buttons.scale = v ns.Buttons:Update() end)
-	Cycle(st, R4.x, R4:Next(30), "Minimap pins:", St.SCALES, function() return db.pins.mmScale end, function(v) db.pins.mmScale = v ns.Pins:Refresh(true) end)
+	Cycle(st, R4.x, R4:Next(30), "Minimap pins:", { { 0.5, "Tiny" }, { 0.6, "Small (default)" }, { 0.8, "80%" }, { 1, "100%" }, { 1.25, "125%" }, { 1.5, "150%" } },
+		function() return db.pins.mmScale end, function(v) db.pins.mmScale = v ns.Pins:Refresh(true) end)
 	Cycle(st, R4.x, R4:Next(30), "World map pins:", St.SCALES, function() return db.pins.wmScale end, function(v) db.pins.wmScale = v ns.Pins:Refresh(true) end)
 	FitContent(st, L4, R4)
 	self.styleOptions = st

@@ -609,7 +609,8 @@ function A:GuideRows(steps, plan)
 end
 
 -- Right-click menu entries for a quest, shared by the guide, the tracker and the missed list.
-function A:MenuItems(root, qid)
+-- noAbandon: the caller has its own Abandon entry.
+function A:MenuItems(root, qid, noAbandon)
 	if not qid then return end
 	local inLog = ns.SafeCall(C_QuestLog.IsOnQuest, qid) == true
 	if self:IsSkipped(qid) then
@@ -622,8 +623,8 @@ function A:MenuItems(root, qid)
 	elseif not inLog then
 		root:CreateButton("Go back for it", function() A:GoBack(qid, true) end)
 	end
-	if inLog then
-		root:CreateButton("Drop this quest...", function() A:Abandon(qid) end)
+	if inLog and not noAbandon then
+		root:CreateButton("Abandon quest...", function() A:Abandon(qid) end)
 	end
 end
 

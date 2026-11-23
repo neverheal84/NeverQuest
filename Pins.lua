@@ -88,9 +88,15 @@ function P:MinimapPoints()
 	local cfg, pts = ns.db.pins, {}
 	local questie = ns.QuestieOverlap()
 	-- Known spawns and marks near you go in first so quest pins draw over them.
+	-- Only spots for your quests' objectives (and your own marks) go on the minimap: it has no
+	-- room for every spot ever learned, or for rares.
 	if ns.db.spawns.minimap and ns.Spawns and not questie then
+		local all = ns.db.spawns.showAll
 		for _, sp in ipairs(ns.Spawns:NearbyPoints(450, 60)) do
-			table.insert(pts, { kind = sp.kind, m = sp.m, x = sp.x, y = sp.y, spawn = sp })
+			local forQuest = sp.ent and sp.ent.refs and #sp.ent.refs > 0
+			if sp.mark or forQuest or (all and sp.kind ~= "rare") then
+				table.insert(pts, { kind = sp.kind, m = sp.m, x = sp.x, y = sp.y, spawn = sp })
+			end
 		end
 	end
 	if cfg.mmGivers and not questie then
@@ -165,7 +171,7 @@ local function PointTooltip(owner, pt)
 	if pt.spawn then
 		ns.Spawns:Tooltip(GameTooltip, pt.spawn)
 		GameTooltip:AddLine("Click: set a waypoint here", 0.5, 0.8, 1)
-		GameTooltip:Show()
+		ns.TipShow()
 		return
 	end
 	GameTooltip:AddLine(pt.title or "", 1, 0.82, 0, true)
@@ -173,7 +179,7 @@ local function PointTooltip(owner, pt)
 	local d = ns.Nav.Distance(pt.m, pt.x, pt.y)
 	if d then GameTooltip:AddLine(ns.Yards(d), 0.8, 0.8, 0.8) end
 	GameTooltip:AddLine(pt.user and "Click: make this the active waypoint" or "Click: point the arrow here", 0.5, 0.8, 1)
-	GameTooltip:Show()
+	ns.TipShow()
 end
 
 local function MinimapPin(i)
@@ -368,7 +374,7 @@ function PinMethods:OnMouseEnter()
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	if info.offer or info.turnin then
 		P:QuestPinTooltip(info)
-		GameTooltip:Show()
+		ns.TipShow()
 		return
 	end
 	GameTooltip:AddLine(info.title or "", 1, 0.82, 0, true)
@@ -386,7 +392,7 @@ function PinMethods:OnMouseEnter()
 	else
 		GameTooltip:AddLine("Guide step " .. (info.label or "") .. ".  Click: point the arrow here.", 0.5, 0.8, 1)
 	end
-	GameTooltip:Show()
+	ns.TipShow()
 end
 
 function PinMethods:OnMouseLeave()
@@ -442,7 +448,7 @@ function SpawnPinMethods:OnMouseEnter()
 	ns.Spawns:Tooltip(GameTooltip, p)
 	GameTooltip:AddLine(p.mark and "Click: set a waypoint.  Shift+click: remove.  Right-click: options."
 		or "Click: set a waypoint.  Right-click: options.", 0.5, 0.8, 1, true)
-	GameTooltip:Show()
+	ns.TipShow()
 end
 
 function SpawnPinMethods:OnMouseLeave()

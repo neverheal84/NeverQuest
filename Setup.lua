@@ -71,7 +71,10 @@ Setup.PAGES = {
 			U.Check(p, 0, row(), "Quest givers on the world map", function() return db.givers.worldmap end, function(v) db.givers.worldmap = v Pins() Guide() end,
 				"Quests you can pick up, with their level in the quest's difficulty color.")
 			U.Check(p, 0, row(), "Learn spawn spots as I play", function() return db.spawns.learn end, function(v) db.spawns.learn = v end)
-			U.Check(p, 0, row(), "Spawn dots on the minimap too", function() return db.spawns.minimap end, function(v) db.spawns.minimap = v Pins() end)
+			U.Check(p, 0, row(), "Tiny quest dots on the minimap", function() return db.spawns.minimap end, function(v) db.spawns.minimap = v Pins() end,
+				"Where your quests' mobs and objects are, drawn small.")
+			U.Cycle(p, 0, row(30), "Hover tooltips:", { { "line", "One line" }, { "off", "Off" }, { "full", "Full" } },
+				function() return ns.TipMode() end, function(v) db.window.tips = v end)
 			U.Check(p, 0, row(), "NeverQuest button on the minimap", function() return db.minimapButton.shown end,
 				function(v) db.minimapButton.shown = v if ns.MinimapButton then ns.MinimapButton:Refresh() end end)
 		end,
