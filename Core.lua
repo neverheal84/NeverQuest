@@ -30,7 +30,8 @@ local DEFAULTS = {
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
 	           rested = true, sessionAtLogout = false, upgrades = true, training = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
-	questdb = { scan = true, worldmap = true, minimap = false, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true },
+	questdb = { scan = true, worldmap = true, minimap = false, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true,
+	           bundled = true, fixes = true },  -- bundled: LibQuestDB, QuestieDB Forever data and wiki lookups; fixes: note where they are wrong
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
 	alerts = { complete = true, sound = true, trackTurnin = false },
 	announce = { enabled = true, objectives = true, quests = true, turnins = false, attunements = true,
@@ -54,7 +55,7 @@ local DEFAULTS = {
 	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = false, dotSize = 1,
 	           showAll = false, aim = true, markClick = true, levelFilter = true, levelBand = 8 },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
-	questDB = { q = {}, scan = {}, chars = {} },  -- quests the game has shown any of your characters (QuestDB.lua)
+	questDB = { q = {}, scan = {}, chars = {}, fix = {} },  -- quests the game has shown any of your characters (QuestDB.lua); fix: Fixes.lua
 	guides = {},       -- recorded or imported guides, shared by all characters
 	setupDone = false, setupHinted = false,  -- setup wizard finished or skipped; one-time hint about it shown
 	positions = {},    -- saved frame positions

@@ -320,6 +320,9 @@ function Q:BuildOffers()
 	if #list == 0 and #self.offers > 0 and self.offers[1].m == m and GetTime() - foreignRequest < 60 then
 		return
 	end
+	-- When the list for your own zone was last read (Fixes.lua: an empty spot only counts once
+	-- the game has answered again while you stood there).
+	self.offersRead = GetTime()
 	-- Nothing new (the game repeats itself a lot, above all during the quest database scan):
 	-- keep what we have and spare the guide, tracker and maps a rebuild.
 	local parts = { m }
@@ -783,6 +786,7 @@ ns:RegisterEvent("ZONE_CHANGED_NEW_AREA", function()
 end)
 
 ns:RegisterEvent("QUESTLINE_UPDATE", function(_, requestRequired)
+	Q.answeredAt = GetTime()
 	-- Fresh answers for the maps you've looked at, too.
 	for m, c in pairs(mapOffers) do c.t = 0 end
 	-- The world map only needs redrawing while it's open.

@@ -94,6 +94,12 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Tracker at logout.* With Blizzard's list hidden, log out, disable NeverQuest at the character screen and log in: your quests should be tracked in Blizzard's list, and accepting a quest should track it automatically. Re-enable NeverQuest and it should all be hidden again within a second of logging in.
     - *Standing still.* `/nq debug`, then stand still for a minute: there should be no stream of guide or route lines. Walk a few steps and they resume.
     - *Talk-to quests.* Accept a quest whose only step is "speak to someone": no "Ready to turn in" alert and no party announcement.
+56. **Bundled database or your own, and wrong places (1.21.6).**
+    - *The choice.* `/nq setup`, go to the Quest database page and pick **Build my own**: the world map should lose its faded "Known quest" markers for quests nobody with NeverQuest has seen, and `/nq lib` should say the library is not in use. Pick **Bundled database** again and they come back within a few seconds.
+    - *Not here.* Find a faded known quest marker you can't actually pick up (one you've done, or one with nobody there). Stand on it for about ten seconds: it should disappear from the world map, and `/nq db fixes` should list it as "the giver wasn't there for you".
+    - *Ctrl+click.* Ctrl+click a known quest marker on the world map: chat says it won't be shown there any more and it disappears. `/nq db fixes undo <its number>` brings it back.
+    - *Moved.* Take or hand in a quest at an NPC whose marker was somewhere else: `/nq db fixes` should list it as "found somewhere else", with where.
+    - *Export.* `/nq db export` should mention the places where the bundled data was wrong.
 
 ## Afterwards, send
 

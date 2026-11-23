@@ -380,7 +380,7 @@ function PinMethods:OnMouseEnter()
 		-- /nq db sources turns it back on.
 		local line = P.SourceLine(info)
 		if line then GameTooltip:AddLine(line, 0.6, 0.6, 0.6) end
-		GameTooltip:AddLine("Click: set a waypoint.", 0.5, 0.8, 1)
+		GameTooltip:AddLine("Click: set a waypoint.  Ctrl+click: not here, hide it.", 0.5, 0.8, 1, true)
 	elseif info.user then
 		GameTooltip:AddLine("Click: make active.  Shift+click: remove.", 0.5, 0.8, 1)
 	elseif info.legPin then
@@ -406,7 +406,11 @@ function PinMethods:OnClick(button)
 			ns.Nav:AddUser(info.m, info.wx, info.wy, info.title)
 		end
 	elseif info.known then
-		ns.Nav:AddUser(info.m, info.wx, info.wy, info.title)
+		if IsControlKeyDown() and ns.Fixes then
+			ns.Fixes:NotHere(info.questID, info.m, info.wx, info.wy)
+		else
+			ns.Nav:AddUser(info.m, info.wx, info.wy, info.title)
+		end
 	elseif info.user then
 		if IsShiftKeyDown() then
 			ns.Nav:Remove(info.index)

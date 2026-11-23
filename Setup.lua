@@ -97,7 +97,7 @@ Setup.PAGES = {
 		end,
 	},
 	{
-		key = "helpers", title = "Reminders, travel and the quest database",
+		key = "helpers", title = "Reminders and travel",
 		text = "Small things that cost leveling time. Reminders show up as rows in the guide.",
 		build = function(p, U, row)
 			local db = Cfg()
@@ -108,9 +108,25 @@ Setup.PAGES = {
 			U.Check(p, 0, row(), "Logging out with no rested XP", function() return db.upkeep.rested end, function(v) db.upkeep.rested = v end)
 			U.Check(p, 0, row(), "Flight paths you don't have yet", function() return db.travel.flightPaths end, function(v) db.travel.flightPaths = v Re() end)
 			U.Check(p, 0, row(), "Say when to hearth back to hand in quests", function() return db.travel.hearth end, function(v) db.travel.hearth = v Re() end)
-			U.Check(p, 0, row(), "Quest database: scan zones in the background", function() return db.questdb.scan end,
+		end,
+	},
+	{
+		key = "database", title = "Quest database",
+		text = "Where NeverQuest's quest givers and turn-ins come from.\n\n" ..
+			"|cffffd100Use the bundled database|r (recommended): LibQuestDB, QuestieDB's WoW Forever data and the Warcraft Wiki fill in what NeverQuest hasn't seen yet, so the map is full from your first login. Where your own game shows the bundled data is wrong, NeverQuest notes it and stops showing the wrong place.\n\n" ..
+			"|cffffd100Build my own|r: only what your characters see, what NeverQuest ships of its own, and what other NeverQuest players in your party and guild pass on. The map starts emptier and fills in as you play.",
+		build = function(p, U, row)
+			local db = Cfg()
+			U.Cycle(p, 0, row(30), "Quest data:", { { "bundled", "Bundled database" }, { "own", "Build my own" } },
+				function() return db.questdb.bundled == false and "own" or "bundled" end,
+				function(v) if ns.QuestDB then ns.QuestDB:SetBundled(v == "bundled") else db.questdb.bundled = (v == "bundled") end Pins() Guide() end,
+				"You can switch any time under Options, or with /nq db bundled on | off.")
+			U.Check(p, 0, row(), "Note where the bundled data is wrong", function() return db.questdb.fixes ~= false end,
+				function(v) db.questdb.fixes = v if ns.QuestDB then ns.QuestDB:ClearNearby() end ns:SendMessage("MAP_OFFERS_UPDATED") end,
+				"Standing where the bundled data puts a quest giver, with the quest not on offer to you, or finding the giver or turn-in somewhere else: NeverQuest writes it down and stops showing the wrong place. /nq db fixes lists them.")
+			U.Check(p, 0, row(), "Scan zones in the background", function() return db.questdb.scan end,
 				function(v) db.questdb.scan = v if not v and ns.QuestDB then ns.QuestDB:StopScan() end end,
-				"Built from what the game itself shows your characters. /nq db searches it.")
+				"Asks the game which quests each zone offers you, paused in combat. This is how NeverQuest builds its own data. /nq db searches it.")
 			U.Check(p, 0, row(), "Known quests on the world map", function() return db.questdb.worldmap end, function(v) db.questdb.worldmap = v end)
 		end,
 	},

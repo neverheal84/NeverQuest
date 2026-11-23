@@ -37,7 +37,8 @@ end
 
 -- The library, or nil when it is not installed, not ready, or switched off.
 function L:Get()
-	if ns.db and ns.db.questdb and ns.db.questdb.library == false then return nil end
+	local cfg = ns.db and ns.db.questdb
+	if cfg and (cfg.library == false or cfg.bundled == false) then return nil end
 	if not looked then
 		looked = true
 		local stub = _G.LibStub
@@ -373,7 +374,9 @@ function L:StatusLines(questID)
 	local lines = {}
 	local off = ns.db.questdb.library == false
 	local l = self:Get()
-	if off then
+	if ns.db.questdb.bundled == false then
+		lines[#lines + 1] = "quest library: not in use, along with the rest of the bundled quest data. /nq db bundled on uses it again."
+	elseif off then
 		lines[#lines + 1] = "quest library: switched off. /nq lib on uses it again."
 	elseif not l then
 		lines[#lines + 1] = "quest library: not loaded. NeverQuest is using only what it has learned itself."

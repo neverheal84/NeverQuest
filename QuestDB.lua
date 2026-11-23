@@ -229,7 +229,7 @@ function ns.Looked(qid)
 	local got = looked[qid]
 	if got ~= nil then return got or nil end
 	got = false
-	if ns.db.questdb.lookups ~= false then
+	if ns.db.questdb.lookups ~= false and D:Bundled() then
 		local wiki = ns.Lookups and ns.Lookups.q and ns.Lookups.q[qid]
 		local theirs = ns.QuestieForever and ns.QuestieForever.q and ns.QuestieForever.q[qid]
 		if wiki or theirs then
@@ -275,8 +275,59 @@ local function Hint(qid)
 end
 function D:ForgetHints() hints, looked = {}, {} end
 
+function D:SetBundled(on)
+	ns.db.questdb.bundled = on and true or false
+	self:ForgetHints()
+	self:ForgetLinks()
+	if ns.Library then
+		ns.Library:Reset()
+		if on then ns.Library:Warm() end
+	end
+	self:ClearNearby()
+	ns:SendMessage("QUESTDB_UPDATED")
+	ns:SendMessage("MAP_OFFERS_UPDATED")
+end
+
+-- The bundled data (LibQuestDB, QuestieDB's Forever data and the wiki lookups) in use? With it
+-- off NeverQuest goes by what it has seen itself, what it shipped of its own, and what other
+-- NeverQuest players passed on: nothing from anywhere else.
+function D:Bundled() return ns.db.questdb.bundled ~= false end
+
+-- Where the bundled data puts a quest's giver and its turn-in, whatever NeverQuest itself
+-- knows: Fixes.lua holds these up against what the game shows you. Nil when it has none.
+function D:BundledStart(qid)
+	if not self:Bundled() then return nil end
+	local h = Hint(qid)
+	if h and h.m then return { m = h.m, x = h.x, y = h.y, src = h.src or "lookup" } end
+	local s = ns.Library and ns.Library:Start(qid)
+	if s then return { m = s.m, x = s.x, y = s.y, src = "library" } end
+end
+function D:BundledEnd(qid)
+	if not self:Bundled() then return nil end
+	local look = ns.Looked(qid)
+	if look and look.em then return { m = look.em, x = look.ex, y = look.ey, src = look.src or "lookup" } end
+	local f = ns.Library and ns.Library:Finish(qid)
+	if f then return { m = f.m, x = f.x, y = f.y, src = "library" } end
+end
+
+-- The same quest with no place: what is left when its place has been shown to be wrong.
+local function Placeless(e)
+	if not e then return nil end
+	return { t = e.t, l = e.l, f = e.f, c = e.c, z = e.z, zm = e.zm, s = e.s, o = e.o, n = e.n,
+		rl = e.rl, pre = e.pre, bar = e.bar, shut = e.shut, twins = e.twins, again = e.again,
+		hint = e.hint, lib = e.lib, fixed = true }
+end
+
 local function Borrow(qid, q)
+	-- A place you have found to be wrong (Fixes.lua). "all": you said so yourself, so no place
+	-- is used at all. "borrowed": standing there, the game didn't offer it to this character,
+	-- so the bundled place goes and only one NeverQuest saw for itself is left.
+	local wrong = ns.Fixes and ns.Fixes:HideStart(qid)
+	if wrong == "all" then
+		return Placeless(q or Hint(qid) or (ns.Library and ns.Library:Layer()[qid]))
+	end
 	if q and q.m and q.x then return q end
+	if wrong then return q or Placeless(Hint(qid) or (ns.Library and ns.Library:Layer()[qid])) end
 	local known = Hint(qid)
 	if not (known and known.m) then
 		known = (ns.Library and ns.Library:Layer()[qid]) or known
@@ -337,6 +388,7 @@ function D:Each()
 		repeat
 			qid, q = next(layer, qid)
 		until qid == nil or (store[qid] == nil and base[qid] == nil)
+		if qid and ns.Fixes and ns.Fixes:HideStart(qid) then return qid, Placeless(q) end
 		return qid, q
 	end
 end
@@ -1131,8 +1183,10 @@ local function BuildLinks()
 	for qid, e in pairs(ns.Library and ns.Library:Layer() or {}) do
 		for _, p in ipairs(e.pre or {}) do Link(p, qid) end
 	end
-	for qid, e in pairs(ns.QuestieForever and ns.QuestieForever.q or {}) do
-		for _, p in ipairs(e.pre or {}) do Link(p, qid) end
+	if ns.db.questdb.lookups ~= false and D:Bundled() then
+		for qid, e in pairs(ns.QuestieForever and ns.QuestieForever.q or {}) do
+			for _, p in ipairs(e.pre or {}) do Link(p, qid) end
+		end
 	end
 	for _, list in pairs(nextIndex) do table.sort(list) end
 end
@@ -1150,7 +1204,7 @@ end
 -- The quest that follows this one, skipping any in `seen`, or nil. Only quests this character
 -- can take count: a chain that carries on for another class does not carry on for you.
 function D:NextQuest(qid, seen)
-	if ns.db.questdb.lookups == false and not (ns.Library and ns.Library:Get()) then return nil end
+	if not D:Bundled() or (ns.db.questdb.lookups == false and not (ns.Library and ns.Library:Get())) then return nil end
 	if not nextIndex then BuildLinks() end
 	local direct = ns.Library and ns.Library:NextInChain(qid)
 	if direct and not (seen and seen[direct]) and Takeable(direct) then return direct end
@@ -1161,6 +1215,7 @@ function D:NextQuest(qid, seen)
 end
 
 function D:PrevQuest(qid)
+	if not D:Bundled() then return nil end
 	if not nextIndex then BuildLinks() end
 	return prevOf[qid]
 end
@@ -1251,7 +1306,11 @@ function D:Export()
 			bare = bare + 1
 		end
 	end
-	return table.concat(out, REC), n, bare
+	-- Where the bundled data turned out to be wrong, so it can be put right in the addon for
+	-- everybody. Older versions skip these records (they don't start with a number).
+	local fixes = ns.Fixes and ns.Fixes:ExportRecords() or {}
+	for _, r in ipairs(fixes) do out[#out + 1] = r end
+	return table.concat(out, REC), n, bare, #fixes
 end
 
 function D:Import(text)
@@ -1264,7 +1323,8 @@ function D:Import(text)
 	local added, updated, skipped, at = 0, 0, 0, 0
 	for record in text:gmatch("[^" .. REC .. "]+") do
 		at = at + 1
-		if at > 3 then                      -- 1 the tag, 2 the client build, 3 the addon version
+		-- Corrections (X...) are for building the addon; somebody else's are not applied here.
+		if at > 3 and record:sub(1, 1) ~= "X" then  -- 1 the tag, 2 the client build, 3 the addon version
 			local f = Split(record)
 			local qid = tonumber(f[1])
 			local m, x, y = tonumber(f[4]), tonumber(f[5]), tonumber(f[6])
@@ -1559,8 +1619,16 @@ ns:AddSlash("db", function(arg)
 		ns.Print("known quests on the minimap " .. (ns.db.questdb.minimap and "on." or "off."))
 		D:ClearNearby()
 		ns:SendMessage("MAP_OFFERS_UPDATED")
+	elseif cmd == "bundled" then
+		local want = rest:lower()
+		if want == "on" or want == "off" then D:SetBundled(want == "on") end
+		ns.Print(D:Bundled()
+			and "using the bundled quest data (LibQuestDB, QuestieDB's Forever data and the Warcraft Wiki lookups) to fill in what NeverQuest hasn't seen yet. /nq db bundled off goes by NeverQuest's own data only."
+			or "using NeverQuest's own quest data only: what your characters have seen, what NeverQuest shipped of its own, and what other NeverQuest players passed on. /nq db bundled on fills in the rest from the bundled data.")
+	elseif cmd == "fixes" or cmd == "fix" then
+		if ns.Fixes then ns.Fixes:Command(rest) end
 	elseif cmd == "export" then
-		local text, n, bare = D:Export()
+		local text, n, bare, fixes = D:Export()
 		-- Whether or not there's anything to export yet, outstanding work is the thing you
 		-- need told: it's the reason an export would be short, and the reason to wait.
 		local busy
@@ -1570,7 +1638,7 @@ ns:AddSlash("db", function(arg)
 				(D.scanning and #D.loads > 0) and ", " or "",
 				#D.loads > 0 and string.format("%d quests to ask about", #D.loads) or "")
 		end
-		if n + (bare or 0) == 0 then
+		if n + (bare or 0) + (fixes or 0) == 0 then
 			ns.Print((busy and (busy .. " ") or "")
 				.. "no quest starts with a place to export yet." .. (busy and "" or " /nq db scan fills the database in."))
 			return
@@ -1580,6 +1648,7 @@ ns:AddSlash("db", function(arg)
 		end
 		ns.UI:ShowIO("export", text, "Export quest starts",
 			n .. " quest starts" .. ((bare or 0) > 0 and (", and " .. bare .. " more quests known by name and level only") or "")
+				.. ((fixes or 0) > 0 and (", plus " .. fixes .. " places where the bundled data was wrong") or "")
 				.. ". Press Ctrl+C to copy. Quests and places only: no character or realm names.")
 	elseif cmd == "import" then
 		ns.UI:ShowIO("import", rest ~= "" and rest or "", "Import quest starts",
@@ -1615,7 +1684,7 @@ ns:AddSlash("db", function(arg)
 			DEFAULT_CHAT_FRAME:AddMessage("   /nq db way " .. found[1].qid .. " points the arrow there.")
 		end
 	end
-end, "/nq db [name|zone <zone>|way <id>|scan|ready|ask|guild|share|map|minimap|export|import] - the quest database: search it, list a zone, point the arrow, check whether it's finished, ask your guild for theirs")
+end, "/nq db [name|zone <zone>|way <id>|scan|ready|ask|guild|share|map|minimap|bundled|fixes|export|import] - the quest database: search it, list a zone, point the arrow, check whether it's finished, ask your guild for theirs")
 
 ---------------------------------------------------------------------------
 -- Events

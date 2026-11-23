@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: NeverQuest
 ## Notes: Leveling guide, quest database, reward upgrades, raid attunements, waypoint arrow, spawn and objective maps, quest buttons, XP tracker, auto loot, junk selling and repairs for WoW Forever.
-## Version: 1.21.5
+## Version: 1.21.6
 ## X-Curse-Project-ID: 1810798
 ## X-License: GPL-3.0-or-later
 ## OptionalDeps: QuestDB
@@ -47,6 +47,7 @@ Libs\QuestDB\Data\Forever\enUS\SortText.lua
 Libs\QuestDB\QuestieSource.lua
 Library.lua
 QuestDB.lua
+Fixes.lua
 Profiles.lua
 Spawns.lua
 Chains.lua
