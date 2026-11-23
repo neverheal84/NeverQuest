@@ -98,7 +98,7 @@ end
 
 local function ObjectiveSummary(questID, complete)
 	local objectives = C_QuestLog.GetQuestObjectives(questID)
-	local done, total, firstOpen, mob = 0, 0, nil, nil
+	local done, total, firstOpen, mob, openType = 0, 0, nil, nil, nil
 	if objectives then
 		for _, o in ipairs(objectives) do
 			local need, have = ns.Num(o.numRequired), ns.Num(o.numFulfilled)
@@ -110,10 +110,11 @@ local function ObjectiveSummary(questID, complete)
 			end
 			if not o.finished and not firstOpen and o.text and o.text ~= "" then firstOpen = o.text end
 			if not o.finished and not mob then mob = MobName(o) end
+			if not o.finished and not openType and type(o.type) == "string" then openType = o.type end
 		end
 	end
 	local progress = total > 0 and done / total or (complete and 1 or 0)
-	return progress, firstOpen, mob, objectives and #objectives or 0
+	return progress, firstOpen, mob, objectives and #objectives or 0, openType
 end
 
 function Q:Scan()
@@ -151,7 +152,7 @@ function Q:Scan()
 					xp = ns.Num(GetQuestLogRewardXP(qid)),
 				}
 				local count
-				e.progress, e.objective, e.mob, count = ObjectiveSummary(qid, complete)
+				e.progress, e.objective, e.mob, count, e.objType = ObjectiveSummary(qid, complete)
 				e.noObjectives = count == 0   -- "find the place" quests: the text is the only guide
 				e.logIndex = i
 				local link, icon, charges, showWhenComplete = GetQuestLogSpecialItemInfo(i)
@@ -409,7 +410,13 @@ function Q:LastNPC(window)
 	if lastNPC and GetTime() - lastNPC.t <= (window or 30) then return lastNPC.name end
 end
 
-function Q:GiverName(questID) return questID and ns.db.npcs.giver[questID] or nil end
+function Q:GiverName(questID)
+	if not questID then return nil end
+	local name = ns.db.npcs.giver[questID]
+	if name then return name end
+	local look = ns.Looked and ns.Looked(questID)
+	return (look and look.by) or (ns.Library and ns.Library:StartName(questID)) or nil
+end
 function Q:TurnInName(questID) return questID and ns.db.npcs.turnin[questID] or nil end
 
 ns:RegisterEvent("QUEST_DETAIL", function()
@@ -500,6 +507,10 @@ function Q:ZoneWork(name)
 	for _, o in ipairs(self.offers) do
 		if not o.trivial and o.difficulty ~= 4 and same(self:ZoneOf(o), name) then n = n + 1 end
 	end
+	-- The game reports quests on offer only for the map you are on. For any other zone, count
+	-- what NeverQuest knows is open to you there.
+	local id = ns.Profiles and ns.Profiles.ZoneID(name)
+	if id and id ~= self.offerMap and ns.QuestDB then n = n + ns.QuestDB:OpenCount(id) end
 	return n
 end
 
@@ -591,6 +602,71 @@ end
 Q.TextInfo = TextInfo
 function Q:ForgetText(questID) textInfo[questID] = nil end
 
+---------------------------------------------------------------------------
+-- The people your quests send you to
+--
+-- name (lower case) -> list of { kind, questID, title }, most pressing first:
+--   "turnin"  a quest you have finished is handed to them
+--   "giver"   they have a quest the game is offering you now
+--   "later"   a quest you are still working on goes back to them when it is done
+-- Names come from the quest's own text ("...return to Novice Elreth") and from whoever any of
+-- your characters has taken a quest from or handed one to. Nameplates and tooltips draw on it.
+---------------------------------------------------------------------------
+local roles
+local RANK = { turnin = 1, giver = 2, later = 3 }
+
+function Q:NpcRoles()
+	if roles then return roles end
+	roles = {}
+	local npcs = ns.db.npcs
+	local function Add(name, kind, questID, title)
+		if type(name) ~= "string" or name == "" or ns.IsSecret(name) then return end
+		local key = name:lower()
+		local list = roles[key]
+		if not list then list = {} roles[key] = list end
+		for _, r in ipairs(list) do
+			if r.questID == questID then
+				if RANK[kind] < RANK[r.kind] then r.kind = kind end
+				return
+			end
+		end
+		table.insert(list, { kind = kind, questID = questID, title = title })
+	end
+	for _, e in ipairs(self.log) do
+		local qid = e.questID
+		local info = TextInfo(e)
+		local kind = (e.complete or e.noObjectives) and "turnin" or "later"
+		-- Once a quest is done its closing text is the better witness to who wants it.
+		Add(npcs.turnin[qid], kind, qid, e.title)
+		Add(info.doneNpc, kind, qid, e.title)
+		if not info.doneNpc then Add(info.objNpc, kind, qid, e.title) end
+		-- And whoever the optional quest library says ends it, when nothing above names anyone.
+		if not (npcs.turnin[qid] or info.doneNpc or info.objNpc) then
+			local look = ns.Looked and ns.Looked(qid)
+			Add((look and look.eby) or (ns.Library and ns.Library:FinishName(qid)), kind, qid, e.title)
+		end
+	end
+	for _, o in ipairs(self.offers) do
+		if o.questID and not self.byID[o.questID] then
+			local look = ns.Looked and ns.Looked(o.questID)
+			Add(npcs.giver[o.questID] or (look and look.by) or (ns.Library and ns.Library:StartName(o.questID)), "giver", o.questID, o.title)
+		end
+	end
+	for _, list in pairs(roles) do
+		table.sort(list, function(a, b) return RANK[a.kind] < RANK[b.kind] end)
+	end
+	return roles
+end
+
+function Q:NpcRole(name)
+	if type(name) ~= "string" or ns.IsSecret(name) then return nil end
+	return self:NpcRoles()[name:lower()]
+end
+
+function Q:ForgetNpcRoles() roles = nil end
+ns:RegisterMessage("QUESTS_UPDATED", function() roles = nil end)
+ns:RegisterMessage("OFFERS_UPDATED", function() roles = nil end)
+
 -- NPCs you've met, from quests you picked up or handed in: name -> where they stand.
 local npcIndex, npcDirty = nil, true
 local function NPCSpot(name)
@@ -647,6 +723,16 @@ function Q:ResolveTurnin(e)
 		if not npc and sameZone and not e.noObjectives then
 			return { m = giver.m, x = giver.x, y = giver.y, source = "giver", npc = giverName }
 		end
+	end
+	-- Nothing learned and nothing in the text to go on: the optional quest library may know
+	-- who ends it. Better than the middle of a zone, and never used over anything above.
+	local look = ns.Looked and ns.Looked(qid)
+	if look and look.em then
+		return { m = look.em, x = look.ex, y = look.ey, source = "lookup", npc = npc or look.eby }
+	end
+	local fin = ns.Library and ns.Library:Finish(qid)
+	if fin and InZone(fin) then
+		return { m = fin.m, x = fin.x, y = fin.y, source = "library", npc = npc or fin.name }
 	end
 	if zone then
 		local m = ns.Profiles and ns.Profiles.ZoneID(zone)

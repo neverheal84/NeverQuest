@@ -8,7 +8,7 @@ ns.Diagnostics = D
 local TOC_INTERFACE = 16001
 
 local ATLASES = {
-	"QuestNormal", "QuestTurnin", "questlog-questtypeicon-quest", "questlog-questtypeicon-heroic",
+	"QuestNormal", "QuestTurnin", "questlog-questtypeicon-heroic",
 	"Waypoint-MapPin-Tracked", "Waypoint-MapPin-Untracked", "Waypoint-MapPin-Highlight",
 	"Navigation-Tracked-Arrow", "FlightMaster", "Innkeeper", "Vendor", "Class",
 	"minimap-genericevent-hornicon", "common-search-magnifyingglass", "VignetteKill",

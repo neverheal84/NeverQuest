@@ -37,6 +37,8 @@ local BANKED_PER_LEVEL = 0.06  -- finished quests lose XP as you out-level them,
 local BANKED_MAX = 1.5
 local STOP_WORK = 8         -- seconds to talk to an NPC
 local PICKUP_SHARE = 0.4    -- a pickup is worth part of its quest's XP: the rest comes later
+local AHEAD_SHARE = 0.8     -- a pickup in the zone you're heading to, planned before you get there
+local AHEAD_MAX = 6         -- of those, at most this many per zone, nearest first
 -- Seconds per objective unit, by objective type.
 local WORK = { monster = 22, item = 30, object = 15, event = 30, log = 20, progressbar = 150 }
 
@@ -206,8 +208,61 @@ function P:Bundles(cont)
 				end
 			end
 		end
+		self:AheadBundles(bundles, cont, focus, avg)
 	end
 	return bundles
+end
+
+-- Quest givers in the zone your plan sends you to next (or now, when you're somewhere else).
+-- The game only reports quests on offer for the map you're on, so these come from what
+-- NeverQuest knows (QuestDB.lua); the moment you arrive, the game's own list takes over.
+local aheadRequested = {}
+function P:AheadBundles(bundles, cont, focus, avg)
+	if not focus or not ns.QuestDB or not ns.Profiles then return end
+	local targets = {}
+	if focus.moveOn and focus.primaryID then targets[#targets + 1] = focus.primaryID end
+	if focus.nearEnd and focus.nextZone then
+		local id = ns.Profiles.ZoneID(focus.nextZone)
+		if id then targets[#targets + 1] = id end
+	end
+	local taken = {}
+	for _, o in ipairs(ns.Quests.offers) do taken[o.questID] = true end
+	for _, b in ipairs(bundles) do taken[b.questID] = true end
+	local doneZone = {}
+	for _, zid in ipairs(targets) do
+		if zid ~= ns.Quests.offerMap and not doneZone[zid] then
+			doneZone[zid] = true
+			local picks = {}
+			for _, k in ipairs(ns.QuestDB:OpenIn(zid)) do
+				if not taken[k.qid] then
+					picks[#picks + 1] = { k = k, d = ns.Nav.Distance(k.q.m, k.q.x, k.q.y) or math.huge }
+				end
+			end
+			table.sort(picks, function(a, b) return a.d < b.d end)
+			local zoneName = ns.Nav.MapName(zid)
+			for i = 1, math.min(#picks, AHEAD_MAX) do
+				local k, q = picks[i].k, picks[i].k.q
+				taken[k.qid] = true
+				local xp = ns.Num(GetQuestLogRewardXP(k.qid))
+				if not (xp and xp > 0) and not aheadRequested[k.qid] then
+					aheadRequested[k.qid] = true
+					pcall(C_QuestLog.RequestLoadQuestByID, k.qid)
+				end
+				local o = { questID = k.qid, title = q.t, level = q.l, m = q.m, x = q.x, y = q.y,
+					xp = (xp and xp > 0) and xp or nil, dist = picks[i].d < math.huge and picks[i].d or nil, ahead = true }
+				local chain, ups = 0, 0
+				if ns.Chains then chain, ups = ns.Chains:Value(k.qid, avg) end
+				local s = Stop("pickup", k.qid, o, o, cont, STOP_WORK)
+				if s then
+					local b = { questID = k.qid, e = o, value = ((o.xp or avg) + chain) * PICKUP_SHARE * AHEAD_SHARE,
+						chainCount = ups, stops = { s }, work = STOP_WORK, pickup = true, ahead = true }
+					b.value = b.value * StyleWeight(k.qid, zoneName, focus, false)
+					s.bundle, s.order = b, 1
+					table.insert(bundles, b)
+				end
+			end
+		end
+	end
 end
 
 ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ local DEFAULTS = {
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
 	           rested = true, sessionAtLogout = false, upgrades = true, training = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
-	questdb = { scan = true, worldmap = true, minimap = true, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true },
+	questdb = { scan = true, worldmap = true, minimap = false, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true },
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
 	alerts = { complete = true, sound = true, trackTurnin = false },
 	announce = { enabled = true, objectives = true, quests = true, turnins = false, attunements = true,
@@ -42,12 +42,12 @@ local DEFAULTS = {
 	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
 	           classTab = true, profQuests = true, profMine = true },
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
-	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true,
+	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, sources = false,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 1, wmScale = 1 },
 	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
 	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false },
-	tooltips = { units = true, items = true, party = true },   -- quest lines on mob and item tooltips
-	plates = { enabled = true, count = true, skull = true, scale = 1, side = "left" },   -- quest icons on nameplates (drawn by us; not raid markers)
+	tooltips = { units = true, items = true, party = true, npcs = true },   -- quest lines on mob and item tooltips
+	plates = { enabled = true, count = true, skull = true, npcs = true, scale = 1, side = "left" },   -- quest icons on nameplates (drawn by us; not raid markers)
 	flightTimes = {},   -- seconds each flight took, learned from your own flights
 	minimapButton = { shown = true, locked = false, angle = 210 },
 	givers = { worldmap = true, otherZones = true, gray = false, red = false, dailies = true, levels = true, turnins = false },
@@ -335,6 +335,13 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 	if not ns.db.quietLogin then
 		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything.")
 	end
+	-- Quest givers you could take a quest from are a world map thing now; on the minimap they
+	-- are off unless asked for. Switched off once for everyone when this arrived, because it
+	-- had been on without anyone choosing it. /nq db minimap brings them back.
+	if not ns.db.questdb.minimapReset then
+		ns.db.questdb.minimapReset = true
+		ns.db.questdb.minimap = false
+	end
 	-- After an update: one line pointing at what changed.
 	if ns.db.lastVersion ~= ns.version then
 		if ns.db.lastVersion or not ns.freshInstall then
@@ -382,6 +389,44 @@ function ns.SafeCall(fn, ...)
 end
 
 -- Unit name, or nil when the game hides it (restricted content) or the unit doesn't exist.
+---------------------------------------------------------------------------
+-- Icons
+--
+-- In this game a yellow "?" means one thing: hand a quest in here. So it is used for that and
+-- for nothing else. Work still to do gets a picture of the work: a sword where something has
+-- to die, a bag where something has to be picked up, a cog for anything else. These are the
+-- game's own cursor pictures, the ones you already see when you point at such things.
+--
+-- An icon is either the name of a texture atlas or the path of a texture file.
+---------------------------------------------------------------------------
+ns.ICON_KILL = "Interface\\CURSOR\\Attack"
+ns.ICON_LOOT = "Interface\\CURSOR\\Pickup"
+ns.ICON_DO = "Interface\\CURSOR\\Interact"
+
+function ns.IsTexturePath(icon)
+	return type(icon) == "string" and icon:find("\\", 1, true) ~= nil
+end
+
+-- Puts an icon of either sort on a texture. Answers whether there was one to show.
+function ns.SetIcon(tex, icon)
+	if not icon then return false end
+	if ns.IsTexturePath(icon) then
+		tex:SetTexture(icon)
+		tex:SetTexCoord(0, 1, 0, 1)
+		return true
+	end
+	if C_Texture and C_Texture.GetAtlasInfo and not C_Texture.GetAtlasInfo(icon) then return false end
+	tex:SetAtlas(icon, false)
+	return true
+end
+
+-- The picture for a quest you are still working on (a quest log entry).
+function ns.ObjectiveIcon(e)
+	if e and (e.mob or e.objType == "monster") then return ns.ICON_KILL end
+	if e and (e.dropMob or e.objType == "item" or e.objType == "object") then return ns.ICON_LOOT end
+	return ns.ICON_DO
+end
+
 function ns.SafeName(unit)
 	if not UnitExists(unit) then return nil end
 	local name = UnitName(unit)

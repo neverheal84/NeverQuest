@@ -505,6 +505,16 @@ function P:Focus(plan, level, zoneWork)
 		local inFocus = SameZone(here, leg.zone) or (leg.alt and SameZone(here, leg.alt))
 		f.moveOn = not inFocus
 		f.reason = string.format("Your route: %s for levels %d-%d.%s", leg.zone, leg.from, leg.to, leg.note and (" " .. leg.note) or "")
+		-- Nothing left for you here while the next leg's zone has quests you can already take:
+		-- go now rather than grind out the rest of the window.
+		if inFocus and f.nextZone and zoneWork(here) == 0 and zoneWork(f.nextZone) > 0 then
+			f.zoneDone, f.moveOn = true, true
+			f.reason = string.format("Nothing left for you in %s. %s is next on your route and already has quests for you.", here, f.nextZone)
+			f.primary = f.nextZone
+			f.zones = { [f.nextZone] = true }
+			local after = nextLeg and self:NextLeg(plan, nextLeg)
+			f.nextZone = after and after.zone ~= nextLeg.zone and after.zone or nil
+		end
 	else
 		local band = self:BandFor(plan, level)
 		if not band then return nil end
@@ -525,8 +535,14 @@ function P:Focus(plan, level, zoneWork)
 			f.primary = stay
 		else
 			f.zoneDone = here ~= nil and zoneWork(here) == 0
-			for _, z in ipairs(self:UsableZones(band, level)) do
-				if not f.primary and not SameZone(z.name, here) and (zoneWork(z.name) > 0 or not z.here) then f.primary = z.name end
+			-- Nearest first, but a zone with quests open to you beats one with none. Counts for
+			-- zones you are not in come from what NeverQuest knows (QuestDB.lua); with nothing
+			-- known anywhere, the nearest zone in the plan is still the answer.
+			local usable = self:UsableZones(band, level)
+			for pass = 1, 2 do
+				for _, z in ipairs(usable) do
+					if not f.primary and not SameZone(z.name, here) and (pass == 2 or zoneWork(z.name) > 0) then f.primary = z.name end
+				end
 			end
 			local nextBand = self:NextBand(plan, band)
 			if not f.primary and nextBand then f.primary = nextBand.zones[1] end

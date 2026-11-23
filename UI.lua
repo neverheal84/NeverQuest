@@ -10,8 +10,7 @@ local WIDTH, ROWS, ROW_H = 430, 11, 34
 -- Scrolling list widget
 ---------------------------------------------------------------------------
 local function SetIcon(tex, atlas)
-	if atlas and C_Texture.GetAtlasInfo(atlas) then
-		tex:SetAtlas(atlas, false)
+	if ns.SetIcon(tex, atlas) then
 		tex:Show()
 	else
 		tex:Hide()
@@ -181,7 +180,7 @@ local function QuestItems()
 		if party then table.insert(parts, "|cff66ccffparty: " .. party .. "|r") end
 		local item = {
 			key = "quest:" .. e.questID, questID = e.questID,
-			icon = e.complete and "QuestTurnin" or "questlog-questtypeicon-quest",
+			icon = e.complete and "QuestTurnin" or ns.ObjectiveIcon(e),
 			title = (e.level and ("[" .. e.level .. (e.elite and "+" or "") .. "] ") or "") .. e.title,
 			color = { ns.QuestColor(e.questID) },
 			sub = table.concat(parts, "  ·  "),

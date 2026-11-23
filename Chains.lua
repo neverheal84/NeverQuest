@@ -1,12 +1,15 @@
 -- NeverQuest Chains: which quests lead to which, so the guide can favor quests that open up
 -- more quests and grab follow-ups while you're standing at the NPC.
 --
--- Two sources, both from your own game client:
+-- Three sources, in this order:
 --   quest lines   the game's C_QuestLine data: the line's name, its quests in order, and
 --                 which of them you haven't done yet
 --   your play     a quest offered right after you turn one in, that wasn't on offer just
 --                 before, is that quest's follow-up. Learned links are shared by all your
 --                 characters, so alts know the chains before they get there.
+--   the data      what the bundled quest library and the QuestieDB-derived file say must come
+--                 before each quest (QuestDB.lua), read backwards. Used only where the first
+--                 two say nothing, so it helps most on a first character.
 
 local ADDON, ns = ...
 local C = {}
@@ -77,7 +80,7 @@ end
 function C:Prev(questID)
 	local line = self:Line(questID)
 	if line and line.index and line.index > 1 then return line.quests[line.index - 1] end
-	return ns.db.chains.prev[questID]
+	return ns.db.chains.prev[questID] or (ns.QuestDB and ns.QuestDB:PrevQuest(questID))
 end
 
 -- Up to n quests that follow this one and that you haven't done yet, nearest first.
@@ -104,6 +107,18 @@ function C:FollowUps(questID, n)
 		seen[nextID] = true
 		if not Done(nextID) and not ns.SafeCall(C_QuestLog.IsOnQuest, nextID) then table.insert(out, nextID) end
 		cur = nextID
+	end
+	-- Where the game and your play have nothing more to say, the data carries the chain on.
+	if #out < n and ns.QuestDB then
+		local steps = 0
+		while #out < n and steps < 12 do
+			steps = steps + 1
+			local nextID = ns.QuestDB:NextQuest(cur, seen)
+			if not nextID then break end
+			seen[nextID] = true
+			if not Done(nextID) and not ns.SafeCall(C_QuestLog.IsOnQuest, nextID) then table.insert(out, nextID) end
+			cur = nextID
+		end
 	end
 	return out
 end

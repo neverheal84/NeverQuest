@@ -82,7 +82,78 @@ end
 ---------------------------------------------------------------------------
 local nodeCache = {}
 
--- Flight masters this character has discovered and may use, in continent map coordinates.
+-- Which flight masters this character can actually fly to.
+--
+-- The world map's list of flight masters says whether each one is discovered, but that list
+-- also holds places you cannot fly to at all: points the game keeps for scripted flights, other
+-- factions' masters it does not mark as such, and on some clients nodes whose "undiscovered"
+-- flag is simply never set. Planning from it sent people to fly to places with no flight master.
+--
+-- So the authority is the flight map itself. Every time you open it at a flight master, the
+-- masters it shows as reachable from there are remembered for this character, and a new flight
+-- path you discover is added on the spot. Flights are only planned between masters on that list.
+-- Until you have opened a flight map once, no flights are suggested at all.
+local function Known()
+	ns.char.taxiKnown = ns.char.taxiKnown or { ids = {}, names = {} }
+	return ns.char.taxiKnown
+end
+R.TaxiKnown = Known
+
+function R.Usable(node)
+	local k = Known()
+	return node and ((node.id and k.ids[node.id]) or (node.name and k.names[node.name])) and true or false
+end
+
+-- Reads the open flight map. Answers how many masters were added.
+function R.LearnTaxiMap()
+	local k = Known()
+	local added = 0
+	local function Add(id, name)
+		local new = false
+		if id and not k.ids[id] then k.ids[id], new = true, true end
+		if name and not k.names[name] then k.names[name], new = true, true end
+		if new then added = added + 1 end
+	end
+	local mapID = GetTaxiMapID and ns.SafeCall(GetTaxiMapID)
+	local S = Enum and Enum.FlightPathState
+	if C_TaxiMap and C_TaxiMap.GetAllTaxiNodes and mapID and S then
+		for _, info in ipairs(ns.SafeCall(C_TaxiMap.GetAllTaxiNodes, mapID) or {}) do
+			if info.state == S.Current or info.state == S.Reachable then Add(info.nodeID, Text(info.name)) end
+		end
+	end
+	-- The older way the flight map tells it: by name, one node at a time.
+	if NumTaxiNodes and TaxiNodeGetType and TaxiNodeName then
+		for i = 1, (Num(ns.SafeCall(NumTaxiNodes)) or 0) do
+			local kind = ns.SafeCall(TaxiNodeGetType, i)
+			if kind == "CURRENT" or kind == "REACHABLE" then Add(nil, Text(ns.SafeCall(TaxiNodeName, i))) end
+		end
+	end
+	wipe(nodeCache)
+	return added
+end
+
+-- "New flight path discovered!": the master you are standing at is now yours.
+function R.LearnHere()
+	local pm, px, py = ns.Nav.GetPlayerPosition()
+	local cont = pm and ns.Nav.GetContinentMap(pm)
+	if not cont then return false end
+	local best, bestD
+	for _, info in ipairs(ns.SafeCall(C_TaxiMap.GetTaxiNodesForMap, cont) or {}) do
+		if info.position then
+			local x, y = info.position:GetXY()
+			local d = Num(x) and Num(y) and ns.Nav.DistanceBetween(pm, px, py, cont, x, y)
+			if d and d < 120 and (not bestD or d < bestD) then best, bestD = info, d end
+		end
+	end
+	if not best then return false end
+	local k = Known()
+	if best.nodeID then k.ids[best.nodeID] = true end
+	if Text(best.name) then k.names[Text(best.name)] = true end
+	wipe(nodeCache)
+	return true
+end
+
+-- Flight masters this character can fly to, in continent map coordinates.
 function R.KnownNodes(continentMap)
 	local cached = nodeCache[continentMap]
 	if cached and GetTime() - cached.t < 30 then return cached.nodes end
@@ -90,7 +161,7 @@ function R.KnownNodes(continentMap)
 	local faction = UnitFactionGroup("player")
 	local F = Enum.FlightPathFaction
 	for _, info in ipairs(C_TaxiMap.GetTaxiNodesForMap(continentMap) or {}) do
-		local ok = not info.isUndiscovered
+		local ok = info.isUndiscovered ~= true and R.Usable({ id = info.nodeID, name = Text(info.name) })
 		if ok and F and info.faction == F.Horde then ok = faction == "Horde" end
 		if ok and F and info.faction == F.Alliance then ok = faction == "Alliance" end
 		if ok and info.position then
@@ -164,6 +235,13 @@ function R:FlightFor(t)
 	if f and f.key ~= key then f, self.flight = nil, nil end
 	if f then
 		if f.landed then return nil end
+		-- A plan made before a flight map showed what you can really fly to.
+		if f.from and f.to and not (R.Usable(f.from) and R.Usable(f.to)) then
+			self:DropFlight()
+			f = nil
+		end
+	end
+	if f then
 		if f.from then
 			local away = ns.Nav.Distance(f.from.m, f.from.x, f.from.y)
 			if away and f.originDist and away > f.originDist + ORIGIN_DRIFT then
@@ -254,6 +332,11 @@ for _, event in ipairs({ "SUPER_TRACKING_PATH_UPDATED", "SUPER_TRACKING_CHANGED"
 end
 
 ns:RegisterEvent("TAXI_NODE_STATUS_CHANGED", function() wipe(nodeCache) R:Invalidate() end)
+ns:RegisterEvent("UI_INFO_MESSAGE", function(_, _, msg)
+	if msg ~= nil and msg == ERR_NEWTAXIPATH then
+		if R.LearnHere() then R:Invalidate() end
+	end
+end)
 
 -- How long each flight takes isn't something the game tells an addon, so it's timed: the first
 -- time you fly a planned leg it's measured, and from then on the arrow counts it down.
@@ -305,10 +388,14 @@ ns:RegisterEvent("PLAYER_CONTROL_GAINED", function()
 	end)
 end)
 
--- At the flight master, remind which flight to take.
+-- At the flight master: learn what can be reached from here, then remind which flight to take.
 ns:RegisterEvent("TAXIMAP_OPENED", function()
-	wipe(nodeCache)
+	R.LearnTaxiMap()
 	local f = R.flight
+	if f and f.to and not f.landed and not (R.Usable(f.from) and R.Usable(f.to)) then
+		R:DropFlight()
+		f = nil
+	end
 	if f and f.to and not f.landed then
 		ns.Alert("Fly to " .. f.to.name, 0.4, 0.8, 1)
 	end

@@ -8,8 +8,10 @@ G.steps = {}        -- what the Guide tab shows right now
 G.registered = {}   -- guides shipped in Guides\*.lua files
 
 G.ICONS = {
-	turnin = "QuestTurnin", pickup = "QuestNormal", objective = "questlog-questtypeicon-quest",
-	accept = "QuestNormal", complete = "questlog-questtypeicon-quest",
+	-- "?" is for handing in and "!" for picking up, as everywhere else in the game. Work to do
+	-- never uses either (see the icons in Core.lua).
+	turnin = "QuestTurnin", pickup = "QuestNormal", objective = ns.ICON_DO,
+	accept = "QuestNormal", complete = ns.ICON_DO,
 	["goto"] = "Waypoint-MapPin-Tracked", fly = "FlightMaster", travel = "Innkeeper",
 	level = "questlog-questtypeicon-heroic", note = "minimap-genericevent-hornicon",
 	zone = "Waypoint-MapPin-Tracked", tip = "minimap-genericevent-hornicon",
@@ -69,9 +71,11 @@ function G:MakeStep(kind, e)
 		s.title = "Pick up: " .. tag .. e.title
 		s.npc = ns.Quests:GiverName(e.questID)
 		if s.npc then table.insert(parts, "from " .. s.npc) end
+		if e.ahead then table.insert(parts, "|cff99ccffnext zone on your route: " .. (ns.Nav.MapName(ns.Nav.GetZoneMap(e.m)) or "ahead") .. "|r") end
 		if e.important then table.insert(parts, "story") end
 	else
 		s.title = tag .. e.title
+		s.icon = ns.ObjectiveIcon(e)
 		table.insert(parts, e.objective or "Complete the objectives")
 		if e.pos and e.pos.spawn and e.pos.label then
 			table.insert(parts, "|cffffd070known spot: " .. e.pos.label .. "|r")
@@ -391,8 +395,13 @@ function G:MoveOnStep(steps)
 	else
 		title = "Head to " .. f.primary
 	end
+	local sub = f.reason
+	local waiting = ns.QuestDB and ns.QuestDB:OpenCount(f.primaryID) or 0
+	if waiting > 0 then
+		sub = sub .. string.format(" %d %s open to you there.", waiting, waiting == 1 and "quest" or "quests")
+	end
 	local step = { kind = "zone", key = "zone:" .. f.primaryID, m = f.primaryID, x = 0.5, y = 0.5,
-		title = title, navTitle = f.primary, sub = f.reason, color = { 0.6, 1, 0.6 }, moveOn = true }
+		title = title, navTitle = f.primary, sub = sub, color = { 0.6, 1, 0.6 }, moveOn = true }
 	local at = 1
 	while steps[at] and (steps[at].milestoneKey or ((steps[at].kind == "turnin" or steps[at].kind == "pickup")
 		and not steps[at].predicted and steps[at].dist and steps[at].dist <= 300)) do

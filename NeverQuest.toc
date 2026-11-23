@@ -1,8 +1,10 @@
 ## Interface: 16001
 ## Title: NeverQuest
 ## Notes: Leveling guide, quest database, reward upgrades, raid attunements, waypoint arrow, spawn and objective maps, quest buttons, XP tracker, auto loot, junk selling and repairs for WoW Forever.
-## Version: 1.20.0
+## Version: 1.21.4
 ## X-Curse-Project-ID: 1810798
+## X-License: GPL-3.0-or-later
+## OptionalDeps: QuestDB
 ## SavedVariables: NeverQuestDB
 ## SavedVariablesPerCharacter: NeverQuestCharDB
 ## IconTexture: Interface\AddOns\NeverQuest\Media\Icon
@@ -17,6 +19,33 @@ XP.lua
 QuestSpots.lua
 Quests.lua
 Data\Starts.lua
+Data\Lookups.lua
+# Derived from QuestieDB, GPLv3: see Data\Questie\NOTICE.md.
+Data\Questie\Forever.lua
+# LibQuestDB by Pimptasty (MIT, see Libs\QuestDB\LICENSE), in its own load order.
+Libs\QuestDB\libs\LibStub\LibStub.lua
+Libs\QuestDB\LibQuestDB-1.0.lua
+Libs\QuestDB\Data\Forever\_core\Rewards.lua
+Libs\QuestDB\Data\Forever\_core\Quests.lua
+Libs\QuestDB\Data\Forever\_core\Harvest.lua
+Libs\QuestDB\Data\Forever\_core\Coverage.lua
+Libs\QuestDB\Data\Forever\_core\QuestXP.lua
+Libs\QuestDB\Data\Forever\_core\NPCs.lua
+Libs\QuestDB\Data\Forever\_core\Objects.lua
+Libs\QuestDB\Data\Forever\_core\NPCSpawns.lua
+Libs\QuestDB\Data\Forever\_core\ObjectSpawns.lua
+Libs\QuestDB\Data\Forever\_core\Drops.lua
+Libs\QuestDB\Data\Forever\_core\Zones.lua
+Libs\QuestDB\Data\Forever\_core\Paths.lua
+Libs\QuestDB\Data\Forever\_core\Approaches.lua
+Libs\QuestDB\Data\Forever\_core\Locales.lua
+Libs\QuestDB\Data\Forever\enUS\Text.lua
+Libs\QuestDB\Data\Forever\enUS\HarvestText.lua
+Libs\QuestDB\Data\Forever\enUS\NPCText.lua
+Libs\QuestDB\Data\Forever\enUS\ObjectText.lua
+Libs\QuestDB\Data\Forever\enUS\SortText.lua
+Libs\QuestDB\QuestieSource.lua
+Library.lua
 QuestDB.lua
 Profiles.lua
 Spawns.lua

@@ -1170,28 +1170,84 @@ ns:RegisterMessage("QUESTS_UPDATED", function()
 	S:ScanProgress()
 end)
 
+-- Which mob a loot window's quest items came from, by name, or nil when they came from an
+-- object (a herb, a crate, a branch on the ground) or the mob cannot be named for certain.
+--
+-- It used to be "the dead mob you have targeted". That is wrong whenever you kill something,
+-- leave it targeted and then pick an object up off the ground: the mob was recorded as dropping
+-- the object's item, and from then on NeverQuest told you to kill it for the quest. The game
+-- says exactly where each loot slot came from, so that is asked first, and a mob is only named
+-- when it is the one you are targeting or pointing at.
+function S.LootSource(slots)
+	if IsFishingLoot and SafeCall(IsFishingLoot) == true then return nil end
+	if GetLootSourceInfo then
+		local guid
+		for _, slot in ipairs(slots or {}) do
+			local g = SafeCall(GetLootSourceInfo, slot)
+			if type(g) == "string" and g ~= "" and not ns.IsSecret(g) then guid = g break end
+		end
+		if guid then
+			if not (guid:find("^Creature") or guid:find("^Vehicle")) then return nil end
+			for _, unit in ipairs({ "target", "mouseover" }) do
+				local ug = UnitGUID and SafeCall(UnitGUID, unit)
+				if ug == guid then return ns.SafeName(unit) end
+			end
+			return nil
+		end
+	end
+	-- A client that cannot say: the dead mob you are targeting, and only if you are standing
+	-- at it. Still a guess, so it is held to looting distance.
+	for _, unit in ipairs({ "target", "mouseover" }) do
+		if UnitExists(unit) and SafeCall(UnitIsDead, unit) == true and SafeCall(UnitIsPlayer, unit) == false
+			and SafeCall(CheckInteractDistance, unit, 3) == true then
+			return ns.SafeName(unit)
+		end
+	end
+	return nil
+end
+
+-- Mobs recorded as dropping a quest item before the fix above may be wrong. Links from a mob to
+-- an item objective of a quest in your log are cleared once; the right ones are learned again
+-- the next time you loot the item. Kill objectives, places and everything else are kept.
+function S:ClearOldDropLinks()
+	local data = Data()
+	if data.dropLinksChecked or #ns.Quests.log == 0 then return 0 end
+	local cleared = 0
+	for _, rec in pairs(data.npcs or {}) do
+		for qid, i in pairs(rec.q or {}) do
+			local o = i and i > 0 and (C_QuestLog.GetQuestObjectives(qid) or {})[i]
+			if o and o.type == "item" then
+				rec.q[qid] = nil
+				cleared = cleared + 1
+			end
+		end
+	end
+	data.dropLinksChecked = true
+	if cleared > 0 then
+		ns.Debug("spawns: cleared " .. cleared .. " old drop links")
+		Changed()
+	end
+	return cleared
+end
+ns:RegisterMessage("QUESTS_UPDATED", function() S:ClearOldDropLinks() end)
+
 ns:RegisterEvent("LOOT_READY", function()
 	if not Cfg().learn then return end
 	local m, x, y = Here()
 	if not m then return end
-	local items, quest = {}, false
+	local items, quest, questSlots = {}, false, {}
 	for slot = 1, (GetNumLootItems and GetNumLootItems() or 0) do
 		local _, item, _, _, _, _, isQuestItem, questID, isActive = GetLootSlotInfo(slot)
 		local hidden = ns.IsSecret(isQuestItem) or ns.IsSecret(questID) or ns.IsSecret(isActive)
 		-- Quest-starting items (a quest you don't have yet) aren't objectives.
 		if not hidden and isQuestItem and not (questID and not isActive) then
 			quest = true
+			questSlots[#questSlots + 1] = slot
 			if Clean(item) then table.insert(items, Clean(item)) end
 		end
 	end
 	if not quest then return end
-	local source
-	for _, unit in ipairs({ "target", "mouseover" }) do
-		if UnitExists(unit) and SafeCall(UnitIsDead, unit) == true and SafeCall(UnitIsPlayer, unit) == false then
-			source = ns.SafeName(unit)
-			if source then break end
-		end
-	end
+	local source = S.LootSource(questSlots)
 	lastLoot = { m = m, x = x, y = y, source = source, items = items, t = GetTime() }
 	ns.Debug("spawns: quest loot from " .. (source or "an object") .. ": " .. table.concat(items, ", "))
 end)

@@ -63,6 +63,21 @@ end
 
 function T:Invalidate() self.index = nil end
 
+-- The references worth showing on a unit. One that names a quest but no objective (the mob's
+-- tooltip once listed the quest) says nothing about whether you still need it, so it only
+-- counts while the game itself still flags the unit as part of an active quest.
+function T:Usable(refs, related)
+	if not refs then return nil end
+	local out
+	for _, r in ipairs(refs) do
+		if r.index or related then
+			out = out or {}
+			out[#out + 1] = r
+		end
+	end
+	return out
+end
+
 function T:ForMob(name)
 	return type(name) == "string" and self:Index().mobs[name:lower()] or nil
 end
@@ -99,19 +114,48 @@ end
 -- Lines
 ---------------------------------------------------------------------------
 -- Lines to add to a mob's tooltip: { text, r, g, b }.
+-- A small picture in front of a line of text, from either sort of icon (see Core.lua).
+local function Inline(icon)
+	if ns.IsTexturePath(icon) then return "|T" .. icon .. ":14:14|t " end
+	return "|A:" .. icon .. ":14:14|a "
+end
+T.Inline = Inline
+
+local ROLE_ICON = { turnin = "QuestTurnin", giver = "QuestNormal" }
+local ROLE_TEXT = { turnin = "Hand in: ", giver = "Has a quest: ", later = "Hand in here when done: " }
+
+-- Someone your quests send you to: what for.
+function T:RoleLines(name, lines)
+	local list = ns.Quests:NpcRole(name)
+	if not list then return end
+	for i, role in ipairs(list) do
+		if i > 4 then break end
+		local icon = ROLE_ICON[role.kind]
+		local text = (icon and Inline(icon) or "") .. ROLE_TEXT[role.kind] .. (role.title or "a quest")
+		if role.kind == "later" then
+			table.insert(lines, { text, 0.6, 0.6, 0.6 })
+		else
+			table.insert(lines, { text, 1, 0.82, 0 })
+		end
+	end
+end
+
 function T:UnitLines(unit)
 	local cfg = Cfg()
 	local lines = {}
 	if not unit or not UnitExists(unit) or SafeCall(UnitIsPlayer, unit) ~= false then return lines end
-	local refs = self:ForMob(ns.SafeName(unit))
-	if not refs then return lines end
+	local name = ns.SafeName(unit)
+	if cfg.npcs ~= false and name then self:RoleLines(name, lines) end
 	-- When the game knows the mob belongs to a quest it lists your objectives itself.
 	local native = SafeCall(C_QuestLog.UnitIsRelatedToActiveQuest, unit) == true
+	if UnitCanAttack and SafeCall(UnitCanAttack, "player", unit) == false then return lines end
+	local refs = self:Usable(self:ForMob(name), native)
+	if not refs then return lines end
 	local partyDone = {}
 	for _, ref in ipairs(refs) do
 		local d = self:Describe(ref)
 		if cfg.units and not native then
-			table.insert(lines, { d.title, 1, 0.82, 0 })
+			table.insert(lines, { Inline(ref.kind == "kill" and ns.ICON_KILL or ns.ICON_LOOT) .. d.title, 1, 0.82, 0 })
 			if d.text then
 				table.insert(lines, { " - " .. d.text .. (ref.kind == "drop" and "  (drops here)" or ""), 1, 1, 1 })
 			elseif ref.kind == "drop" then

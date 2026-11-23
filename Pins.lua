@@ -9,7 +9,7 @@ ns.Pins = P
 local sqrt, cos, sin, min = math.sqrt, math.cos, math.sin, math.min
 
 local ATLAS = {
-	giver = "QuestNormal", turnin = "QuestTurnin", objective = "questlog-questtypeicon-quest",
+	giver = "QuestNormal", turnin = "QuestTurnin", objective = ns.ICON_DO,
 	waypoint = "Waypoint-MapPin-Untracked", active = "Waypoint-MapPin-Tracked",
 	note = "minimap-genericevent-hornicon", rare = "VignetteKill",
 }
@@ -72,7 +72,7 @@ local function LevelTag(o)
 end
 
 local function StepAtlas(step)
-	return ns.Guide.ICONS[step.kind] or ATLAS.waypoint
+	return step.icon or ns.Guide.ICONS[step.kind] or ATLAS.waypoint
 end
 
 local function Inside(x, y)
@@ -117,6 +117,7 @@ function P:MinimapPoints()
 		for _, e in ipairs(ns.Quests.log) do
 			if e.pos and not e.pos.waypoint then
 				table.insert(pts, { kind = e.complete and "turnin" or "objective", m = e.pos.m, x = e.pos.x, y = e.pos.y,
+					atlas = (not e.complete) and ns.ObjectiveIcon(e) or nil,
 					questID = e.questID, key = (e.complete and "turnin:" or "objective:") .. e.questID,
 					title = (e.complete and "Turn in: " or "") .. e.title, sub = (not e.complete) and e.objective or nil })
 			end
@@ -277,7 +278,7 @@ function P:UpdateMinimap()
 					pin.Dot:Hide()
 					pin.Ring:Hide()
 					pin.icon:Show()
-					pin.icon:SetAtlas(pt.atlas or ATLAS[pt.kind] or ATLAS.waypoint, false)
+					ns.SetIcon(pin.icon, pt.atlas or ATLAS[pt.kind] or ATLAS.waypoint)
 					local size = ((pt.kind == "active") and 16 or 13) * scale
 					pin:SetSize(size, size)
 				end
@@ -301,6 +302,17 @@ NeverQuestMapPinMixin = {}
 NeverQuestSpawnPinMixin = {}
 local PinMethods, SpawnPinMethods = {}, {}
 
+-- The line under a known quest's marker that says where its place came from, or nil when
+-- that is switched off.
+function P.SourceLine(info)
+	if not (info and info.known and ns.db.pins.sources) then return nil end
+	return info.src == "questie" and "From QuestieDB's data (GPLv3). Not yet seen in game by NeverQuest."
+		or info.src == "lookup" and "Looked up on the Warcraft Wiki. Not yet seen in game by NeverQuest."
+		or info.src == "library" and "From the bundled LibQuestDB library."
+		or info.src == "shipped" and "From the quest data NeverQuest ships."
+		or "Your own quest database, learned while playing."
+end
+
 function PinMethods:OnLoad()
 	self:SetScalingLimits(1, 1.0, 1.25)
 end
@@ -317,7 +329,7 @@ end
 function PinMethods:OnAcquired(info)
 	self.info = info
 	self:UseFrameLevelType(info.frameLevel or "PIN_FRAME_LEVEL_WAYPOINT_LOCATION")
-	self.Icon:SetAtlas(info.atlas, false)
+	ns.SetIcon(self.Icon, info.atlas)
 	local size = (info.size or 22) * (ns.db.pins.wmScale or 1)
 	self:SetSize(size, size)
 	self.Icon:SetSize(size, size)
@@ -340,8 +352,10 @@ function PinMethods:OnMouseEnter()
 	GameTooltip:AddLine(info.title or "", 1, 0.82, 0, true)
 	if info.sub and info.sub ~= "" then GameTooltip:AddLine(info.sub, 1, 1, 1, true) end
 	if info.known then
-		GameTooltip:AddLine(info.src == "shipped" and "From the quest data NeverQuest ships."
-			or "Your own quest database, learned while playing.", 0.6, 0.6, 0.6)
+		-- Where the place came from is off by default (while the sources are being tested);
+		-- /nq db sources turns it back on.
+		local line = P.SourceLine(info)
+		if line then GameTooltip:AddLine(line, 0.6, 0.6, 0.6) end
 		GameTooltip:AddLine("Click: set a waypoint.", 0.5, 0.8, 1)
 	elseif info.user then
 		GameTooltip:AddLine("Click: make active.  Shift+click: remove.", 0.5, 0.8, 1)
