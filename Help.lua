@@ -230,14 +230,15 @@ Help.TOPICS = {
 		"",
 		Y .. "Where the data comes from" .. E,
 		"NeverQuest's own data, and your own client always wins: what you have seen, what your other characters have seen, what your party and guild pass on, and the quest starts built into the addon, gathered the same way by NeverQuest's own scan. If one of them is wrong, the first time you walk past the real giver your own client corrects it, for good.",
-		"Then the bundled database fills in what NeverQuest hasn't seen yet: LibQuestDB, QuestieDB's WoW Forever data and places looked up on the Warcraft Wiki. None of it is ever saved, exported or shared as NeverQuest's own.",
+		"Then QuestieDB fills in what NeverQuest hasn't seen yet. QuestieDB is the quest database the Questie team builds and keeps up to date. It's an addon of its own, installed with NeverQuest (the CurseForge app does that for you), and NeverQuest reads it without copying it: nothing from it is ever saved, exported or shared as NeverQuest's own. Thanks to the Questie team for it.",
+		"A QuestieDB quest only gets a marker when this character can take it now or on level alone: not another race's or class's, not a profession quest without the profession and skill, not a part of a quest you aren't on, and not one behind an earlier quest you haven't done.",
 		"",
-		Y .. "Bundled database, or build your own" .. E,
-		"With the bundled database (the default) the map is full from your first login. " .. Y .. "Build my own" .. E .. " leaves it out and goes by NeverQuest's own data only, so the map starts emptier and fills in as you play. The setup wizard asks; " .. Y .. "/nq db bundled on" .. E .. " or " .. Y .. "off" .. E .. " and the Options switch change it any time.",
+		Y .. "QuestieDB, or build your own" .. E,
+		"With QuestieDB (the default) the map is full from your first login, and each QuestieDB update reaches you through the CurseForge app. " .. Y .. "Build my own" .. E .. " leaves QuestieDB alone, even when it's installed, and goes by NeverQuest's own data only, so the map starts emptier and fills in as you play. The setup wizard asks; " .. Y .. "/nq db bundled on" .. E .. " or " .. Y .. "off" .. E .. " and the Options switch change it any time. " .. Y .. "/nq lib" .. E .. " says whether QuestieDB is in use.",
 		"",
-		Y .. "When the bundled data is wrong" .. E,
-		"NeverQuest notices and writes it down. Stand where the bundled data puts a quest giver, and if the game, asked again, doesn't offer you that quest, the place is dropped for characters of your race and class (some quests are for certain races or classes only). Take a quest or hand it in well away from where the bundled data said, and a note keeps where it really was. " .. Y .. "Ctrl+click" .. E .. " a known quest on the world map to say it isn't there yourself; that hides it for all your characters.",
-		"If the game later offers you the quest, the note settles itself. " .. Y .. "/nq db fixes" .. E .. " lists the notes, and they go out with " .. Y .. "/nq db export" .. E .. " (places only) so the data can be put right in the addon for everyone.",
+		Y .. "When QuestieDB's data is wrong" .. E,
+		"NeverQuest notices and writes it down. Stand where QuestieDB puts a quest giver, and if the game, asked again, doesn't offer you that quest, the place is dropped for characters of your race and class (some quests are for certain races or classes only). Take a quest or hand it in well away from where QuestieDB said, and a note keeps where it really was. " .. Y .. "Ctrl+click" .. E .. " a known quest on the world map to say it isn't there yourself; that hides it for all your characters. QuestieDB itself is never changed.",
+		"If the game later offers you the quest, the note settles itself. " .. Y .. "/nq db fixes" .. E .. " lists the notes, and they go out with " .. Y .. "/nq db export" .. E .. " (places only) so they can be reported to the Questie team.",
 		"",
 		Y .. "Building it from other players" .. E,
 		"Quest starts pass between NeverQuest users in your party and your guild as they're learned. A guild is the useful one: fifty people at fifty levels across both factions know most of the world between them, and a new character inherits it over a few sessions. " .. Y .. "/nq db ask" .. E .. " asks your guild outright and gets a bounded answer from a few of them.",
@@ -258,8 +259,9 @@ Help.TOPICS = {
 		"  " .. Y .. "/nq db map" .. E .. "  known quest starts on the world map, on or off",
 		"  " .. Y .. "/nq db minimap" .. E .. "  known quest starts on the minimap, on or off",
 		"  " .. Y .. "/nq db sources" .. E .. "  say in each known quest's map tooltip where its place came from (off for now)",
-		"  " .. Y .. "/nq db bundled on|off" .. E .. "  use the bundled database, or build your own",
-		"  " .. Y .. "/nq db fixes" .. E .. "  where the bundled data was wrong; " .. Y .. "undo <id>" .. E .. " brings one back, " .. Y .. "clear" .. E .. " forgets them all",
+		"  " .. Y .. "/nq db bundled on|off" .. E .. "  use QuestieDB, or build your own",
+		"  " .. Y .. "/nq lib" .. E .. "  whether QuestieDB is in use; " .. Y .. "/nq lib <id>" .. E .. " shows what it says about a quest and where that quest stands for this character",
+		"  " .. Y .. "/nq db fixes" .. E .. "  where QuestieDB's data was wrong; " .. Y .. "undo <id>" .. E .. " brings one back, " .. Y .. "clear" .. E .. " forgets them all",
 		"  " .. Y .. "/nq db ready" .. E .. "  whether anything is still running, and how much is known",
 		"",
 		Y .. "On the world map" .. E,
@@ -295,6 +297,25 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.22.2" .. E,
+		"  A Credits page in this window (" .. Y .. "/nq credits" .. E .. ") names QuestieDB and the people who build it. The quest database option and the login line say where the quest data comes from too.",
+		"",
+		Y .. "1.22.1" .. E,
+		"  The new WoW Forever races are read correctly: they were being told that every race-limited quest wasn't for them.",
+		"  A quest that opens after any one of several earlier quests (the same step under another race's or class's number) now opens when you've done one of them. It used to wait for all of them, which never came.",
+		"  Fewer markers for quests you can't take: profession quests only show for characters with that profession and enough skill, battleground quests stop showing once you're past their level bracket, parts of a bigger quest wait until that quest is in your log, and placeholder quests the game never offers are gone.",
+		"  What a quest asks of you (an earlier quest, a profession, your race) now also holds for quests NeverQuest has its own place for, so a quest another of your characters saw no longer shows as open when it isn't yet.",
+		"  Dungeon quests are found by QuestieDB's own dungeon list, which catches the ones filed under a dungeon's other area number: most of Gnomeregan's, Uldaman's and Zul'Farrak's, and the new WoW Forever dungeons.",
+		"  Loading QuestieDB's quests after login is spread out by time, so slower machines don't hitch, and the memory used for it is handed back once the list is built.",
+		"  " .. Y .. "/nq lib <quest id>" .. E .. " now ends with where that quest stands for this character and why. " .. Y .. "/nq questiedb" .. E .. " is another name for " .. Y .. "/nq lib" .. E .. ".",
+		"  The setup wizard's Quest database page says whether QuestieDB is installed. If you had switched the old library off with " .. Y .. "/nq lib off" .. E .. ", you stay on Build my own.",
+		"",
+		Y .. "1.22.0" .. E,
+		"  Quest data now comes from QuestieDB, the quest database the Questie team builds and keeps up to date. It's installed as its own addon next to NeverQuest (the CurseForge app does that for you), so each QuestieDB update reaches you without waiting for a NeverQuest release. Thanks to the Questie team.",
+		"  NeverQuest no longer ships quest data from anywhere else: the LibQuestDB library, the copy of QuestieDB's WoW Forever data and the Warcraft Wiki lookups are gone, and the download is a fraction of the size.",
+		"  " .. Y .. "Build my own" .. E .. " is unchanged and never reads QuestieDB, even when it's installed. Choose it in the setup wizard, under Options > Quest database, or with " .. Y .. "/nq db bundled off" .. E .. ".",
+		"  Without QuestieDB installed, NeverQuest says so once at login and works from what it has learned itself. " .. Y .. "/nq lib" .. E .. " and " .. Y .. "/nq check" .. E .. " show whether it's in use.",
+		"",
 		Y .. "1.21.7" .. E,
 		"  New option: get dungeon quests and their pre-quests first. For each dungeon you tick, the route picks up its quests a couple of levels early, and the quests that have to come before them. They count for a lot more than ordinary quests. Choose dungeons in the setup wizard, in Options (Choose dungeons), or with " .. Y .. "/nq dungeons" .. E .. ".",
 		"  Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone.",
@@ -407,6 +428,21 @@ Help.TOPICS = {
 		"",
 		Y .. "1.11" .. E,
 		"  Setup wizard, this help window, auto loot and junk selling, hand-ins in other zones, a smaller button bar.")
+	end },
+	{ key = "credits", title = "Credits", text = function()
+		-- The names come from QuestieDB's own author line when it is installed, so they stay
+		-- theirs to keep up to date.
+		local who = ns.Library and ns.Library:Authors()
+		return Lines(
+		Y .. "Quest data: QuestieDB" .. E,
+		"Where quests start and end, what has to be done first, and which quests belong to which dungeon come from " .. Y .. "QuestieDB" .. E .. ", the quest database built and curated by the Questie team over many years. NeverQuest reads it as a separate addon and ships no copy of it.",
+		who and ("QuestieDB's authors, in their own words: " .. who .. ".") or "Code by Logonz; data by Muehe, TheCrux (BreakBB), Drejjmit, Dyaxler, Cheeq, TechnoHunter, Yttrium and everyone else who has contributed to Questie.",
+		"QuestieDB is free software under the GNU General Public License v3: github.com/Questie/QuestieDB",
+		"NeverQuest is not affiliated with or endorsed by Questie. If the quest data helps you, the thanks belong to them.",
+		"",
+		Y .. "NeverQuest" .. E,
+		"By NeverHeal84, free software under the GNU General Public License v3. Source: github.com/neverheal84/NeverQuest",
+		"NeverQuest's own quest starts were gathered in game by NeverQuest and the players who sent theirs in. Thank you to everyone who tests it and reports what's wrong.")
 	end },
 	{ key = "trouble", title = "Troubleshooting", text = function() return Lines(
 		Y .. "Something isn't working" .. E,
@@ -543,4 +579,5 @@ ns:AddSlash("discord", function()
 	ns.Print("Discord: " .. ns.DISCORD)
 end, "/nq discord - the NeverQuest Discord: bug reports, help and suggestions")
 ns:AddSlash("news", function() Help:Open("news") end, "/nq news - what changed in recent versions")
+ns:AddSlash("credits", function() Help:Open("credits") end, "/nq credits - who made the quest data NeverQuest reads, and NeverQuest itself")
 ns:AddSlash("commands", PrintCommands, "/nq commands - list every command in chat")

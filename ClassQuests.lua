@@ -155,6 +155,43 @@ function C:MyProfessions()
 	return mine, found
 end
 
+-- Does this character have a profession, by the game's skill line number, at a given skill?
+-- true, "low" (has it, not enough skill yet), false (doesn't have it), or nil when that can't
+-- be told: the game wouldn't list professions, or listed them by name only in a language
+-- NeverQuest has no names for. Asked for every profession quest on every map draw, so the
+-- list is kept for ten seconds; learning a profession shows up within that.
+local SKILL_NAMES = { [129] = "first aid", [164] = "blacksmithing", [165] = "leatherworking", [171] = "alchemy",
+	[182] = "herbalism", [185] = "cooking", [186] = "mining", [197] = "tailoring", [202] = "engineering",
+	[333] = "enchanting", [356] = "fishing", [393] = "skinning" }
+local skillCache, skillAt = nil, -math.huge
+
+function C:ForgetSkills() skillCache = nil end
+
+function C:HasSkill(line, need)
+	local now = GetTime()
+	if not skillCache or now - skillAt > 10 then
+		local mine, found = self:MyProfessions()
+		local byLine = false
+		for k in pairs(mine) do if type(k) == "number" then byLine = true break end end
+		skillCache, skillAt = { mine = mine, found = found, byLine = byLine }, now
+	end
+	local c = skillCache
+	if not c.found then return nil end
+	local rec = c.mine[line]
+	if not rec then
+		local name = SKILL_NAMES[line]
+		local english = (GetLocale and GetLocale() or "enUS"):sub(1, 2) == "en"
+		rec = name and english and c.mine[name] or nil
+		-- Listed by name only, in a language those names aren't in: no way to tell.
+		if not rec and not c.byLine and not english then return nil end
+		-- A profession NeverQuest has no name for, and no line numbers to go by.
+		if not rec and not c.byLine and not name then return nil end
+	end
+	if not rec then return false end
+	if need and (rec.skill or 0) < need then return "low" end
+	return true
+end
+
 local function ProfTicked() return ns.char.profQuests end
 
 function C:ToggleProf(key)

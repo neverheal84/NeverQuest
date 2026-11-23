@@ -1,84 +1,191 @@
--- NeverQuest Library: reading the LibQuestDB quest library.
+-- NeverQuest Library: reading QuestieDB.
 --
 -- NeverQuest's own database holds only what NeverQuest clients have seen in the game, which
--- is a small list to begin with. LibQuestDB (by Pimptasty, MIT licence) is a full quest
--- database, and a copy of it ships inside NeverQuest in Libs\QuestDB, unchanged, with its
--- licence. NeverQuest asks it where quests start and end and uses the answers to fill the map.
--- A newer copy installed as its own addon is used in place of the bundled one.
+-- is a small list to begin with. QuestieDB is the quest database built and curated by the
+-- Questie team (GPLv3, https://github.com/Questie/QuestieDB). It is its own addon, installed
+-- next to NeverQuest (the CurseForge app does this automatically, because NeverQuest lists it
+-- as a required dependency) and kept up to date by them. NeverQuest reads it through its
+-- public API, LibQuestieDB, and ships no copy of its data.
 --
 -- The rules this file keeps:
---   * The two are kept apart. Nothing from the library is written into NeverQuest's own
+--   * The two are kept apart. Nothing from QuestieDB is written into NeverQuest's own
 --     database, saved variables, exports, or messages to the party or guild. NeverQuest's
---     data stays NeverQuest's, and the library's stays the library's.
---   * Anything a NeverQuest client has seen for itself always wins over the library.
---   * With the library switched off (/nq lib off) everything works exactly as before.
+--     data stays NeverQuest's, and QuestieDB's stays QuestieDB's.
+--   * Anything a NeverQuest client has seen for itself always wins over QuestieDB.
+--   * With "Build my own" chosen (/nq db bundled off), or QuestieDB not installed, NeverQuest
+--     never reads QuestieDB at all and works from its own data alone.
 --
--- The library is used through its published functions only. Its answers are treated like any
--- other outside data: checked, and never trusted to have a particular shape.
+-- QuestieDB's answers are treated like any other outside data: checked, and never trusted to
+-- have a particular shape.
 
 local ADDON, ns = ...
 local L = {}
 ns.Library = L
 
-local NAME = "LibQuestDB-1.0"
+local CONTRACT = 4       -- the QuestieDB API contract this file was written against
 local MAX_SPOTS = 6      -- places kept per NPC; a patrol or a rare has many
 
-local lib, looked
+-- What NeverQuest asks QuestieDB about each quest, in one read.
+local QKEYS = { "name", "startedBy", "finishedBy", "requiredLevel", "questLevel", "requiredRaces",
+	"requiredClasses", "preQuestGroup", "preQuestSingle", "exclusiveTo", "zoneOrSort",
+	"nextQuestInChain", "specialFlags", "breadcrumbForQuestId", "requiredSkill", "requiredMaxLevel",
+	"parentQuest" }
+
+local lib, looked, refused
 local areaMap, ends = {}, {}
 local layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 local nextCache = {}
 local ancestors = {}
+local zoneTable, dungeonOf
 
 function L:Reset()
 	ancestors = {}
-	lib, looked = nil, nil
+	lib, looked, refused = nil, nil, nil
 	areaMap, ends = {}, {}
 	layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 	nextCache = {}
+	zoneTable, dungeonOf = nil, nil
 end
 
--- The library, or nil when it is not installed, not ready, or switched off.
-function L:Get()
-	local cfg = ns.db and ns.db.questdb
-	if cfg and (cfg.library == false or cfg.bundled == false) then return nil end
+-- QuestieDB's API when it is installed and this version of NeverQuest can read it, whatever
+-- the "Quest data" setting says. Looked for once.
+local function Find()
 	if not looked then
 		looked = true
-		local stub = _G.LibStub
-		if stub then
-			local ok, found = pcall(stub, NAME, true)
-			if ok and type(found) == "table" and type(found.GetQuest) == "function" then lib = found end
+		local q = rawget(_G, "LibQuestieDB")
+		if type(q) == "table" and type(q.Quest) == "table" and type(q.Npc) == "table" then
+			local ok, fine = true, true
+			if type(q.RequireContract) == "function" then
+				ok, fine = pcall(q.RequireContract, CONTRACT)
+				-- An older QuestieDB still has every field NeverQuest reads (they are all in the
+				-- first contract), so it is used rather than turned away.
+				if not (ok and fine) and (ns.Num(q.contractVersion) or 0) < CONTRACT then
+					ok, fine = pcall(q.RequireContract, 1)
+				end
+			end
+			if ok and fine then lib = q else refused = true end
 		end
-	end
-	if not lib then return nil end
-	if type(lib.IsReady) == "function" then
-		local ok, ready = pcall(lib.IsReady, lib)
-		if not ok or ready == false then return nil end
 	end
 	return lib
 end
 
-function L:Present() return self:Get() ~= nil end
-
-local function Call(name, ...)
-	local l = L:Get()
-	local fn = l and l[name]
-	if type(fn) ~= "function" then return nil end
-	local ok, res = pcall(fn, l, ...)
-	if ok and not ns.IsSecret(res) then return res end
+-- The QuestieDB API, or nil when it is not installed, too old or too new for this version of
+-- NeverQuest, or not wanted ("Build my own").
+function L:Get()
+	local cfg = ns.db and ns.db.questdb
+	if cfg and cfg.bundled == false then return nil end
+	return Find()
 end
 
--- The library names zones by the game's area numbers; NeverQuest uses map numbers. The game
--- gives an area's name, and the name finds the map. An area with no map of its own (a cave, a
--- subzone) is left out rather than guessed at.
+function L:Present() return self:Get() ~= nil end
+
+-- Is QuestieDB installed at all, whatever the setting says?
+function L:Installed() return type(rawget(_G, "LibQuestieDB")) == "table" end
+
+-- One field of one quest, NPC or object. QuestieDB's getters are plain functions: Get(id, key).
+local function Field(kind, id, key)
+	local l = L:Get()
+	local entity = l and l[kind]
+	local fn = type(entity) == "table" and entity.Get
+	if type(fn) ~= "function" then return nil end
+	local ok, v = pcall(fn, id, key)
+	if ok and not ns.IsSecret(v) then return v end
+end
+
+-- Everything NeverQuest uses about a quest, by field name, or nil for a quest QuestieDB
+-- doesn't have.
+local function Quest(qid)
+	local l = L:Get()
+	local QD = l and l.Quest
+	if type(QD) ~= "table" or type(QD.GetAll) ~= "function" then return nil end
+	local ok, row = pcall(QD.GetAll, qid, QKEYS)
+	if not ok or type(row) ~= "table" then return nil end
+	local q = {}
+	for i, key in ipairs(QKEYS) do q[key] = row[i] end
+	return q
+end
+L.Quest = Quest
+
+-- QuestieDB's own table from the game's area numbers to its map numbers, with its overrides
+-- laid on top. It ships as Lua source text, which is how QuestieDB hands it to consumers.
+local function ZoneTable()
+	if zoneTable ~= nil then return zoneTable or nil end
+	zoneTable = false
+	local l = L:Get()
+	local support = l and l.Support
+	if type(support) ~= "table" or type(support.Get) ~= "function" then return nil end
+	local ok, zdb = pcall(support.Get, "ZoneDB")
+	local private = ok and type(zdb) == "table" and zdb.private
+	if type(private) ~= "table" then return nil end
+	local function Read(v)
+		if type(v) == "string" and loadstring then
+			local f = loadstring(v)
+			local fine, t = false, nil
+			if f then fine, t = pcall(f) end
+			v = fine and t or nil
+		end
+		return type(v) == "table" and v or nil
+	end
+	local t = { map = {}, parent = {} }
+	for _, key in ipairs({ "areaIdToUiMapId", "areaIdToUiMapIdOverride" }) do
+		for a, m in pairs(Read(private[key]) or {}) do t.map[a] = m end
+	end
+	for _, key in ipairs({ "subZoneToParentZone", "subZoneToParentZoneOverride" }) do
+		for a, p in pairs(Read(private[key]) or {}) do t.parent[a] = p end
+	end
+	zoneTable = t
+	return t
+end
+
+-- The dungeon an area number belongs to, by QuestieDB's own list: each dungeon's number, the
+-- other numbers its quests are filed under (most Gnomeregan and Uldaman quests sit under one of
+-- those), and the dungeons that are new in WoW Forever. Nil for anything else.
+function L:DungeonName(areaID)
+	areaID = ns.Num(areaID)
+	if not areaID or not self:Get() then return nil end
+	if not dungeonOf then
+		dungeonOf = {}
+		local support = lib.Support
+		local ok, zdb = pcall(function() return support.Get("ZoneDB") end)
+		local list = ok and type(zdb) == "table" and type(zdb.private) == "table" and zdb.private.dungeons
+		for id, d in pairs(type(list) == "table" and list or {}) do
+			local name = type(d) == "table" and d[1]
+			if ns.Num(id) and type(name) == "string" and name ~= "" then
+				dungeonOf[id] = name
+				for _, other in ipairs(type(d[2]) == "table" and d[2] or {}) do
+					if ns.Num(other) and dungeonOf[other] == nil then dungeonOf[other] = name end
+				end
+			end
+		end
+	end
+	return dungeonOf[areaID]
+end
+
+local function RealMap(m)
+	m = ns.Num(m)
+	return m and m > 0 and C_Map and ns.SafeCall(C_Map.GetMapInfo, m) ~= nil and m or nil
+end
+
+-- QuestieDB names zones by the game's area numbers; NeverQuest uses map numbers. QuestieDB's
+-- own table answers first, then the area's parent zone, then the game: it gives an area's name,
+-- and the name finds the map. An area with no map of its own is left out rather than guessed at.
 function L:AreaMap(areaID)
 	areaID = ns.Num(areaID)
 	if not areaID then return nil end
 	local m = areaMap[areaID]
 	if m == nil then
 		m = false
-		-- The library's own answer first; it is built from this client's tables.
-		local own = ns.Num(Call("GetUiMapId", areaID))
-		if own and own > 0 and ns.SafeCall(C_Map.GetMapInfo, own) ~= nil then m = own end
+		local zt = ZoneTable()
+		if zt then
+			local own = zt.map[areaID]
+			if own == 0 then
+				areaMap[areaID] = false   -- QuestieDB says this area is not shown on a map
+				return nil
+			end
+			m = RealMap(own) or false
+			local parent = not m and ns.Num(zt.parent[areaID])
+			if parent then m = RealMap(zt.map[parent]) or false end
+		end
 		local name = not m and C_Map and C_Map.GetAreaInfo and ns.SafeCall(C_Map.GetAreaInfo, areaID)
 		if type(name) == "string" and name ~= "" and not ns.IsSecret(name) then
 			local id = ns.Nav.FindZone(name)
@@ -90,80 +197,69 @@ function L:AreaMap(areaID)
 	return m or nil
 end
 
--- NPC numbers out of whatever shape "startedBy" or "finishedBy" turns out to have: a number,
--- a list of numbers, a list of { id = , type = }, a table keyed npc / npcs / creature, or a
--- list of lists whose first is the NPCs.
-local function NpcIDs(v, out, depth)
-	out, depth = out or {}, depth or 0
-	if type(v) == "number" then
-		if v > 0 then out[#out + 1] = v end
-	elseif type(v) == "table" and depth < 3 then
-		local keyed = v.npc or v.npcs or v.creature or v.creatures or v.NPC
-		if keyed ~= nil then
-			NpcIDs(keyed, out, depth + 1)
-		elseif v.id ~= nil then
-			local kind = v.type or v.kind
-			if kind == nil or kind == "npc" or kind == "creature" then NpcIDs(v.id, out, depth + 1) end
-		elseif type(v[1]) == "table" and v[1].id == nil then
-			NpcIDs(v[1], out, depth + 1)
-		else
-			for i = 1, math.min(#v, 8) do NpcIDs(v[i], out, depth + 1) end
+-- The ids in one part of "startedBy" or "finishedBy": QuestieDB lists NPCs first, then
+-- objects, then items, each a list of numbers.
+local function Ids(v, out)
+	out = out or {}
+	if type(v) == "table" then
+		for i = 1, math.min(#v, 8) do
+			local id = ns.Num(v[i])
+			if id and id > 0 then out[#out + 1] = id end
 		end
 	end
 	return out
 end
-L.NpcIDs = NpcIDs
+L.Ids = Ids
 
-local function Places(npcID, name, out, object)
-	local spawns = Call(object and "GetObjectSpawns" or "GetNPCSpawns", npcID)
+local function Places(id, name, out, object)
+	local spawns = Field(object and "Object" or "Npc", id, "spawns")
 	if type(spawns) ~= "table" then return end
 	for areaID, list in pairs(spawns) do
 		local m = L:AreaMap(areaID)
 		if m and type(list) == "table" then
 			for i = 1, math.min(#list, MAX_SPOTS) do
 				local s = list[i]
-				local x, y = type(s) == "table" and ns.Num(s[1] or s.x), type(s) == "table" and ns.Num(s[2] or s.y)
+				local x, y = type(s) == "table" and ns.Num(s[1]), type(s) == "table" and ns.Num(s[2])
 				if x and y and x > 0 and y > 0 and x <= 100 and y <= 100 then
-					out[#out + 1] = { m = m, x = x / 100, y = y / 100, name = name, npcID = (not object) and npcID or nil,
-						objectID = object and npcID or nil, side = out.side }
+					out[#out + 1] = { m = m, x = x / 100, y = y / 100, name = name, npcID = (not object) and id or nil,
+						objectID = object and id or nil, side = out.side }
 				end
 			end
 		end
 	end
 end
 
+local function Name(kind, id)
+	local name = Field(kind, id, "name")
+	return type(name) == "string" and name ~= "" and name or nil
+end
+
 -- { start = { spots }, finish = { spots } } for a quest, each spot { m, x, y, name, npcID }.
--- False when the library has nothing; remembered for the session either way.
+-- False when QuestieDB has nothing; remembered for the session either way.
 function L:Ends(questID)
 	questID = ns.Num(questID)
 	if not questID or not self:Get() then return nil end
 	local known = ends[questID]
 	if known ~= nil then return known or nil end
 	local res = false
-	local q = Call("GetQuest", questID)
-	if type(q) == "table" then
+	local q = Quest(questID)
+	if q then
 		res = { start = {}, finish = {} }
 		for field, key in pairs({ startedBy = "start", finishedBy = "finish" }) do
-			for _, npcID in ipairs(NpcIDs(q[field])) do
-				local npc = Call("GetNPC", npcID)
-				local name = type(npc) == "table" and type(npc.name) == "string" and not ns.IsSecret(npc.name) and npc.name or nil
+			local by = type(q[field]) == "table" and q[field] or {}
+			for _, npcID in ipairs(Ids(by[1])) do
+				local name = Name("Npc", npcID)
 				if name and not res[key].name then res[key].name = name end
 				-- Which side this NPC will talk to: "A", "H", "AH" or unknown.
-				local side = type(npc) == "table" and type(npc.friendlyToFaction) == "string" and npc.friendlyToFaction or nil
-				if side and not res[key].side then res[key].side = side end
+				local side = Field("Npc", npcID, "friendlyToFaction")
+				if type(side) == "string" and side ~= "" and not res[key].side then res[key].side = side end
 				Places(npcID, name, res[key])
 			end
 			-- A quest can start or end at a thing in the world: a wanted poster, a crate.
-			local objects = type(q[field]) == "table" and q[field].objects
-			if type(objects) == "table" then
-				for i = 1, math.min(#objects, 8) do
-					local id = ns.Num(objects[i])
-					if id and id > 0 then
-						local obj = Call("GetObject", id)
-						local name = type(obj) == "table" and type(obj.name) == "string" and not ns.IsSecret(obj.name) and obj.name or nil
-						Places(id, name, res[key], true)
-					end
-				end
+			for _, objectID in ipairs(Ids(by[2])) do
+				local name = Name("Object", objectID)
+				if name and not res[key].name then res[key].name = name end
+				Places(objectID, name, res[key], true)
 			end
 		end
 		if #res.start == 0 and #res.finish == 0 and not res.start.name and not res.finish.name then res = false end
@@ -205,32 +301,71 @@ function L:FinishName(questID)
 end
 
 ---------------------------------------------------------------------------
--- The layer: every quest the library can put on a map, ready to be listed
+-- The layer: every quest QuestieDB can put on a map, ready to be listed
 --
--- Asking the library about four thousand quests takes a moment, so it is done a few hundred
--- at a time after you log in, and the map fills in over the first second or two. An entry has
--- the same fields as one of NeverQuest's own (QuestDB.lua), marked lib, plus:
+-- Asking about six thousand quests takes a moment, so it is done a few hundred at a time after
+-- you log in, and the map fills in over the first second or two. An entry has the same fields
+-- as one of NeverQuest's own (QuestDB.lua), marked lib, plus:
 --   rl   the level you must be to take it      pre  quests that must be done first
 --   bar  "faction" or "other" when this character can never take it
 ---------------------------------------------------------------------------
-local WARM_BATCH = 150
+local WARM_BATCH = 150   -- quests per step at most
+local WARM_BUDGET = 6    -- milliseconds per step at most, so a slow machine never hitches
 local WARM_GAP = 0.05
+local WARM_GAP_CUT = 0.03  -- after a step that ran out of time, so a slow machine still finishes soon
 
 local function HasBit(mask, n)
 	return n and n >= 1 and math.floor(mask / 2 ^ (n - 1)) % 2 == 1
 end
 
+-- This character's bit in QuestieDB's race masks. QuestieDB's own table says which: the races
+-- that are new in WoW Forever have numbers far above the bit they use. Without the table, the
+-- classic rule (race n is bit n) is right for the classic races and nothing is assumed for others.
+local function RaceBit()
+	local raceID = ns.Num(select(3, UnitRace("player")))
+	if not raceID then return nil end
+	local l = L:Get()
+	local byId = l and type(l.Enum) == "table" and l.Enum.raceMaskById
+	if type(byId) == "table" then return ns.Num(byId[raceID]) end
+	return raceID <= 30 and 2 ^ (raceID - 1) or nil
+end
+
 local function Barred(q)
 	local races, classes = ns.Num(q.requiredRaces) or 0, ns.Num(q.requiredClasses) or 0
 	if races > 0 then
-		local raceID = select(3, UnitRace("player"))
-		if ns.Num(raceID) and not HasBit(races, raceID) then return "faction" end
+		local bit = RaceBit()
+		if bit and bit > 0 and math.floor(races / bit) % 2 == 0 then return "faction" end
 	end
 	if classes > 0 then
 		local classID = select(3, UnitClass("player"))
 		if ns.Num(classID) and not HasBit(classes, classID) then return "other" end
 	end
 	return nil
+end
+
+local function IdList(list, limit)
+	local out
+	if type(list) == "table" then
+		for i = 1, math.min(#list, limit or 6) do
+			local id = ns.Num(list[i])
+			if id and id > 0 then out = out or {} out[#out + 1] = id end
+		end
+	end
+	return out
+end
+
+-- What has to be done first. QuestieDB keeps two lists and they mean different things:
+-- preQuestGroup is quests that must ALL be done, preQuestSingle is quests of which ANY ONE will
+-- do (the same step under another number for another race or class, mostly). Returns the
+-- all-of list and the any-of list; a single with one quest in it is simply required.
+local function Pre(q, limit)
+	local all, any = IdList(q.preQuestGroup, limit), IdList(q.preQuestSingle, limit)
+	if any and #any == 1 then
+		all = all or {}
+		all[#all + 1] = any[1]
+		any = nil
+	end
+	return all, any
 end
 
 -- Every quest that has to be done before this one, all the way back its chain. Cached in
@@ -245,15 +380,12 @@ local function Ancestors(qid)
 		depth = depth + 1
 		local nextQueue = {}
 		for _, id in ipairs(queue) do
-			local q = Call("GetQuest", id)
-			if type(q) == "table" then
-				for _, field in ipairs({ "preQuestSingle", "preQuestGroup" }) do
-					for _, p in ipairs(type(q[field]) == "table" and q[field] or {}) do
-						p = ns.Num(p)
-						if p and p > 0 and not known[p] and p ~= qid then
-							known[p] = true
-							nextQueue[#nextQueue + 1] = p
-						end
+			local single, group = Field("Quest", id, "preQuestSingle"), Field("Quest", id, "preQuestGroup")
+			for _, list in ipairs({ IdList(single, 12) or {}, IdList(group, 12) or {} }) do
+				for _, p in ipairs(list) do
+					if not known[p] and p ~= qid then
+						known[p] = true
+						nextQueue[#nextQueue + 1] = p
 					end
 				end
 			end
@@ -264,26 +396,19 @@ local function Ancestors(qid)
 end
 
 local function Entry(qid)
-	local q = Call("GetQuest", qid)
-	if type(q) ~= "table" or q.hidden then return nil end
+	local q = Quest(qid)
+	if not q then return nil end
 	local title = q.name
 	if type(title) ~= "string" or title == "" or ns.IsSecret(title) then return nil end
+	-- Placeholders left in the game's data, never offered to anyone: "<NYI> ...", "REUSE ME".
+	if title:find("^%s*<") or title:upper():find("^REUSE ?ME") then return nil end
 	local e = L:Ends(qid)
-	-- No place to stand is still worth having: the quests that are new in WoW Forever come
-	-- with a name and a level and nothing else, and that is enough to search and to plan by.
+	-- No place to stand is still worth having: a quest with a name and a level is enough to
+	-- search and to plan by.
 	local s = e and e.start[1] or {}
 	local level = ns.Num(q.questLevel)
 	local rl = ns.Num(q.requiredLevel)
-	local pre
-	for _, field in ipairs({ "preQuestSingle", "preQuestGroup" }) do
-		local list = q[field]
-		if type(list) == "table" then
-			for i = 1, math.min(#list, 6) do
-				local id = ns.Num(list[i])
-				if id and id > 0 then pre = pre or {} pre[#pre + 1] = id end
-			end
-		end
-	end
+	local pre, any = Pre(q)
 	-- Quests that close this one: taking either shuts the other, and an optional lead-in is
 	-- pointless once the quest it leads to is taken or done.
 	local shut
@@ -302,16 +427,13 @@ local function Entry(qid)
 	-- The Defias Brotherhood has the same title and giver.
 	local twins
 	if s.npcID then
-		local also = Call("GetQuestsStartedByNPC", s.npcID)
+		local also = Field("Npc", s.npcID, "questStarts")
 		if type(also) == "table" then
 			for i = 1, math.min(#also, 60) do
 				local other = ns.Num(also[i])
-				if other and other ~= qid then
-					local h = Call("GetQuestHeader", other)
-					if type(h) == "table" and h.name == title
-						and not Ancestors(qid)[other] and not Ancestors(other)[qid] then
-						twins = twins or {} twins[#twins + 1] = other
-					end
+				if other and other ~= qid and Name("Quest", other) == title
+					and not Ancestors(qid)[other] and not Ancestors(other)[qid] then
+					twins = twins or {} twins[#twins + 1] = other
 				end
 			end
 		end
@@ -320,29 +442,38 @@ local function Entry(qid)
 	-- zs: the zone (an area number) or category the quest is filed under. Dungeons.lua uses it
 	-- to tell which quests are done inside a dungeon.
 	local zs = ns.Num(q.zoneOrSort)
+	-- skill: a profession and the skill in it the quest asks for.  xl: the last level it is
+	-- offered at.  parent: the quest this one is a part of, only offered while that one is in
+	-- your log. QuestDB.lua's Status holds these up against the character as it is now.
+	local skill = type(q.requiredSkill) == "table" and ns.Num(q.requiredSkill[1]) and q.requiredSkill[1] > 0
+		and { q.requiredSkill[1], ns.Num(q.requiredSkill[2]) or 1 } or nil
+	local xl, parent = ns.Num(q.requiredMaxLevel), ns.Num(q.parentQuest)
 	return { t = title, l = (level and level > 0) and level or nil, rl = (rl and rl > 0) and rl or nil,
-		m = s.m, x = s.x, y = s.y, f = e and e.start.side, pre = pre, bar = Barred(q), lib = true,
-		shut = shut, twins = twins, again = (special % 2 == 1) or nil, zs = (zs and zs > 0) and zs or nil }
+		m = s.m, x = s.x, y = s.y, f = e and e.start.side, pre = pre, any = any, bar = Barred(q), lib = true,
+		shut = shut, twins = twins, again = (special % 2 == 1) or nil, zs = (zs and zs > 0) and zs or nil,
+		skill = skill, xl = (xl and xl > 0) and xl or nil, parent = (parent and parent > 0 and parent ~= qid) and parent or nil }
 end
 
--- The quest the library says comes next in this one's chain, or nil.
+-- The quest QuestieDB says comes next in this one's chain, or nil.
 function L:NextInChain(questID)
 	questID = ns.Num(questID)
 	if not questID or not self:Get() then return nil end
 	local known = nextCache[questID]
 	if known == nil then
-		local q = Call("GetQuest", questID)
-		known = type(q) == "table" and ns.Num(q.nextQuestInChain) or false
+		known = ns.Num(Field("Quest", questID, "nextQuestInChain")) or false
 		if known and known <= 0 then known = false end
 		nextCache[questID] = known
 	end
 	return known or nil
 end
 
--- Every quest number the library has a row for, ascending.
+-- Every quest number QuestieDB has a row for, ascending.
 function L:QuestIds()
-	local ids = Call("GetQuestIds")
-	return type(ids) == "table" and ids or nil
+	local l = self:Get()
+	local QD = l and l.Quest
+	if type(QD) ~= "table" or type(QD.GetAllIds) ~= "function" then return nil end
+	local ok, ids = pcall(QD.GetAllIds)
+	return ok and type(ids) == "table" and ids or nil
 end
 
 function L:Layer() return layer end
@@ -352,18 +483,23 @@ function L:Warming() return warming ~= nil end
 -- Builds the layer in the background. Safe to call again; it only ever runs once at a time.
 function L:Warm(done)
 	if warming or not self:Get() then return false end
-	local ids = Call("GetQuestIds")
-	if type(ids) ~= "table" then return false end
+	local ids = self:QuestIds()
+	if not ids then return false end
 	layer, layerCount, nameOnly = {}, 0, 0
 	local run = { i = 1 }
 	warming = run
 	local function step()
 		if warming ~= run then return end
 		if InCombatLockdown() then ns.After(2, step) return end
-		for _ = 1, WARM_BATCH do
+		local began = debugprofilestop and debugprofilestop()
+		local cut
+		for n = 1, WARM_BATCH do
+			-- Out of time for this frame: carry on a moment later.
+			if began and n > 10 and debugprofilestop() - began > WARM_BUDGET then cut = true break end
 			local qid = ns.Num(ids[run.i])
 			if not qid then
 				warming = nil
+				L:ReleaseCache()
 				if ns.QuestDB then ns.QuestDB:ClearNearby() end
 				ns:SendMessage("QUESTDB_UPDATED")
 				ns:SendMessage("MAP_OFFERS_UPDATED")
@@ -377,14 +513,36 @@ function L:Warm(done)
 				if e.m then layerCount = layerCount + 1 else nameOnly = nameOnly + 1 end
 			end
 		end
-		ns.After(WARM_GAP, step)
+		ns.After(cut and WARM_GAP_CUT or WARM_GAP, step)
 	end
 	step()
 	return true
 end
 
+local told
+-- Reading every quest leaves QuestieDB holding a decoded copy of each row. NeverQuest keeps what
+-- it needs in its own layer, so once that is built the copies are handed back (QuestieDB's own
+-- InvalidateCache; it only means the next read decodes again). Left alone when Questie itself
+-- is running, since those copies are then Questie's to use.
+function L:ReleaseCache()
+	local l = self:Get()
+	local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+	if not l or type(l.InvalidateCache) ~= "function" or (loaded and ns.SafeCall(loaded, "Questie")) then return false end
+	return pcall(l.InvalidateCache) and true or false
+end
+
 ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
 	if layerCount == 0 and not warming then ns.After(3, function() L:Warm() end) end
+	-- Set to use QuestieDB but it isn't there (a manual install without it): say so once a
+	-- session, so an emptier map has an explanation.
+	if not told and ns.db and ns.db.questdb.bundled ~= false and not L:Get() then
+		told = true
+		ns.After(6, function()
+			if L:Get() then return end
+			ns.Print(refused and "QuestieDB is installed but this version of NeverQuest can't read it. Update both through the CurseForge app; until then the map shows what NeverQuest has learned itself."
+				or "QuestieDB isn't installed, so the map only shows what NeverQuest has learned itself. The CurseForge app installs it with NeverQuest. To build your own database instead, choose Build my own under Options > Quest database.")
+		end)
+	end
 end)
 
 ---------------------------------------------------------------------------
@@ -405,22 +563,54 @@ local function Show(v, depth)
 	return "{" .. table.concat(parts, ", ") .. "}"
 end
 
+function L:Version()
+	local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+	local v = get and ns.SafeCall(get, "QuestieDB", "Version")
+	return type(v) == "string" and v ~= "" and v or nil
+end
+
+-- QuestieDB's own author line, from its TOC, or nil when it isn't installed.
+function L:Authors()
+	if not self:Installed() then return nil end
+	local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+	local who = get and ns.SafeCall(get, "QuestieDB", "Author")
+	return type(who) == "string" and who ~= "" and not ns.IsSecret(who) and who or nil
+end
+
+-- One coloured line on whether QuestieDB is there to be used, whatever the setting says: for
+-- the setup wizard, where the choice is made.
+function L:Short()
+	if not self:Installed() then
+		return "|cffff9933QuestieDB isn't installed right now, so NeverQuest works from its own data either way. The CurseForge app installs it with NeverQuest.|r"
+	end
+	if not Find() then
+		return "|cffff9933QuestieDB is installed, but this version of NeverQuest can't read it. Update both through the CurseForge app.|r"
+	end
+	local v = self:Version()
+	return "|cff33ff33QuestieDB" .. (v and (" " .. v) or "") .. " is installed.|r"
+end
+
+-- What NeverQuest makes of one quest from QuestieDB, worked out afresh: for /nq lib <id>.
+function L:Entry(questID)
+	questID = ns.Num(questID)
+	return questID and self:Get() and Entry(questID) or nil
+end
+
 function L:StatusLines(questID)
 	local lines = {}
-	local off = ns.db.questdb.library == false
 	local l = self:Get()
 	if ns.db.questdb.bundled == false then
-		lines[#lines + 1] = "quest library: not in use, along with the rest of the bundled quest data. /nq db bundled on uses it again."
-	elseif off then
-		lines[#lines + 1] = "quest library: switched off. /nq lib on uses it again."
+		lines[#lines + 1] = "QuestieDB: not in use. You chose to build your own quest database, so NeverQuest goes by what it has seen itself. /nq db bundled on uses QuestieDB again."
+	elseif refused then
+		lines[#lines + 1] = "QuestieDB: installed, but this version of NeverQuest can't read it. Update both through the CurseForge app. Until then NeverQuest goes by what it has learned itself."
 	elseif not l then
-		lines[#lines + 1] = "quest library: not loaded. NeverQuest is using only what it has learned itself."
+		lines[#lines + 1] = "QuestieDB: not installed. NeverQuest lists it as a required dependency, so the CurseForge app installs it for you; with a manual install, add the QuestieDB addon. Until then NeverQuest goes by what it has learned itself."
 	else
-		lines[#lines + 1] = string.format("quest library: LibQuestDB in use, %d quests placed on the map and %d more known by name and level only%s (data source: %s). It ships with NeverQuest under its own MIT licence; /nq lib off ignores it.",
-			layerCount, nameOnly, warming and ", still loading" or "", tostring(Call("GetDataSource") or "?"))
+		lines[#lines + 1] = string.format("QuestieDB%s in use: %d quests placed on the map and %d more known by name and level only%s. QuestieDB is built and curated by the Questie team and updated separately; /nq db bundled off builds your own database instead.",
+			self:Version() and (" " .. self:Version()) or "", layerCount, nameOnly, warming and ", still loading" or "")
 	end
 	if l and questID then
-		lines[#lines + 1] = "raw answer for quest " .. questID .. ": " .. Show(Call("GetQuest", questID))
+		lines[#lines + 1] = "QuestieDB's answer for quest " .. questID .. ": " .. Show(Quest(questID))
 		local e = self:Ends(questID)
 		if not e then
 			lines[#lines + 1] = "nothing NeverQuest can use from that."
@@ -431,19 +621,25 @@ function L:StatusLines(questID)
 					s and string.format(" at %s %.1f, %.1f (%d places)", ns.Nav.MapName(s.m) or s.m, s.x * 100, s.y * 100, #e[key]) or ", no place on a map NeverQuest knows")
 			end
 		end
+		-- And what that comes to for this character, which is the usual question.
+		local entry = Entry(questID)
+		if not entry then
+			lines[#lines + 1] = "NeverQuest leaves this one out: no name, or a placeholder the game never offers."
+		elseif ns.QuestDB then
+			local why = { done = "done, or closed by a quest you took or finished", log = "in your log", available = "open to you now",
+				later = "opens at level " .. tostring(entry.rl or entry.l or "?"), locked = "waiting on an earlier quest, a profession skill or the quest it is a part of",
+				faction = "not for your race or faction", other = "not for this character (class, profession or level)", ["repeat"] = "a repeatable hand-in, not shown as a new quest" }
+			local st = ns.QuestDB:Status(questID, ns.QuestDB:Get(questID) or entry)
+			lines[#lines + 1] = "for this character: " .. (why[st] or st) .. "."
+		end
 	end
 	return lines
 end
 
-ns:AddSlash("lib", function(rest)
+local function LibCommand(rest)
 	rest = (rest or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-	if rest == "on" or rest == "off" then
-		ns.db.questdb.library = (rest == "on")
-		L:Reset()
-		if rest == "on" then L:Warm() end
-		if ns.QuestDB then ns.QuestDB:ClearNearby() end
-		ns:SendMessage("QUESTDB_UPDATED")
-		ns:SendMessage("MAP_OFFERS_UPDATED")
-	end
+	if (rest == "on" or rest == "off") and ns.QuestDB then ns.QuestDB:SetBundled(rest == "on") end
 	for _, line in ipairs(L:StatusLines(tonumber(rest))) do ns.Print(line) end
-end, "/nq lib [on | off | <quest number>] - the optional LibQuestDB quest library: whether it is in use, and what it says about a quest")
+end
+ns:AddSlash("lib", LibCommand, "/nq lib [on | off | <quest number>] - QuestieDB: whether it is in use, and what it says about a quest for this character")
+ns:AddSlash("questiedb", LibCommand)

@@ -13,16 +13,15 @@ General Public License below for more details.
 
 Source: https://github.com/neverheal84/NeverQuest
 
-## Parts by others, under their own licences
+## Quest data
 
-| Part | Author | Licence |
-|---|---|---|
-| `Libs/QuestDB` (LibQuestDB v0.1.0, unchanged) | Pimptasty | MIT, see `Libs/QuestDB/LICENSE` |
-| `Data/Questie/Forever.lua` (a checked subset of QuestieDB's WoW Forever data) | the Questie contributors | GPLv3, see `Data/Questie/NOTICE.md` |
-| `Data/Lookups.lua` (quest places read from the Warcraft Wiki) | Warcraft Wiki contributors | CC BY-SA 4.0 |
+NeverQuest ships no quest data made by others. Quest givers and turn-ins it hasn't seen in game
+come from QuestieDB (https://github.com/Questie/QuestieDB), the quest database built and curated
+by the Questie team and distributed by them as its own addon under the GNU General Public
+License v3. NeverQuest reads it while the game runs, through its public API, and copies none of
+it. The quest starts in `Data/Starts.lua` were gathered from the game by NeverQuest itself.
 
-NeverQuest is not affiliated with or endorsed by Questie, LibQuestDB, the Warcraft Wiki or
-Blizzard Entertainment.
+NeverQuest is not affiliated with or endorsed by Questie or Blizzard Entertainment.
 
 ---
 

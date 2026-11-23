@@ -330,9 +330,7 @@ local PinMethods, SpawnPinMethods = {}, {}
 -- that is switched off.
 function P.SourceLine(info)
 	if not (info and info.known and ns.db.pins.sources) then return nil end
-	return info.src == "questie" and "From QuestieDB's data (GPLv3). Not yet seen in game by NeverQuest."
-		or info.src == "lookup" and "Looked up on the Warcraft Wiki. Not yet seen in game by NeverQuest."
-		or info.src == "library" and "From the bundled LibQuestDB library."
+	return info.src == "library" and "From QuestieDB, the Questie team's quest database. Not yet seen in game by NeverQuest."
 		or info.src == "shipped" and "From the quest data NeverQuest ships."
 		or "Your own quest database, learned while playing."
 end

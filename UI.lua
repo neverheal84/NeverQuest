@@ -1184,12 +1184,12 @@ function UI:CreateOptions()
 	R:Next(10)
 	Heading(p, R.x, R:Next(), "Quest database")
 	local qd = db.questdb
-	Check(p, R.x, R:Next(), "Use the bundled quest data", function() return qd.bundled ~= false end,
+	Check(p, R.x, R:Next(), "Use QuestieDB for quest data", function() return qd.bundled ~= false end,
 		function(v) ns.QuestDB:SetBundled(v) end,
-		"LibQuestDB, QuestieDB's WoW Forever data and the Warcraft Wiki fill in quest givers and turn-ins NeverQuest hasn't seen yet. Off: NeverQuest builds its own, from what your characters see, what it shipped of its own and what your party and guild pass on.")
-	Check(p, R.x + 16, R:Next(), "Note where the bundled data is wrong", function() return qd.fixes ~= false end,
+		"QuestieDB, the quest database the Questie team builds and keeps up to date, fills in quest givers and turn-ins NeverQuest hasn't seen yet. It's installed with NeverQuest as its own addon, and /nq credits names the people who make it. Off: build your own. NeverQuest doesn't read QuestieDB and goes by what your characters see, what it shipped of its own and what your party and guild pass on.")
+	Check(p, R.x + 16, R:Next(), "Note where QuestieDB's data is wrong", function() return qd.fixes ~= false end,
 		function(v) qd.fixes = v ns.QuestDB:ClearNearby() ns:SendMessage("MAP_OFFERS_UPDATED") end,
-		"Standing where the bundled data puts a quest giver, with the quest not on offer to you, or finding the giver or turn-in somewhere else: NeverQuest writes it down and stops showing the wrong place. Ctrl+click a known quest on the world map to say so yourself. /nq db fixes lists them, and Export starts sends them in.")
+		"Standing where QuestieDB puts a quest giver, with the quest not on offer to you, or finding the giver or turn-in somewhere else: NeverQuest writes it down and stops showing the wrong place. QuestieDB itself is never changed. Ctrl+click a known quest on the world map to say so yourself. /nq db fixes lists them, and Export starts includes them.")
 	Check(p, R.x, R:Next(), "Scan zones for quests in the background", function() return qd.scan end,
 		function(v) qd.scan = v if not v then ns.QuestDB:StopScan() end end,
 		"Asks the game which quests each zone offers, one zone every couple of seconds, paused in combat. Every character adds to one shared database. /nq db searches it.")

@@ -417,8 +417,7 @@ function Q:GiverName(questID)
 	if not questID then return nil end
 	local name = ns.db.npcs.giver[questID]
 	if name then return name end
-	local look = ns.Looked and ns.Looked(questID)
-	return (look and look.by) or (ns.Library and ns.Library:StartName(questID)) or nil
+	return ns.Library and ns.Library:StartName(questID) or nil
 end
 function Q:TurnInName(questID) return questID and ns.db.npcs.turnin[questID] or nil end
 
@@ -643,16 +642,14 @@ function Q:NpcRoles()
 		Add(npcs.turnin[qid], kind, qid, e.title)
 		Add(info.doneNpc, kind, qid, e.title)
 		if not info.doneNpc then Add(info.objNpc, kind, qid, e.title) end
-		-- And whoever the optional quest library says ends it, when nothing above names anyone.
+		-- And whoever QuestieDB says ends it, when nothing above names anyone.
 		if not (npcs.turnin[qid] or info.doneNpc or info.objNpc) then
-			local look = ns.Looked and ns.Looked(qid)
-			Add((look and look.eby) or (ns.Library and ns.Library:FinishName(qid)), kind, qid, e.title)
+			Add(ns.Library and ns.Library:FinishName(qid), kind, qid, e.title)
 		end
 	end
 	for _, o in ipairs(self.offers) do
 		if o.questID and not self.byID[o.questID] then
-			local look = ns.Looked and ns.Looked(o.questID)
-			Add(npcs.giver[o.questID] or (look and look.by) or (ns.Library and ns.Library:StartName(o.questID)), "giver", o.questID, o.title)
+			Add(npcs.giver[o.questID] or (ns.Library and ns.Library:StartName(o.questID)), "giver", o.questID, o.title)
 		end
 	end
 	for _, list in pairs(roles) do
@@ -727,12 +724,8 @@ function Q:ResolveTurnin(e)
 			return { m = giver.m, x = giver.x, y = giver.y, source = "giver", npc = giverName }
 		end
 	end
-	-- Nothing learned and nothing in the text to go on: the optional quest library may know
-	-- who ends it. Better than the middle of a zone, and never used over anything above.
-	local look = ns.Looked and ns.Looked(qid)
-	if look and look.em then
-		return { m = look.em, x = look.ex, y = look.ey, source = "lookup", npc = npc or look.eby }
-	end
+	-- Nothing learned and nothing in the text to go on: QuestieDB may know who ends it. Better
+	-- than the middle of a zone, and never used over anything above.
 	local fin = ns.Library and ns.Library:Finish(qid)
 	if fin and InZone(fin) then
 		return { m = fin.m, x = fin.x, y = fin.y, source = "library", npc = npc or fin.name }

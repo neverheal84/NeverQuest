@@ -1,31 +1,31 @@
--- NeverQuest Fixes: where the bundled quest data turned out to be wrong, as your own game shows it.
+-- NeverQuest Fixes: where QuestieDB's quest data turned out to be wrong, as your own game shows it.
 --
--- The bundled data (LibQuestDB, QuestieDB's WoW Forever data, the Warcraft Wiki lookups) fills in
--- quest givers and turn-ins NeverQuest hasn't seen for itself. Some of it is wrong for WoW
--- Forever. This notices when the game says so and writes it down, so the wrong place stops
--- being shown:
+-- QuestieDB (the Questie team's quest database, read by Library.lua) fills in quest givers and
+-- turn-ins NeverQuest hasn't seen for itself. Now and then a place is wrong for WoW Forever.
+-- This notices when the game says so and writes it down, so the wrong place stops being shown:
 --
---   * not here: you stood where the bundled data puts a quest giver, the game was asked again
---     what your zone offers you, and that quest was not among them. The bundled place is dropped
---     for characters of the same race and class (a quest can be for some races or classes only).
---   * moved: you took the quest, or handed it in, at an NPC well away from where the bundled data
---     said. What NeverQuest saw itself replaces the bundled place anyway; this keeps a note so the
---     data can be put right in the addon.
+--   * not here: you stood where QuestieDB puts a quest giver, the game was asked again what your
+--     zone offers you, and that quest was not among them. QuestieDB's place is dropped for
+--     characters of the same race and class (a quest can be for some races or classes only).
+--   * moved: you took the quest, or handed it in, at an NPC well away from where QuestieDB said.
+--     What NeverQuest saw itself replaces QuestieDB's place anyway; this keeps a note so the
+--     data can be put right.
 --   * you said so: Ctrl+click a known quest on the world map. Hidden for all your characters.
 --
 -- When the game later offers the quest, a "not here" note is dropped (or becomes "moved" if the
--- giver turned out to be elsewhere). Nothing here is shared with your party or guild; /nq db export
--- carries the notes, places only, so they can be built into the addon for everybody.
+-- giver turned out to be elsewhere). Nothing here is shared with your party or guild, and
+-- QuestieDB itself is never changed; /nq db export carries the notes, places only, so they can
+-- be passed on to the Questie team.
 
 local ADDON, ns = ...
 local F = {}
 ns.Fixes = F
 
 local NEAR = 25          -- yards: standing here, the quest giver would be right in front of you
-local MOVED = 60         -- yards between the bundled place and the real one before it counts as wrong
+local MOVED = 60         -- yards between QuestieDB's place and the real one before it counts as wrong
 local CONFIRM = 5        -- seconds at an empty spot, with a fresh answer from the game, before it counts
 local TICK = 2
-local LIST_TTL = 30      -- seconds the zone's bundled places are reused before being worked out again
+local LIST_TTL = 30      -- seconds the zone's QuestieDB places are reused before being worked out again
 local ASK_GAP = 4        -- seconds between asking the game again what your zone offers
 local MAX_NOTES = 2500
 
@@ -48,7 +48,7 @@ end
 function F:On() return ns.db.questdb.fixes ~= false end
 
 -- Whether to drop a quest's giver place: "all" (you said it isn't there), "borrowed" (the
--- bundled place was empty for a character like this one) or nil. Called for every quest on
+-- QuestieDB place was empty for a character like this one) or nil. Called for every quest on
 -- every map draw, so it does as little as it can.
 function F:HideStart(qid)
 	local fix = ns.db.questDB.fix
@@ -145,7 +145,7 @@ function F:NotHere(qid, m, x, y)
 end
 
 ---------------------------------------------------------------------------
--- Not here: standing at a bundled quest giver's place, and the game doesn't offer the quest.
+-- Not here: standing at QuestieDB's place for a quest giver, and the game doesn't offer the quest.
 ---------------------------------------------------------------------------
 local zone = { id = nil, at = -math.huge, list = nil }
 local pending = {}
@@ -153,7 +153,7 @@ local lastAsk = -math.huge
 
 function F:ForgetZone() zone.id, zone.list = nil, nil end
 
--- The bundled places in a zone that are in use right now: quests NeverQuest itself has no place
+-- The QuestieDB places in a zone that are in use right now: quests NeverQuest itself has no place
 -- for, that this character can take. Only the zone's own map; a giver inside a building or cave
 -- with a map of its own is left alone, since the zone's list may not include it.
 local function Candidates(zoneMap)
@@ -172,16 +172,7 @@ local function Candidates(zoneMap)
 		if D:Status(qid, q) ~= "available" then return end
 		out[#out + 1] = { qid = qid, m = q.m, x = q.x, y = q.y }
 	end
-	for qid, e in pairs(ns.Library and ns.Library:Layer() or {}) do
-		local look = ns.Looked(qid)
-		Consider(qid, (look and look.m) or e.m)
-	end
-	for _, file in ipairs({ ns.Lookups, ns.QuestieForever }) do
-		for qid in pairs(file and file.q or {}) do
-			local look = ns.Looked(qid)
-			if look and look.m then Consider(qid, look.m) end
-		end
-	end
+	for qid, e in pairs(ns.Library and ns.Library:Layer() or {}) do Consider(qid, e.m) end
 	zone.id, zone.at, zone.list = zoneMap, now, out
 	return out
 end
@@ -312,7 +303,7 @@ end
 -- /nq db fixes
 ---------------------------------------------------------------------------
 local WHY = {
-	gone = "the giver wasn't there for you: the game didn't offer the quest where the bundled data puts it",
+	gone = "the giver wasn't there for you: the game didn't offer the quest where QuestieDB puts it",
 	moved = "found somewhere else",
 	user = "you said it isn't there",
 }
@@ -340,26 +331,26 @@ function F:Command(rest)
 	local undo = rest:match("^undo%s+(%d+)$")
 	if rest == "clear" then
 		local n = self:ClearAll()
-		ns.Print(string.format("forgot %d note%s about the bundled quest data.", n, n == 1 and "" or "s"))
+		ns.Print(string.format("forgot %d note%s about QuestieDB's quest data.", n, n == 1 and "" or "s"))
 		return
 	elseif undo then
 		local qid = tonumber(undo)
 		if self:Clear(qid) then
-			ns.Print(string.format("|cffffd100%s|r: the note is gone, and the bundled place is used again.", Title(qid)))
+			ns.Print(string.format("|cffffd100%s|r: the note is gone, and QuestieDB's place is used again.", Title(qid)))
 		else
 			ns.Print("no note for quest " .. undo .. ".")
 		end
 		return
 	elseif rest ~= "" then
-		ns.Print("/nq db fixes [undo <quest number> | clear]: where the bundled quest data turned out to be wrong.")
+		ns.Print("/nq db fixes [undo <quest number> | clear]: where QuestieDB's quest data turned out to be wrong.")
 		return
 	end
 	local n, gone, moved, user = self:Count()
 	if n == 0 then
-		ns.Print("no notes yet about the bundled quest data being wrong." .. (self:On() and "" or " Noting them is switched off (Options, Quest database)."))
+		ns.Print("no notes yet about QuestieDB's quest data being wrong." .. (self:On() and "" or " Noting them is switched off (Options, Quest database)."))
 		return
 	end
-	ns.Print(string.format("%d place%s where the bundled quest data was wrong: %d not there for you, %d found somewhere else, %d you marked yourself. Newest first:",
+	ns.Print(string.format("%d place%s where QuestieDB's quest data was wrong: %d not there for you, %d found somewhere else, %d you marked yourself. Newest first:",
 		n, n == 1 and "" or "s", gone, moved, user))
 	local lines, total = self:Lines(10)
 	for _, line in ipairs(lines) do DEFAULT_CHAT_FRAME:AddMessage("   " .. line) end

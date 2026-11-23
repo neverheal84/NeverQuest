@@ -7,9 +7,9 @@
 -- Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone.
 --
 -- Which quests belong to which dungeon comes from three places:
---   * the bundled quest library, which files each quest under a zone or a dungeon;
+--   * QuestieDB, which files each quest under a zone or a dungeon (not used with Build my own);
 --   * the game, which tags a dungeon quest "Dungeon" and says which map it belongs to (this is
---     how the dungeons new in WoW Forever are found, which the library doesn't know);
+--     how dungeons missing from the list below are found, the ones new in WoW Forever among them);
 --   * your quest log, which lists dungeon quests under the dungeon's name. Anything one of your
 --     characters picks up is remembered for all of them.
 
@@ -17,8 +17,8 @@ local ADDON, ns = ...
 local DQ = {}
 ns.Dungeons = DQ
 
--- The game's area numbers for the classic dungeons, which is how the library files their quests.
--- WoW Forever's own dungeons aren't in the library; the game and your quest log find those.
+-- The game's area numbers for the classic dungeons, which is how QuestieDB files their quests.
+-- For dungeons not listed here, the game and your quest log find their quests.
 DQ.AREA = {
 	["Ragefire Chasm"] = 2437, ["The Deadmines"] = 1581, ["Wailing Caverns"] = 718,
 	["Shadowfang Keep"] = 209, ["Blackfathom Deeps"] = 719, ["The Stockade"] = 717,
@@ -111,7 +111,12 @@ local function AreaDungeon(area)
 	for name, id in pairs(DQ.AREA) do
 		if id == area then known = name break end
 	end
-	-- A dungeon the library knows that this list has no number for: the game names the area.
+	-- QuestieDB's own dungeon list: the other numbers a dungeon's quests are filed under (most
+	-- of Gnomeregan's and Uldaman's), and the dungeons that are new in WoW Forever.
+	if not known and ns.Library then
+		known = DQ:ByName(ns.Library:DungeonName(area)) or false
+	end
+	-- And an area neither has a number for: the game names it.
 	if not known and C_Map and C_Map.GetAreaInfo then
 		known = DQ:ByName(ns.SafeCall(C_Map.GetAreaInfo, area)) or false
 	end
@@ -126,7 +131,7 @@ local function Add(name, qid)
 	ofQuest[qid] = name
 end
 
-function DQ:Forget() index, ofQuest = nil, nil self.plan = nil end
+function DQ:Forget() index, ofQuest, areaName = nil, nil, {} self.plan = nil end
 
 function DQ:Index()
 	if index then return index end
@@ -171,7 +176,7 @@ function DQ:LearnFromLog()
 	if any then Changed() end
 end
 
--- The game, for quests the library doesn't place: is it tagged Dungeon, and which map is it on?
+-- The game, for quests QuestieDB doesn't place: is it tagged Dungeon, and which map is it on?
 -- Asked a few at a time for the quests near the dungeons you're heading for.
 local asked = {}
 function DQ:Ask(qid)
@@ -244,6 +249,14 @@ local function Pres(qid, q)
 	local out, seen = {}, {}
 	for _, p in ipairs(q and q.pre or {}) do
 		if not seen[p] then seen[p] = true out[#out + 1] = p end
+	end
+	-- Any one of these will do. With one done already, none of the others matters.
+	local one = false
+	for _, p in ipairs(q and q.any or {}) do if Done(p) then one = true end end
+	if not one then
+		for _, p in ipairs(q and q.any or {}) do
+			if not seen[p] then seen[p] = true out[#out + 1] = p end
+		end
 	end
 	local prev = ns.QuestDB:PrevQuest(qid)
 	if prev and not seen[prev] then out[#out + 1] = prev end

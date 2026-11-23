@@ -94,18 +94,33 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Tracker at logout.* With Blizzard's list hidden, log out, disable NeverQuest at the character screen and log in: your quests should be tracked in Blizzard's list, and accepting a quest should track it automatically. Re-enable NeverQuest and it should all be hidden again within a second of logging in.
     - *Standing still.* `/nq debug`, then stand still for a minute: there should be no stream of guide or route lines. Walk a few steps and they resume.
     - *Talk-to quests.* Accept a quest whose only step is "speak to someone": no "Ready to turn in" alert and no party announcement.
-56. **Bundled database or your own, and wrong places (1.21.6).**
-    - *The choice.* `/nq setup`, go to the Quest database page and pick **Build my own**: the world map should lose its faded "Known quest" markers for quests nobody with NeverQuest has seen, and `/nq lib` should say the library is not in use. Pick **Bundled database** again and they come back within a few seconds.
+56. **QuestieDB or your own, and wrong places (1.21.6, QuestieDB from 1.22.0).**
+    - *The choice.* `/nq setup`, go to the Quest database page and pick **Build my own**: the world map should lose its faded "Known quest" markers for quests nobody with NeverQuest has seen, and `/nq lib` should say QuestieDB is not in use. Pick **QuestieDB** again and they come back within a few seconds.
     - *Not here.* Find a faded known quest marker you can't actually pick up (one you've done, or one with nobody there). Stand on it for about ten seconds: it should disappear from the world map, and `/nq db fixes` should list it as "the giver wasn't there for you".
     - *Ctrl+click.* Ctrl+click a known quest marker on the world map: chat says it won't be shown there any more and it disappears. `/nq db fixes undo <its number>` brings it back.
     - *Moved.* Take or hand in a quest at an NPC whose marker was somewhere else: `/nq db fixes` should list it as "found somewhere else", with where.
-    - *Export.* `/nq db export` should mention the places where the bundled data was wrong.
+    - *Export.* `/nq db export` should mention the places where QuestieDB's data was wrong.
 57. **Dungeon quests (1.21.7).**
     - *The wizard.* `/nq setup`: there should be a Dungeon quests page with the switch and a tick box for each dungeon on your side.
     - *Before the Deadmines (Alliance).* At level 16 or 17 with Westfall open, the guide should put Deadmines pickups near the top: "Oh Brother...", "Collecting Memories" and "Underground Assault" in Stormwind, and The Defias Brotherhood from Gryan Stoutmantle, labelled "pre-quest for Red Silk Bandanas (The Deadmines)". A row "The Deadmines quests: ..." should count them.
     - *Cherry-picking.* `/nq dungeons deadmines` (or untick it in Choose dungeons): those pickups should leave the route. Tick it again and they come back.
     - *Waiting.* With a Deadmines quest in your log, the route shouldn't send you to the dungeon's entrance; its step says "done in The Deadmines". Inside the Deadmines it's routed normally.
     - *New Forever dungeons.* Pick up a quest for The Hall of Thanes or another new dungeon on one character; `/nq dungeons` on an alt should count it.
+
+58. **QuestieDB (1.22.0).**
+    - *Installed with NeverQuest.* Install or update through the CurseForge app: QuestieDB should be installed along with NeverQuest. In game, `/nq lib` should say "QuestieDB 1.x.x in use" with a count of quests placed, and the world map should show faded known quests in a zone you haven't played yet.
+    - *One quest.* `/nq lib 783` on an Alliance character: Deputy Willem should be the start and Marshal McBride the finish, both in Elwynn Forest.
+    - *Build my own.* Choose **Build my own** in `/nq setup`: `/nq lib` says QuestieDB isn't in use, and markers for quests nobody with NeverQuest has seen go away. Choose **QuestieDB** again.
+    - *Without QuestieDB.* Disable QuestieDB on the character screen's AddOns list and log in: one chat line should say QuestieDB isn't installed, `/nq check` should show a WARN line for QuestieDB, and there should be no Lua errors. Turn it back on.
+    - *Old files.* After a CurseForge update the NeverQuest folder should have no `Libs` folder, no `Data\Questie` and no `Data\Lookups.lua`. A manual update over the old folder can leave them behind; that's harmless, since nothing loads them.
+    - *Questie as well.* With the Questie addon itself enabled, NeverQuest's giver and spawn pins should still step aside (`/nq questie`), as before.
+59. **Reading QuestieDB for your character (1.22.1).**
+    - *Login.* Log in with QuestieDB enabled: no stutter in the first few seconds, and within about ten seconds `/nq lib` shows the count of quests placed without "still loading".
+    - *A quest you can't take.* Pick a faded marker and run `/nq lib <its number>`: the last line should say it is open to you now or opens at a level. Try a quest you know is for another class: it should say it's not for this character, and it should have no marker.
+    - *Professions.* On a character without Cooking, there should be no marker for a cooking quest such as Clamlette Surprise in Gadgetzan. On one with the skill, there should be.
+    - *New races.* On one of the new WoW Forever races, your starting zone and capital should show quest markers as on any other race.
+    - *Dungeons.* `/nq dungeons` near level 28 should count Gnomeregan quests in the twenties, not two or three.
+    - *The wizard.* `/nq setup`, Quest database page: a green line says QuestieDB is installed, with its version.
 
 ## Afterwards, send
 

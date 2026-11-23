@@ -126,17 +126,18 @@ Setup.PAGES = {
 	{
 		key = "database", title = "Quest database",
 		text = "Where NeverQuest's quest givers and turn-ins come from.\n\n" ..
-			"|cffffd100Use the bundled database|r (recommended): LibQuestDB, QuestieDB's WoW Forever data and the Warcraft Wiki fill in what NeverQuest hasn't seen yet, so the map is full from your first login. Where your own game shows the bundled data is wrong, NeverQuest notes it and stops showing the wrong place.\n\n" ..
-			"|cffffd100Build my own|r: only what your characters see, what NeverQuest ships of its own, and what other NeverQuest players in your party and guild pass on. The map starts emptier and fills in as you play.",
+			"|cffffd100QuestieDB|r (recommended): the quest database built and kept up to date by the Questie team, installed with NeverQuest as its own addon. It fills in what NeverQuest hasn't seen yet, so the map is full from your first login. Where your own game shows its data is wrong, NeverQuest notes it and stops showing the wrong place.\n\n" ..
+			"|cffffd100Build my own|r: NeverQuest doesn't read QuestieDB at all. Only what your characters see, what NeverQuest ships of its own, and what other NeverQuest players in your party and guild pass on. The map starts emptier and fills in as you play.",
+		note = function() return ns.Library and ns.Library:Short() end,
 		build = function(p, U, row)
 			local db = Cfg()
-			U.Cycle(p, 0, row(30), "Quest data:", { { "bundled", "Bundled database" }, { "own", "Build my own" } },
+			U.Cycle(p, 0, row(30), "Quest data:", { { "bundled", "QuestieDB" }, { "own", "Build my own" } },
 				function() return db.questdb.bundled == false and "own" or "bundled" end,
 				function(v) if ns.QuestDB then ns.QuestDB:SetBundled(v == "bundled") else db.questdb.bundled = (v == "bundled") end Pins() Guide() end,
 				"You can switch any time under Options, or with /nq db bundled on | off.")
-			U.Check(p, 0, row(), "Note where the bundled data is wrong", function() return db.questdb.fixes ~= false end,
+			U.Check(p, 0, row(), "Note where QuestieDB's data is wrong", function() return db.questdb.fixes ~= false end,
 				function(v) db.questdb.fixes = v if ns.QuestDB then ns.QuestDB:ClearNearby() end ns:SendMessage("MAP_OFFERS_UPDATED") end,
-				"Standing where the bundled data puts a quest giver, with the quest not on offer to you, or finding the giver or turn-in somewhere else: NeverQuest writes it down and stops showing the wrong place. /nq db fixes lists them.")
+				"Standing where QuestieDB puts a quest giver, with the quest not on offer to you, or finding the giver or turn-in somewhere else: NeverQuest writes it down and stops showing the wrong place. /nq db fixes lists them.")
 			U.Check(p, 0, row(), "Scan zones in the background", function() return db.questdb.scan end,
 				function(v) db.questdb.scan = v if not v and ns.QuestDB then ns.QuestDB:StopScan() end end,
 				"Asks the game which quests each zone offers you, paused in combat. This is how NeverQuest builds its own data. /nq db searches it.")
@@ -273,7 +274,9 @@ function Setup:Go(i)
 	local page = self.PAGES[i]
 	for n, p in ipairs(self.pageFrames) do p:SetShown(n == i) end
 	f.title:SetText(page.title)
-	f.text:SetText(page.text or "")
+	-- A page can add a line that depends on how things stand right now.
+	local note = page.note and page.note()
+	f.text:SetText((page.text or "") .. (note and ("\n\n" .. note) or ""))
 	f.step:SetFormattedText("Step %d of %d", i, #self.PAGES)
 	local last = i == #self.PAGES
 	f.back:SetShown(i > 1)

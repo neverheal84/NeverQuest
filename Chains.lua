@@ -7,8 +7,8 @@
 --   your play     a quest offered right after you turn one in, that wasn't on offer just
 --                 before, is that quest's follow-up. Learned links are shared by all your
 --                 characters, so alts know the chains before they get there.
---   the data      what the bundled quest library and the QuestieDB-derived file say must come
---                 before each quest (QuestDB.lua), read backwards. Used only where the first
+--   the data      what QuestieDB says must come before each quest (QuestDB.lua), read
+--                 backwards. Used only where the first
 --                 two say nothing, so it helps most on a first character.
 
 local ADDON, ns = ...

@@ -209,75 +209,12 @@ end
 -- Read through Get and Each rather than a cached copy, so a write anywhere (a profile reset,
 -- saved variables loading, a test) can never leave a stale view behind.
 ---------------------------------------------------------------------------
--- A place borrowed from the optional quest library (Library.lua) for a quest known by name
--- only. Always a fresh table marked lib: the borrowed place is never written into your saved
--- data and never exported or shared.
--- A place looked up by hand (Data\Lookups.lua) for a quest nothing else can place. Treated
--- exactly like a borrowed one, and marked hint so the map can say it is unconfirmed.
---
--- Two files feed this. Data\Lookups.lua was read off the Warcraft Wiki by hand; its entries
--- come first. Data\Questie\Forever.lua is a checked subset of QuestieDB (GPLv3, see that
--- folder); it fills whatever the first leaves open. ns.Looked gives the two as one answer:
---   { m, x, y, by, em, ex, ey, eby, rl, f, pre, shut, t, l, src = "lookup" | "questie" }
-local hints, looked = {}, {}
-
-local function AreaMap(area)
-	return area and ns.Library and ns.Library:AreaMap(area) or nil
-end
-
-function ns.Looked(qid)
-	local got = looked[qid]
-	if got ~= nil then return got or nil end
-	got = false
-	if ns.db.questdb.lookups ~= false and D:Bundled() then
-		local wiki = ns.Lookups and ns.Lookups.q and ns.Lookups.q[qid]
-		local theirs = ns.QuestieForever and ns.QuestieForever.q and ns.QuestieForever.q[qid]
-		if wiki or theirs then
-			local r = {}
-			if wiki then
-				r.t, r.l, r.rl, r.f = wiki.t, wiki.l, wiki.rl, wiki.f
-				r.m, r.x, r.y, r.by = wiki.m, wiki.x, wiki.y, wiki.by
-				r.em, r.ex, r.ey, r.eby = wiki.em, wiki.ex, wiki.ey, wiki.eby
-				r.src = wiki.m and "lookup" or nil
-			end
-			if theirs then
-				r.rl, r.f = r.rl or theirs.rl, r.f or theirs.f
-				r.pre, r.shut = theirs.pre, theirs.shut
-				if not r.m and theirs.x then
-					local m = AreaMap(theirs.a)
-					if m then r.m, r.x, r.y, r.src = m, theirs.x, theirs.y, "questie" end
-				end
-				if not r.em and theirs.ex then
-					local m = AreaMap(theirs.ea)
-					if m then r.em, r.ex, r.ey = m, theirs.ex, theirs.ey end
-				end
-				r.by, r.eby = r.by or theirs.by, r.eby or theirs.eby
-			end
-			got = r
-		end
-	end
-	looked[qid] = got
-	return got or nil
-end
-
-local function Hint(qid)
-	local h = hints[qid]
-	if h == nil then
-		h = false
-		local look = ns.Looked(qid)
-		if look and (look.m or look.rl) then
-			h = { t = look.t, l = look.l, rl = look.rl, f = look.f, m = look.m, x = look.x, y = look.y,
-				pre = look.pre, shut = look.shut, lib = true, hint = true, src = look.src }
-		end
-		hints[qid] = h
-	end
-	return h or nil
-end
-function D:ForgetHints() hints, looked = {}, {} end
+-- A place borrowed from QuestieDB (Library.lua) for a quest NeverQuest knows by name only, or
+-- doesn't know at all. Always a fresh table marked lib: the borrowed place is never written
+-- into your saved data and never exported or shared.
 
 function D:SetBundled(on)
 	ns.db.questdb.bundled = on and true or false
-	self:ForgetHints()
 	self:ForgetLinks()
 	if ns.Library then
 		ns.Library:Reset()
@@ -288,24 +225,21 @@ function D:SetBundled(on)
 	ns:SendMessage("MAP_OFFERS_UPDATED")
 end
 
--- The bundled data (LibQuestDB, QuestieDB's Forever data and the wiki lookups) in use? With it
--- off NeverQuest goes by what it has seen itself, what it shipped of its own, and what other
--- NeverQuest players passed on: nothing from anywhere else.
+-- QuestieDB in use? This is the "Quest data" choice: QuestieDB (the setting is still called
+-- bundled, from when the data shipped inside NeverQuest) or Build my own. With it off,
+-- NeverQuest goes by what it has seen itself, what it shipped of its own, and what other
+-- NeverQuest players passed on, and never reads QuestieDB.
 function D:Bundled() return ns.db.questdb.bundled ~= false end
 
--- Where the bundled data puts a quest's giver and its turn-in, whatever NeverQuest itself
--- knows: Fixes.lua holds these up against what the game shows you. Nil when it has none.
+-- Where QuestieDB puts a quest's giver and its turn-in, whatever NeverQuest itself knows:
+-- Fixes.lua holds these up against what the game shows you. Nil when it has none.
 function D:BundledStart(qid)
 	if not self:Bundled() then return nil end
-	local h = Hint(qid)
-	if h and h.m then return { m = h.m, x = h.x, y = h.y, src = h.src or "lookup" } end
 	local s = ns.Library and ns.Library:Start(qid)
 	if s then return { m = s.m, x = s.x, y = s.y, src = "library" } end
 end
 function D:BundledEnd(qid)
 	if not self:Bundled() then return nil end
-	local look = ns.Looked(qid)
-	if look and look.em then return { m = look.em, x = look.ex, y = look.ey, src = look.src or "lookup" } end
 	local f = ns.Library and ns.Library:Finish(qid)
 	if f then return { m = f.m, x = f.x, y = f.y, src = "library" } end
 end
@@ -314,32 +248,28 @@ end
 local function Placeless(e)
 	if not e then return nil end
 	return { t = e.t, l = e.l, f = e.f, c = e.c, z = e.z, zm = e.zm, s = e.s, o = e.o, n = e.n,
-		rl = e.rl, pre = e.pre, bar = e.bar, shut = e.shut, twins = e.twins, again = e.again,
-		hint = e.hint, lib = e.lib, fixed = true }
+		rl = e.rl, pre = e.pre, any = e.any, bar = e.bar, shut = e.shut, twins = e.twins, again = e.again,
+		skill = e.skill, xl = e.xl, parent = e.parent, lib = e.lib, fixed = true }
 end
 
 local function Borrow(qid, q)
+	local layer = ns.Library and ns.Library:Layer()
+	local known = layer and layer[qid]
 	-- A place you have found to be wrong (Fixes.lua). "all": you said so yourself, so no place
 	-- is used at all. "borrowed": standing there, the game didn't offer it to this character,
-	-- so the bundled place goes and only one NeverQuest saw for itself is left.
+	-- so QuestieDB's place goes and only one NeverQuest saw for itself is left.
 	local wrong = ns.Fixes and ns.Fixes:HideStart(qid)
-	if wrong == "all" then
-		return Placeless(q or Hint(qid) or (ns.Library and ns.Library:Layer()[qid]))
-	end
+	if wrong == "all" then return Placeless(q or known) end
 	if q and q.m and q.x then return q end
-	if wrong then return q or Placeless(Hint(qid) or (ns.Library and ns.Library:Layer()[qid])) end
-	local known = Hint(qid)
-	if not (known and known.m) then
-		known = (ns.Library and ns.Library:Layer()[qid]) or known
-	end
+	if wrong then return q or Placeless(known) end
 	if not q then return known end
-	if not ns.Library and not known then return q end
-	local s = (known and known.m and known) or (ns.Library and ns.Library:Start(qid))
+	if not known then return q end
+	local s = (known.m and known) or (ns.Library and ns.Library:Start(qid))
 	if not s then return q end
-	return { t = q.t, l = q.l, f = q.f or (known and known.f), c = q.c, z = q.z, zm = q.zm, s = q.s, o = q.o, n = q.n,
-		rl = known and known.rl, pre = known and known.pre, bar = known and known.bar,
-		shut = known and known.shut, twins = known and known.twins, again = known and known.again,
-		hint = known and known.hint, m = s.m, x = s.x, y = s.y, lib = true }
+	return { t = q.t, l = q.l, f = q.f or known.f, c = q.c, z = q.z, zm = q.zm, s = q.s, o = q.o, n = q.n,
+		rl = known.rl, pre = known.pre, any = known.any, bar = known.bar, shut = known.shut, twins = known.twins,
+		again = known.again, skill = known.skill, xl = known.xl, parent = known.parent,
+		m = s.m, x = s.x, y = s.y, lib = true }
 end
 
 function D:Get(qid)
@@ -384,7 +314,7 @@ function D:Each()
 			if qid then return qid, Borrow(qid, q) end
 			phase, qid = 3, nil
 		end
-		-- Last, what only the bundled library knows.
+		-- Last, what only QuestieDB knows.
 		repeat
 			qid, q = next(layer, qid)
 		until qid == nil or (store[qid] == nil and base[qid] == nil)
@@ -407,8 +337,6 @@ function D:Source(qid)
 	if mine and mine.m and mine.x then return "learned" end
 	local base = Base()[qid]
 	if base and base.m and base.x then return "shipped" end
-	local h = Hint(qid)
-	if h and h.m then return h.src or "lookup" end
 	if ns.Library and ns.Library:Start(qid) then return "library" end
 	return nil
 end
@@ -690,9 +618,8 @@ function D:StartHarvest(from, to)
 	end
 	if self.harvesting then return false end
 	local st = self:HarvestState()
-	-- With the bundled quest library there is no need to count through every number: it
-	-- lists the ones that are quests, including the ones that are new in WoW Forever and sit
-	-- far above the old range. Only those are asked about. A range given by hand still counts.
+	-- With QuestieDB there is no need to count through every number: it lists the ones that
+	-- are quests, including the ones that are new in WoW Forever and sit far above the old range. Only those are asked about. A range given by hand still counts.
 	local ids = (not from and not to) and ns.Library and ns.Library:Get() and ns.Library:QuestIds() or nil
 	if ids and #ids > 0 then return self:StartListHarvest(ids, st) end
 	if from then st.next = math.max(1, math.floor(from)) end
@@ -914,47 +841,78 @@ function D:Status(qid, q)
 	if ns.SafeCall(C_QuestLog.IsQuestFlaggedCompleted, qid) == true then return "done" end
 	if ns.SafeCall(C_QuestLog.IsOnQuest, qid) == true then return "log" end
 	if not q then return "unknown" end
-	-- From the library. First, the ways a quest is over for you without its own number being
-	-- ticked off: a quest that shuts it is taken or done, or a twin of it is (the same quest
-	-- under another number), or a quest of the same name is in your log right now.
-	if q.lib then
+	-- What QuestieDB says the quest asks of you. That holds just as well for a quest NeverQuest
+	-- has a place of its own for: seeing where a giver stands says nothing about what has to be
+	-- done first. `r` is that entry, or the quest itself when QuestieDB has nothing on it.
+	local r = q
+	if not q.lib and ns.Library then r = ns.Library:Layer()[qid] or q end
+	local level = UnitLevel("player")
+	-- First, the ways a quest is over for you without its own number being ticked off: a quest
+	-- that shuts it is taken or done, or a twin of it is (the same quest under another number),
+	-- or a quest of the same name is in your log right now.
+	if r.lib then
 		local function Had(id)
 			return ns.SafeCall(C_QuestLog.IsQuestFlaggedCompleted, id) == true or ns.SafeCall(C_QuestLog.IsOnQuest, id) == true
 		end
-		for _, id in ipairs(q.shut or {}) do if Had(id) then return "done" end end
-		for _, id in ipairs(q.twins or {}) do if Had(id) then return "done" end end
-		if q.t and ns.Quests and ns.Quests.log then
+		for _, id in ipairs(r.shut or {}) do if Had(id) then return "done" end end
+		for _, id in ipairs(r.twins or {}) do if Had(id) then return "done" end end
+		local title = q.t or r.t
+		if title and ns.Quests and ns.Quests.log then
 			for _, e in ipairs(ns.Quests.log) do
-				if e.title == q.t and e.questID ~= qid then
+				if e.title == title and e.questID ~= qid then
 					local follows = false
-					for _, need in ipairs(q.pre or {}) do if need == e.questID then follows = true end end
+					for _, need in ipairs(r.pre or {}) do if need == e.questID then follows = true end end
+					for _, need in ipairs(r.any or {}) do if need == e.questID then follows = true end end
 					if not follows then return "log" end
 				end
 			end
 		end
 		-- A quest you can hand in over and over is never "done", so it is never a new quest
 		-- to go and find either.
-		if q.again then return "repeat" end
+		if r.again then return "repeat" end
 	end
 	-- Then: this character's race or class can never take it, a level it asks for, and
 	-- quests that have to be done first.
-	if q.bar then return q.bar end
-	if q.rl then
-		if q.rl > UnitLevel("player") then return "later" end
-	elseif q.l and q.l > UnitLevel("player") then return "later" end
-	if q.pre then
-		for _, need in ipairs(q.pre) do
+	if r.bar then return r.bar end
+	-- Too high a level for it now (a battleground bracket quest, say): never again for you.
+	if r.xl and level > r.xl then return "other" end
+	-- A profession quest: not for a character without the profession, and waiting on skill
+	-- for one who has it. Left alone when the game won't say what your professions are.
+	if r.skill and ns.ClassQuests then
+		local has = ns.ClassQuests:HasSkill(r.skill[1], r.skill[2])
+		if has == false then return "other" end
+		if has == "low" then return "locked" end
+	end
+	if r.rl then
+		if r.rl > level then return "later" end
+	elseif q.l and q.l > level then return "later" end
+	if r.pre then
+		for _, need in ipairs(r.pre) do
 			if ns.SafeCall(C_QuestLog.IsQuestFlaggedCompleted, need) ~= true then return "locked" end
 		end
 	end
-	if q.rl then
-		if q.f and not q.f:find(Faction(), 1, true) then return "faction" end
-		return "available"
+	-- Any one of these opens it: the same earlier step under another race's or class's number.
+	if r.any then
+		local one = false
+		for _, need in ipairs(r.any) do
+			if ns.SafeCall(C_QuestLog.IsQuestFlaggedCompleted, need) == true then one = true break end
+		end
+		if not one then return "locked" end
 	end
-	if q.l and q.l > UnitLevel("player") then return "later" end
-	if q.f and not q.f:find(Faction(), 1, true) then return "faction" end
+	-- A part of a bigger quest, only handed out while that one is in your log.
+	if r.parent and ns.SafeCall(C_QuestLog.IsOnQuest, r.parent) ~= true then return "locked" end
+	local f = q.f or r.f
+	if f and not f:find(Faction(), 1, true) then return "faction" end
 	if q.c and not q.c:find("," .. Class() .. ",", 1, true) then return "other" end
 	return "available"
+end
+
+-- The level a quest opens at: the level it asks for when QuestieDB knows it, else its own level.
+function D:OpensAt(qid, q)
+	q = q or self:Get(qid)
+	if not q then return nil end
+	local r = (not q.lib and ns.Library and ns.Library:Layer()[qid]) or q
+	return r.rl or q.rl or q.l
 end
 
 local STATUS_TEXT = {
@@ -972,7 +930,8 @@ function D:Line(qid, q)
 	local st = self:Status(qid, q)
 	local giver = ns.db.npcs.giver[qid]
 	local where = self:ZoneName(q) .. (q.x and string.format(" %.1f, %.1f", q.x * 100, q.y * 100) or "")
-	local tail = st == "later" and string.format(" (opens at level %d)", q.l) or ""
+	local opens = st == "later" and self:OpensAt(qid, q)
+	local tail = opens and string.format(" (opens at level %d)", opens) or ""
 	return string.format("|cffffd100%d|r %s%s - %s%s - %s%s", qid, q.l and ("[" .. q.l .. "] ") or "", q.t or ("Quest " .. qid),
 		where, giver and (" (" .. giver .. ")") or "", STATUS_TEXT[st] or st, tail)
 end
@@ -1042,7 +1001,7 @@ function D:MapPoints(mapID, offered)
 				if x and y and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
 					local st = self:Status(qid, q)
 					local hidden = st == "done" or st == "log" or st == "faction"
-					-- The library lists every quest in the game. Only the ones you can take now,
+					-- QuestieDB lists every quest in the game. Only the ones you can take now,
 					-- or will be able to on level alone, are worth a mark; the rest (another
 					-- class's, a later part of a chain, a repeatable hand-in) would bury them.
 					if q.lib and st ~= "available" and st ~= "later" then hidden = true end
@@ -1053,9 +1012,12 @@ function D:MapPoints(mapID, offered)
 					if not hidden then
 						local sub
 						if st == "later" then
-							sub = string.format("Opens at level %d.", q.rl or lv)
+							local opens = self:OpensAt(qid, q)
+							sub = opens and string.format("Opens at level %d.", opens) or "Opens at a higher level."
+						elseif st == "repeat" then
+							sub = "A hand-in you can repeat."
 						elseif st == "other" then
-							sub = "Seen by your other characters. It may be for another class or race."
+							sub = "Seen by your other characters. It may be for another class, race or profession."
 						else
 							sub = "Not offered to you right now: it may need an earlier quest first."
 						end
@@ -1099,8 +1061,8 @@ end
 ---------------------------------------------------------------------------
 -- What is open to you, zone by zone
 --
--- Every quest NeverQuest knows of (its own, the shipped file, the bundled library and the
--- looked-up places) whose giver stands in a zone, that this character can take now, that is not
+-- Every quest NeverQuest knows of (its own, the shipped file and QuestieDB) whose giver stands
+-- in a zone, that this character can take now, that is not
 -- gray and is not already in your log. The route uses it for zones you are not standing in: the
 -- game only reports quests on offer for the map you are on, so for every other zone this is
 -- all there is to go on. Built once and kept until something changes.
@@ -1160,7 +1122,7 @@ end
 ---------------------------------------------------------------------------
 -- Which quest leads to which, from the data
 --
--- The bundled library and the QuestieDB-derived file list what must be done before each quest.
+-- QuestieDB lists what must be done before each quest.
 -- Read backwards, that says what each quest opens up. Chains.lua asks here when neither the
 -- game's quest lines nor your own play have said, so a quest that starts a long chain is worth
 -- more on your very first character.
@@ -1182,11 +1144,7 @@ local function BuildLinks()
 	end
 	for qid, e in pairs(ns.Library and ns.Library:Layer() or {}) do
 		for _, p in ipairs(e.pre or {}) do Link(p, qid) end
-	end
-	if ns.db.questdb.lookups ~= false and D:Bundled() then
-		for qid, e in pairs(ns.QuestieForever and ns.QuestieForever.q or {}) do
-			for _, p in ipairs(e.pre or {}) do Link(p, qid) end
-		end
+		for _, p in ipairs(e.any or {}) do Link(p, qid) end
 	end
 	for _, list in pairs(nextIndex) do table.sort(list) end
 end
@@ -1204,7 +1162,7 @@ end
 -- The quest that follows this one, skipping any in `seen`, or nil. Only quests this character
 -- can take count: a chain that carries on for another class does not carry on for you.
 function D:NextQuest(qid, seen)
-	if not D:Bundled() or (ns.db.questdb.lookups == false and not (ns.Library and ns.Library:Get())) then return nil end
+	if not (ns.Library and ns.Library:Get()) then return nil end
 	if not nextIndex then BuildLinks() end
 	local direct = ns.Library and ns.Library:NextInChain(qid)
 	if direct and not (seen and seen[direct]) and Takeable(direct) then return direct end
@@ -1290,7 +1248,7 @@ function D:Export()
 	local out = { "NQQ1", Field(Build()), Field(ns.version or "?") }
 	local n, bare = 0, 0
 	for qid, q in self:Each() do
-		-- Nothing from the quest library is ours to pass on. A quest only it knows is left
+		-- Nothing from QuestieDB is ours to pass on. A quest only it knows is left
 		-- out, and one you know by name goes out exactly as NeverQuest itself has it.
 		if q.lib then q = self:Own(qid) or {} end
 		if q.m and q.x and q.y and q.t and not q.lib then
@@ -1306,8 +1264,8 @@ function D:Export()
 			bare = bare + 1
 		end
 	end
-	-- Where the bundled data turned out to be wrong, so it can be put right in the addon for
-	-- everybody. Older versions skip these records (they don't start with a number).
+	-- Where QuestieDB's data turned out to be wrong for WoW Forever, so it can be passed on to
+	-- the Questie team. Older versions skip these records (they don't start with a number).
 	local fixes = ns.Fixes and ns.Fixes:ExportRecords() or {}
 	for _, r in ipairs(fixes) do out[#out + 1] = r end
 	return table.concat(out, REC), n, bare, #fixes
@@ -1622,9 +1580,11 @@ ns:AddSlash("db", function(arg)
 	elseif cmd == "bundled" then
 		local want = rest:lower()
 		if want == "on" or want == "off" then D:SetBundled(want == "on") end
-		ns.Print(D:Bundled()
-			and "using the bundled quest data (LibQuestDB, QuestieDB's Forever data and the Warcraft Wiki lookups) to fill in what NeverQuest hasn't seen yet. /nq db bundled off goes by NeverQuest's own data only."
-			or "using NeverQuest's own quest data only: what your characters have seen, what NeverQuest shipped of its own, and what other NeverQuest players passed on. /nq db bundled on fills in the rest from the bundled data.")
+		ns.Print(not D:Bundled()
+			and "building your own quest database: NeverQuest goes by what your characters have seen, what it shipped of its own, and what other NeverQuest players passed on, and doesn't read QuestieDB. /nq db bundled on uses QuestieDB again."
+			or (ns.Library and ns.Library:Get())
+			and "using QuestieDB, the Questie team's quest database, to fill in what NeverQuest hasn't seen yet. /nq db bundled off builds your own database instead."
+			or "set to use QuestieDB, but it isn't installed or can't be read. The CurseForge app installs it with NeverQuest; /nq lib says more.")
 	elseif cmd == "fixes" or cmd == "fix" then
 		if ns.Fixes then ns.Fixes:Command(rest) end
 	elseif cmd == "export" then
@@ -1648,7 +1608,7 @@ ns:AddSlash("db", function(arg)
 		end
 		ns.UI:ShowIO("export", text, "Export quest starts",
 			n .. " quest starts" .. ((bare or 0) > 0 and (", and " .. bare .. " more quests known by name and level only") or "")
-				.. ((fixes or 0) > 0 and (", plus " .. fixes .. " places where the bundled data was wrong") or "")
+				.. ((fixes or 0) > 0 and (", plus " .. fixes .. " places where QuestieDB's data was wrong") or "")
 				.. ". Press Ctrl+C to copy. Quests and places only: no character or realm names.")
 	elseif cmd == "import" then
 		ns.UI:ShowIO("import", rest ~= "" and rest or "", "Import quest starts",

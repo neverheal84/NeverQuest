@@ -31,7 +31,7 @@ local DEFAULTS = {
 	           rested = true, sessionAtLogout = false, upgrades = true, training = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
 	questdb = { scan = true, worldmap = true, minimap = false, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true,
-	           bundled = true, fixes = true },  -- bundled: LibQuestDB, QuestieDB Forever data and wiki lookups; fixes: note where they are wrong
+	           bundled = true, fixes = true },  -- bundled: read QuestieDB (true) or build your own (false); fixes: note where QuestieDB is wrong
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
 	alerts = { complete = true, sound = true, trackTurnin = false },
 	announce = { enabled = true, objectives = true, quests = true, turnins = false, attunements = true,
@@ -336,7 +336,8 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 		ns.Call("rename dialog", OfferReload)
 	end
 	if not ns.db.quietLogin then
-		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything.")
+		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything."
+			.. ((ns.db.questdb.bundled ~= false and ns.Library and ns.Library:Installed()) and " Quest data by the Questie team (QuestieDB): /nq credits." or ""))
 	end
 	-- Quest givers you could take a quest from are a world map thing now; on the minimap they
 	-- are off unless asked for. Switched off once for everyone when this arrived, because it
@@ -345,6 +346,11 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 		ns.db.questdb.minimapReset = true
 		ns.db.questdb.minimap = false
 	end
+	-- Before 1.22 there were two switches: the bundled library (/nq lib off) and the bundled
+	-- data as a whole. Now there is one, QuestieDB or build your own. Someone who had switched
+	-- the library off asked for NeverQuest's own data only, so they keep that.
+	if ns.db.questdb.library == false then ns.db.questdb.bundled = false end
+	ns.db.questdb.library, ns.db.questdb.lookups = nil, nil
 	-- After an update: one line pointing at what changed.
 	if ns.db.lastVersion ~= ns.version then
 		if ns.db.lastVersion or not ns.freshInstall then

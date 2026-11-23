@@ -152,6 +152,17 @@ function D:Check()
 	Line(out, (C_QuestLine and C_QuestLine.RequestQuestLinesForMap) and "OK" or "WARN", "Quest database",
 		string.format("%d quests known%s%s", qdb:Count(), qdb.scanning and string.format(", scanning (%d zones to go)", #qdb.queue) or "",
 			ns.db.questdb.scan and "" or ", background scan off"))
+	local lib = ns.Library
+	if not qdb:Bundled() then
+		Line(out, "OK", "QuestieDB", "not used: building your own quest database")
+	elseif lib and lib:Get() then
+		local placed, named = lib:Count()
+		Line(out, "OK", "QuestieDB", string.format("%s in use, %d quests placed, %d by name only%s", lib:Version() or "version unknown",
+			placed, named, lib:Warming() and ", still loading" or ""))
+	else
+		Line(out, "WARN", "QuestieDB", (lib and lib:Installed()) and "installed but can't be read by this version: update both"
+			or "not installed: the map only shows what NeverQuest has learned (the CurseForge app installs it with NeverQuest)")
+	end
 	local hs = ns.Travel:HearthSpot()
 	Line(out, "OK", "Hearthstone", (ns.Travel:BindName() or "not bound") .. (hs and " (spot known)" or " (spot learned next time you bind)"))
 	Line(out, (C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap) and "OK" or "WARN", "Flight paths",
