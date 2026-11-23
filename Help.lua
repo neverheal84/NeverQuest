@@ -58,7 +58,11 @@ Help.TOPICS = {
 		Y .. "The 1-60 plan" .. E,
 		Y .. "/nq plan" .. E .. " (or the 1-60 plan button) shows your route leg by leg with class quests, talents, riding, dual spec and dungeon windows. Browse any race and class with the Race and Class buttons; Mine goes back to yours.",
 		"",
-		"Quests in the zones your plan wants count for more, and a \"Time to move on\" or \"Zone done\" step points the arrow at the next zone.")
+		"Quests in the zones your plan wants count for more, and a \"Time to move on\" or \"Zone done\" step points the arrow at the next zone.",
+		"",
+		Y .. "Dungeon quests" .. E,
+		"With \"Get dungeon quests and their pre-quests first\" on (Options > Guide & Routes, or the setup wizard), the route picks up the quests for each dungeon you've ticked a couple of levels before its window. A quest that isn't open to you yet sends you to the first quest of the chain that opens it. These count for a lot more on the route than ordinary quests, and the steps say what they're for (\"pre-quest for Red Silk Bandanas (The Deadmines)\"). Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone.",
+		"Choose dungeons with " .. Y .. "/nq dungeons pick" .. E .. ", the Choose dungeons button in Options, or the wizard page. " .. Y .. "/nq dungeons" .. E .. " lists them with what's waiting, and " .. Y .. "/nq dungeons <name>" .. E .. " ticks or unticks one.")
 	end },
 	{ key = "arrow", title = "Arrow and waypoints", text = function() return Lines(
 		Y .. "Waypoint arrow" .. E,
@@ -291,6 +295,11 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.21.7" .. E,
+		"  New option: get dungeon quests and their pre-quests first. For each dungeon you tick, the route picks up its quests a couple of levels early, and the quests that have to come before them. They count for a lot more than ordinary quests. Choose dungeons in the setup wizard, in Options (Choose dungeons), or with " .. Y .. "/nq dungeons" .. E .. ".",
+		"  Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone.",
+		"  Fixed: being on the first part of a chain whose parts all share a title and giver (The Defias Brotherhood) no longer marks the later parts as done.",
+		"",
 		Y .. "1.21.6" .. E,
 		"  Choose where quest data comes from: the bundled database (the default, a full map from your first login) or " .. Y .. "Build my own" .. E .. " from what you see in the game. The setup wizard has a page for it, Options has the switch, and " .. Y .. "/nq db bundled on|off" .. E .. " works too.",
 		"  Where the bundled data is wrong, NeverQuest notes it and stops showing the wrong place: a quest giver you stood in front of that the game didn't offer, or a giver or turn-in somewhere else. Ctrl+click a known quest on the world map to say so yourself. " .. Y .. "/nq db fixes" .. E .. " lists the notes, and Export starts sends them in.",

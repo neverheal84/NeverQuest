@@ -69,6 +69,8 @@ function G:MakeStep(kind, e)
 		end
 	elseif kind == "pickup" then
 		s.title = "Pick up: " .. tag .. e.title
+		local dungeonNote = ns.Dungeons and ns.Dungeons:Note(e.questID)
+		if dungeonNote then table.insert(parts, "|cffd8a8ff" .. dungeonNote .. "|r") end
 		s.npc = ns.Quests:GiverName(e.questID)
 		if s.npc then table.insert(parts, "from " .. s.npc) end
 		if e.ahead then table.insert(parts, "|cff99ccffnext zone on your route: " .. (ns.Nav.MapName(ns.Nav.GetZoneMap(e.m)) or "ahead") .. "|r") end
@@ -76,6 +78,8 @@ function G:MakeStep(kind, e)
 	else
 		s.title = tag .. e.title
 		s.icon = ns.ObjectiveIcon(e)
+		local dungeonNote = ns.Dungeons and ns.Dungeons:Note(e.questID)
+		if dungeonNote then table.insert(parts, "|cffd8a8ff" .. dungeonNote .. "|r") end
 		table.insert(parts, e.objective or "Complete the objectives")
 		if e.pos and e.pos.spawn and e.pos.label then
 			table.insert(parts, "|cffffd070known spot: " .. e.pos.label .. "|r")
@@ -485,6 +489,22 @@ function G:PlanInfoSteps(level)
 			table.insert(rows, { kind = "dungeon", icon = "Dungeon", key = "tip:dungeons",
 				title = "Dungeons for your level: " .. table.concat(names, ", ", 1, math.min(3, #names)),
 				sub = "Good XP and quest rewards with a group right now.", openPlan = true })
+		end
+	end
+	-- Dungeon quests being gathered (Dungeons.lua): one row per dungeon coming up.
+	local DQ = ns.Dungeons
+	if DQ and DQ:On() then
+		for _, row in ipairs(DQ:Plan().rows) do
+			if row.active and (row.open + row.pre + row.inLog) > 0 then
+				local parts = {}
+				if row.open > 0 then table.insert(parts, row.open .. " to pick up") end
+				if row.pre > 0 then table.insert(parts, row.pre .. " behind a pre-quest") end
+				if row.inLog > 0 then table.insert(parts, row.inLog .. " in your log") end
+				table.insert(rows, { kind = "dungeon", icon = "Dungeon", key = "tip:dq:" .. row.name, openDungeons = true,
+					title = string.format("%s quests: %s", row.name, table.concat(parts, ", ")),
+					sub = string.format("Picked up before you run it (levels %d-%d). Click to choose which dungeons.", row.from, row.to),
+					color = { 0.85, 0.7, 1 } })
+			end
 		end
 	end
 	return rows

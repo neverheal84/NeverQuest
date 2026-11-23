@@ -38,6 +38,7 @@ local DEFAULTS = {
 	             raid = false, sharedOnly = false, links = true, tag = true },
 	guide  = { autoTrack = true, showGray = false, nearbyYards = 200, maxOffers = 4,
 	           profile = true, milestones = true, dungeonTips = true,
+	           dungeonQuests = true, dungeonSkip = {},   -- Dungeons.lua: gather dungeon quests and pre-quests; dungeons left out
 	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true,
 	           nearbyFirst = true, zoneAdvice = true, outleveledTip = true, restedTip = true,
 	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
@@ -55,6 +56,7 @@ local DEFAULTS = {
 	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = false, dotSize = 1,
 	           showAll = false, aim = true, markClick = true, levelFilter = true, levelBand = 8 },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
+	dungeonLearned = {}, dungeonChecked = {},   -- Dungeons.lua: quests known to belong to a dungeon, and quests already asked about
 	questDB = { q = {}, scan = {}, chars = {}, fix = {} },  -- quests the game has shown any of your characters (QuestDB.lua); fix: Fixes.lua
 	guides = {},       -- recorded or imported guides, shared by all characters
 	setupDone = false, setupHinted = false,  -- setup wizard finished or skipped; one-time hint about it shown

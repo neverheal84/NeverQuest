@@ -100,6 +100,12 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Ctrl+click.* Ctrl+click a known quest marker on the world map: chat says it won't be shown there any more and it disappears. `/nq db fixes undo <its number>` brings it back.
     - *Moved.* Take or hand in a quest at an NPC whose marker was somewhere else: `/nq db fixes` should list it as "found somewhere else", with where.
     - *Export.* `/nq db export` should mention the places where the bundled data was wrong.
+57. **Dungeon quests (1.21.7).**
+    - *The wizard.* `/nq setup`: there should be a Dungeon quests page with the switch and a tick box for each dungeon on your side.
+    - *Before the Deadmines (Alliance).* At level 16 or 17 with Westfall open, the guide should put Deadmines pickups near the top: "Oh Brother...", "Collecting Memories" and "Underground Assault" in Stormwind, and The Defias Brotherhood from Gryan Stoutmantle, labelled "pre-quest for Red Silk Bandanas (The Deadmines)". A row "The Deadmines quests: ..." should count them.
+    - *Cherry-picking.* `/nq dungeons deadmines` (or untick it in Choose dungeons): those pickups should leave the route. Tick it again and they come back.
+    - *Waiting.* With a Deadmines quest in your log, the route shouldn't send you to the dungeon's entrance; its step says "done in The Deadmines". Inside the Deadmines it's routed normally.
+    - *New Forever dungeons.* Pick up a quest for The Hall of Thanes or another new dungeon on one character; `/nq dungeons` on an alt should count it.
 
 ## Afterwards, send
 

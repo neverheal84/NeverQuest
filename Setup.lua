@@ -5,7 +5,7 @@ local ADDON, ns = ...
 local Setup = {}
 ns.Setup = Setup
 
-local W, H = 540, 430
+local W, H = 560, 480
 
 local function Cfg() return ns.db end
 
@@ -45,6 +45,19 @@ Setup.PAGES = {
 			U.Check(p, 0, row(), "Guide steers the arrow", function() return db.guide.autoTrack end, function(v) db.guide.autoTrack = v Guide() end)
 			U.Check(p, 0, row(), "Include gray (low level) quests", function() return db.guide.showGray end, function(v) db.guide.showGray = v Guide() end)
 			U.Check(p, 0, row(), "Raid attunement reminders from level 50", function() return db.guide.attunements end, function(v) db.guide.attunements = v Guide() end)
+		end,
+	},
+	{
+		key = "dungeons", title = "Dungeon quests",
+		text = "Dungeon quests are some of the best XP and rewards while leveling. With this on, the route picks up the quests for the dungeons you tick a couple of levels before you're ready, and first does any quests that have to come before them. Untick the dungeons you don't plan to run.",
+		build = function(p, U, row)
+			local db = Cfg()
+			U.Check(p, 0, row(30), "Get dungeon quests and their pre-quests first", function() return db.guide.dungeonQuests ~= false end,
+				function(v) ns.Dungeons:SetOn(v) end,
+				"These count for a lot more on the route than ordinary quests. Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone. /nq dungeons lists them.")
+			local top = row(4)
+			local rows = ns.Dungeons:BuildChecks(p, U, top, 22)
+			for _ = 1, rows do row(22) end
 		end,
 	},
 	{

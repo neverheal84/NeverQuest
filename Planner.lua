@@ -39,6 +39,8 @@ local STOP_WORK = 8         -- seconds to talk to an NPC
 local PICKUP_SHARE = 0.4    -- a pickup is worth part of its quest's XP: the rest comes later
 local AHEAD_SHARE = 0.8     -- a pickup in the zone you're heading to, planned before you get there
 local AHEAD_MAX = 6         -- of those, at most this many per zone, nearest first
+local DUNGEON_SHARE = 1.0   -- a dungeon quest, or the pre-quest that opens it: worth the dungeon quest's XP
+local PREP_BOOST = 2.0      -- and doubled, so they're done before the dungeon (Dungeons.lua)
 -- Seconds per objective unit, by objective type.
 local WORK = { monster = 22, item = 30, object = 15, event = 30, log = 20, progressbar = 150 }
 
@@ -131,11 +133,19 @@ function P:Bundles(cont)
 	end
 	local avg = n > 0 and (sum / n) or 300
 	self.avgXP = avg
+	-- Dungeon quests (Dungeons.lua): what to pick up before the dungeons ahead, which quests in
+	-- your log open one, and which wait for the dungeon itself.
+	local dplan = ns.Dungeons and ns.Dungeons:On() and ns.Dungeons:Plan() or nil
+	local function WaitsForDungeon(e)
+		local d = dplan and not e.complete and dplan.wait[e.questID]
+		return d and not ns.Dungeons:Inside(d)
+	end
 
 	for _, e in ipairs(ns.Quests.log) do
 		-- A finished quest is never dropped for being gray. Its XP was earned at the level you
 		-- did the work at, and all that's left is to walk over and collect it.
-		if not e.failed and (cfg.showGray or e.complete or not e.trivial) then
+		-- A dungeon quest waits for the dungeon: the route doesn't send you to its entrance alone.
+		if not e.failed and (cfg.showGray or e.complete or not e.trivial) and not WaitsForDungeon(e) then
 			local xp = (e.xp and e.xp > 0) and e.xp or avg
 			local chain, ups = 0, 0
 			if ns.Chains then chain, ups = ns.Chains:Value(e.questID, avg) end
@@ -143,6 +153,8 @@ function P:Bundles(cont)
 			if e.elite or e.group then b.value = b.value * 0.7 end
 			b.value = b.value * StyleWeight(e.questID, ns.Quests:ZoneOf(e), focus, e.complete)
 			if ns.Catchup then b.value = b.value * ns.Catchup:Weight(e.questID, e.complete, false) end
+			-- A quest that opens a dungeon quest you're gathering: done first.
+			if dplan and dplan.prep[e.questID] then b.value = b.value * PREP_BOOST end
 			if e.complete then
 				-- Banked XP: a finished quest is worth less every level you gain past its level,
 				-- so the longer it sits the sooner it should be done.
@@ -210,7 +222,44 @@ function P:Bundles(cont)
 		end
 		self:AheadBundles(bundles, cont, focus, avg)
 	end
+	if dplan then self:DungeonBundles(bundles, cont, avg, dplan) end
 	return bundles
+end
+
+-- Dungeon quests and the pre-quests that open them (Dungeons.lua), for the dungeons you've ticked
+-- whose level window is coming up. Worth the dungeon quest's XP and then some, so they're picked
+-- up before ordinary quests. One already on the route as a pickup just gets the higher value.
+local dungeonRequested = {}
+function P:DungeonBundles(bundles, cont, avg, dplan)
+	local byQuest = {}
+	for _, b in ipairs(bundles) do if b.pickup then byQuest[b.questID] = b end end
+	for _, pick in ipairs(dplan.picks) do
+		local xp = ns.Num(GetQuestLogRewardXP(pick.forQid))
+		if not (xp and xp > 0) and not dungeonRequested[pick.forQid] then
+			dungeonRequested[pick.forQid] = true
+			pcall(C_QuestLog.RequestLoadQuestByID, pick.forQid)
+		end
+		local worth = ((xp and xp > 0) and xp or avg) * DUNGEON_SHARE * PREP_BOOST
+		local b = byQuest[pick.qid]
+		if b then
+			b.value = max(b.value, worth)
+			b.dungeon = pick.dungeon
+		else
+			local q = ns.QuestDB:Get(pick.qid)
+			if q and q.m and q.x then
+				local o = { questID = pick.qid, title = q.t or ns.Dungeons:Title(pick.qid), level = q.l, m = q.m, x = q.x, y = q.y,
+					dist = ns.Nav.Distance(q.m, q.x, q.y) }
+				local s = Stop("pickup", pick.qid, o, o, cont, STOP_WORK)
+				if s then
+					b = { questID = pick.qid, e = o, value = worth, chainCount = 0, stops = { s }, work = STOP_WORK,
+						pickup = true, dungeon = pick.dungeon }
+					s.bundle, s.order = b, 1
+					table.insert(bundles, b)
+					byQuest[pick.qid] = b
+				end
+			end
+		end
+	end
 end
 
 -- Quest givers in the zone your plan sends you to next (or now, when you're somewhere else).

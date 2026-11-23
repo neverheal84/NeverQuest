@@ -464,6 +464,10 @@ function UI:OnItemClick(item, button)
 		self:TogglePlan(true)
 		return
 	end
+	if item.openDungeons and button ~= "RightButton" then
+		if ns.Dungeons then ns.Dungeons:OpenPicker() end
+		return
+	end
 	if item.followAttune and button ~= "RightButton" then
 		local att = ns.Attune:ByKey(item.followAttune)
 		if att then ns.Attune:Follow(att, true) end
@@ -1273,6 +1277,12 @@ function UI:CreateOptions()
 	Check(g, L1.x + 16, L1:Next(), "Only my professions", function() return db.guide.profMine end, function(v) db.guide.profMine = v Tabs() end,
 		"Off lists every profession, to plan what to pick up.")
 	Check(g, L1.x, L1:Next(), "Dungeons for my level", function() return db.guide.dungeonTips end, function(v) db.guide.dungeonTips = v Guide() end)
+	Check(g, L1.x, L1:Next(), "Get dungeon quests and their pre-quests first", function() return db.guide.dungeonQuests ~= false end,
+		function(v) ns.Dungeons:SetOn(v) end,
+		"For the dungeons you tick, the route picks up their quests a couple of levels before you're ready, and the quests that have to be done first to open them. These count for a lot more than ordinary quests. Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone.")
+	local dqRow = L1:Next(26)
+	local dqPick = Button(g, "Choose dungeons...", 150, function() ns.Dungeons:OpenPicker() end)
+	dqPick:SetPoint("TOPLEFT", g, "TOPLEFT", L1.x + 16, dqRow)
 	Check(g, L1.x, L1:Next(), "Tell me when to move to the next zone", function() return db.guide.zoneAdvice end, function(v) db.guide.zoneAdvice = v Guide() end)
 	Check(g, L1.x, L1:Next(), "Tell me when I've outleveled a zone", function() return db.guide.outleveledTip end, function(v) db.guide.outleveledTip = v Guide() end)
 	Check(g, L1.x, L1:Next(), "Rested XP reminder", function() return db.guide.restedTip end, function(v) db.guide.restedTip = v Guide() end)

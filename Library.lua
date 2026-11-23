@@ -27,8 +27,10 @@ local lib, looked
 local areaMap, ends = {}, {}
 local layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 local nextCache = {}
+local ancestors = {}
 
 function L:Reset()
+	ancestors = {}
 	lib, looked = nil, nil
 	areaMap, ends = {}, {}
 	layer, layerCount, nameOnly, warming = {}, 0, 0, nil
@@ -231,6 +233,36 @@ local function Barred(q)
 	return nil
 end
 
+-- Every quest that has to be done before this one, all the way back its chain. Cached in
+-- `ancestors` (declared at the top, so Reset can clear it).
+local function Ancestors(qid)
+	local known = ancestors[qid]
+	if known then return known end
+	known = {}
+	ancestors[qid] = known
+	local queue, depth = { qid }, 0
+	while #queue > 0 and depth < 12 do
+		depth = depth + 1
+		local nextQueue = {}
+		for _, id in ipairs(queue) do
+			local q = Call("GetQuest", id)
+			if type(q) == "table" then
+				for _, field in ipairs({ "preQuestSingle", "preQuestGroup" }) do
+					for _, p in ipairs(type(q[field]) == "table" and q[field] or {}) do
+						p = ns.Num(p)
+						if p and p > 0 and not known[p] and p ~= qid then
+							known[p] = true
+							nextQueue[#nextQueue + 1] = p
+						end
+					end
+				end
+			end
+		end
+		queue = nextQueue
+	end
+	return known
+end
+
 local function Entry(qid)
 	local q = Call("GetQuest", qid)
 	if type(q) ~= "table" or q.hidden then return nil end
@@ -265,8 +297,9 @@ local function Entry(qid)
 	Shut(q.breadcrumbForQuestId)
 	-- The same quest under another number: the game keeps separate copies of one quest for
 	-- different races, classes or versions, all with one title and one giver. Finishing any of
-	-- them finishes it as far as a player is concerned. A copy that this one follows on from
-	-- is a real earlier part, not a twin, and is left out.
+	-- them finishes it as far as a player is concerned. A quest earlier or later in this one's
+	-- own chain is a real part of it, not a twin, and is left out: every part of a chain like
+	-- The Defias Brotherhood has the same title and giver.
 	local twins
 	if s.npcID then
 		local also = Call("GetQuestsStartedByNPC", s.npcID)
@@ -275,19 +308,21 @@ local function Entry(qid)
 				local other = ns.Num(also[i])
 				if other and other ~= qid then
 					local h = Call("GetQuestHeader", other)
-					if type(h) == "table" and h.name == title then
-						local follows = false
-						for _, need in ipairs(pre or {}) do if need == other then follows = true end end
-						if not follows then twins = twins or {} twins[#twins + 1] = other end
+					if type(h) == "table" and h.name == title
+						and not Ancestors(qid)[other] and not Ancestors(other)[qid] then
+						twins = twins or {} twins[#twins + 1] = other
 					end
 				end
 			end
 		end
 	end
 	local special = ns.Num(q.specialFlags) or 0
+	-- zs: the zone (an area number) or category the quest is filed under. Dungeons.lua uses it
+	-- to tell which quests are done inside a dungeon.
+	local zs = ns.Num(q.zoneOrSort)
 	return { t = title, l = (level and level > 0) and level or nil, rl = (rl and rl > 0) and rl or nil,
 		m = s.m, x = s.x, y = s.y, f = e and e.start.side, pre = pre, bar = Barred(q), lib = true,
-		shut = shut, twins = twins, again = (special % 2 == 1) or nil }
+		shut = shut, twins = twins, again = (special % 2 == 1) or nil, zs = (zs and zs > 0) and zs or nil }
 end
 
 -- The quest the library says comes next in this one's chain, or nil.
