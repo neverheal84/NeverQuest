@@ -1470,7 +1470,8 @@ function UI:CreateOptions()
 		"\"!\" for quests you can pick up, with the quest's level in its difficulty color. Click one for a waypoint.")
 	Check(d, R2.x, R2:Next(), "In any zone I look at, not just mine", function() return gv.otherZones end, function(v) gv.otherZones = v Givers() end)
 	Check(d, R2.x, R2:Next(), "Quest givers on the minimap", function() return db.pins.mmGivers end, function(v) db.pins.mmGivers = v Givers() end)
-	Check(d, R2.x, R2:Next(), "Show quest levels", function() return gv.levels end, function(v) gv.levels = v Givers() end)
+	Check(d, R2.x, R2:Next(), "Show quest levels", function() return gv.levels end, function(v) gv.levels = v Givers() end,
+		"The quest's level beside its marker on the world map and the minimap, in its difficulty color.")
 	Check(d, R2.x, R2:Next(), "Include gray (low level) quests", function() return gv.gray end, function(v) gv.gray = v Givers() end,
 		"Off: only level-appropriate quests (green, yellow and orange) show on the maps. The guide has its own gray setting.")
 	Check(d, R2.x, R2:Next(), "Include red (too high) quests", function() return gv.red end, function(v) gv.red = v Givers() end,

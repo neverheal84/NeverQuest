@@ -513,6 +513,30 @@ function ns.QuestColor(questID)
 	return 1, 0.82, 0
 end
 
+-- The same color worked out from a quest's level, for quests the game hasn't loaded (a known
+-- quest that isn't on offer yet). Uses the game's own rule where it has one.
+function ns.LevelColor(level, questID)
+	if questID and C_PlayerInfo and C_PlayerInfo.GetContentDifficultyQuestForPlayer and GetDifficultyColor then
+		local diff = ns.SafeCall(C_PlayerInfo.GetContentDifficultyQuestForPlayer, questID)
+		local c = type(diff) == "number" and GetDifficultyColor(diff)
+		if c and c.r then return c.r, c.g, c.b end
+	end
+	level = ns.Num(level)
+	if not level then return 1, 0.82, 0 end
+	if GetQuestDifficultyColor then
+		local c = ns.SafeCall(GetQuestDifficultyColor, level)
+		if type(c) == "table" and c.r then return c.r, c.g, c.b end
+	end
+	local me = UnitLevel("player") or 1
+	local diff = level - me
+	if diff >= 5 then return 1, 0.1, 0.1 end
+	if diff >= 3 then return 1, 0.5, 0.25 end
+	if diff >= -2 then return 1, 1, 0 end
+	local range = me <= 5 and 5 or me < 40 and (5 + math.floor(me / 10)) or (1 + math.floor(me / 5))
+	if -diff <= range then return 0.25, 0.75, 0.25 end
+	return 0.5, 0.5, 0.5
+end
+
 -- Runs fn once after `delay` seconds, collapsing repeated calls with the same key.
 local pendingDebounce = {}
 function ns.Debounce(key, delay, fn)

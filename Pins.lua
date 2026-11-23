@@ -98,7 +98,7 @@ function P:MinimapPoints()
 			if ns.Quests:OfferShown(o) then
 				table.insert(pts, { kind = "giver", m = o.m, x = o.x, y = o.y, questID = o.questID, offer = o,
 					key = "pickup:" .. o.questID, title = "Pick up: " .. LevelTag(o) .. o.title, atlas = GiverAtlas(o),
-					faded = o.trivial, sub = o.xp and ("+" .. ns.Comma(o.xp) .. " XP") or nil })
+					faded = o.trivial, sub = o.xp and ("+" .. ns.Comma(o.xp) .. " XP") or nil, level = o.level })
 			end
 		end
 	end
@@ -110,7 +110,7 @@ function P:MinimapPoints()
 			table.insert(pts, { kind = "giver", m = k.m, x = k.x, y = k.y, questID = k.qid,
 				key = "known:" .. k.qid, faded = true, known = true, src = k.src,
 				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t,
-				sub = k.sub })
+				sub = k.sub, level = k.q.l })
 		end
 	end
 	if cfg.mmQuests then
@@ -119,7 +119,8 @@ function P:MinimapPoints()
 				table.insert(pts, { kind = e.complete and "turnin" or "objective", m = e.pos.m, x = e.pos.x, y = e.pos.y,
 					atlas = (not e.complete) and ns.ObjectiveIcon(e) or nil,
 					questID = e.questID, key = (e.complete and "turnin:" or "objective:") .. e.questID,
-					title = (e.complete and "Turn in: " or "") .. e.title, sub = (not e.complete) and e.objective or nil })
+					title = (e.complete and "Turn in: " or "") .. LevelTag(e) .. e.title, sub = (not e.complete) and e.objective or nil,
+					level = e.level })
 			end
 		end
 	end
@@ -201,11 +202,32 @@ local function MinimapPin(i)
 	end
 	pin.Ring:Hide()
 	pin.Dot:Hide()
+	-- The quest's level beside its icon, in its difficulty color.
+	pin.Level = pin:CreateFontString(nil, "OVERLAY", _G.NeverQuestFontNumber and "NeverQuestFontNumber" or "NumberFontNormal")
+	pin.Level:SetPoint("LEFT", pin, "RIGHT", -1, 0)
+	pin.Level:Hide()
 	pin:SetScript("OnEnter", function(self) if self.point then PointTooltip(self, self.point) end end)
 	pin:SetScript("OnLeave", GameTooltip_Hide)
 	pin:SetScript("OnClick", function(self) if self.point then PointClick(self.point) end end)
 	mm.pins[i] = pin
 	return pin
+end
+
+-- The level label on a minimap pin: shown for quests (to pick up, to work on, to hand in) when
+-- quest levels are switched on, in the quest's difficulty color; known quests a little dimmer.
+function P.ApplyMinimapLevel(pin, pt, on, scale)
+	local lv = pt and not pt.spawn and ns.Num(pt.level)
+	if not (on and lv and lv > 0) then
+		pin.Level:SetText("")
+		pin.Level:Hide()
+		return
+	end
+	pin.Level:SetText(tostring(lv))
+	local r, g, b = ns.LevelColor(lv, pt.questID)
+	if pt.known then r, g, b = r * 0.8, g * 0.8, b * 0.8 end
+	pin.Level:SetTextColor(r, g, b)
+	pin.Level:SetScale(math.max(0.6, 0.75 * (scale or 1)))
+	pin.Level:Show()
 end
 
 local function HideMinimapPins(from)
@@ -268,8 +290,10 @@ function P:UpdateMinimap()
 			-- pin sits. What it looks like is only set when the pin is given something else
 			-- to show (or the size setting changes).
 			local scale = ns.db.pins.mmScale or 1
-			if pin.point ~= pt or pin.lookScale ~= scale then
-				pin.point, pin.lookScale, pin.lookEdge = pt, scale, nil
+			local levels = ns.db.givers.levels and true or false
+			if pin.point ~= pt or pin.lookScale ~= scale or pin.lookLevels ~= levels then
+				pin.point, pin.lookScale, pin.lookEdge, pin.lookLevels = pt, scale, nil, levels
+				P.ApplyMinimapLevel(pin, pt, levels, scale)
 				if pt.spawn then
 					pin:SetFrameLevel(Minimap:GetFrameLevel() + 5)
 					ApplySpawnLook(pin, pt.spawn, 0.85 * scale)
@@ -529,7 +553,8 @@ function provider:RefreshAllData()
 			map:AcquirePin("NeverQuestMapPinTemplate", {
 				x = k.x, y = k.y, m = k.q.m, wx = k.q.x, wy = k.q.y, known = true, questID = k.qid,
 				atlas = ATLAS.giver, size = 15, alpha = 0.45,
-				label = (givers.levels and k.q.l) and tostring(k.q.l) or "", labelColor = { 0.75, 0.75, 0.75 },
+				label = (givers.levels and k.q.l) and tostring(k.q.l) or "", labelColor = (function()
+					local r, g, b = ns.LevelColor(k.q.l, k.qid) return { r * 0.8, g * 0.8, b * 0.8 } end)(),
 				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t, sub = k.sub, src = k.src,
 			})
 		end

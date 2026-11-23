@@ -281,6 +281,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.21.5" .. E,
+		"  Quests on the minimap show their level beside the marker, in its difficulty color: quests to pick up, quests you are working on and turn-ins. Known quests on the world map now use difficulty colors too. Both follow the \"Show quest levels\" option.",
+		"",
 		Y .. "1.21.4" .. E,
 		"  NeverQuest is now free software under the GNU General Public License v3, because it includes GPLv3 quest data. LICENSE.md in the addon folder has the details and the credits.",
 		"",
