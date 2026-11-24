@@ -141,6 +141,17 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Another starting zone.* Walk or fly to another race's starting zone on your continent (a human to Dun Morogh, an orc to Mulgore) and take a few quests: the guide should stay there and not send you home while it has quests for you.
     - *Across the sea.* Take the boat or zeppelin to the other continent (an Undead to the Barrens or Durotar): once you arrive, the guide should work from there, staying in that zone and picking the next zone on that continent.
     - *Zone by zone.* In the Zone by zone style, stand in a zone your plan doesn't name that has quests for you: the guide stays and works through them. When it's done, the "Zone done" step names the best zone from where you are.
+63. **Party tracking (1.26.0).** Best with two or three people, at least one without NeverQuest.
+    - *Party view.* Group up with a quest in common: the tracker should open with a Party section, a line per member with "N shared" and distance, and "no NeverQuest" for anyone without it. Click a member: the arrow points at them. Click the Party header: it folds to one line.
+    - *Without NeverQuest.* Have the member without NeverQuest pick up one of your quests: within a few seconds their line should count it, and the quest's party line should say "<name> on it".
+    - *Help.* Finish a quest a member running NeverQuest is still on: a "Help: <quest>" line should appear, and a party icon on the minimap where its mobs or objects are. Click either: the arrow points at the work.
+    - *Alerts.* When they finish an objective of a quest you share, your chat should say "<name> finished <objective> (<quest>)." with a sound. When everyone has finished a quest, "Everyone's ready to hand in <quest>." once, and "Hand in together" in the tracker.
+    - *Switches.* Right-click the tracker's Party header: untick "Party alerts in chat" and the next alert shouldn't show; tick it again. Try `/nq party alerts off`, `/nq party` (it should list what's on) and `/nq party alerts on`. The first alert ever should be followed by a gray line saying how to turn them off. Nothing should show in a raid.
+64. **Mobs, drops and objects on the maps (1.26.0).** With QuestieDB installed and "QuestieDB" chosen in the setup wizard.
+    - *Before you've been there.* Take a kill quest and a collect quest in a zone you haven't played this character in. Tiny coloured dots should show on the minimap near the mobs, and on the world map when zoomed in, without you having seen them yet. Hover one: it names the mob, says "Drops <item>" for the collect quest, the quest, and "From QuestieDB".
+    - *Finished objectives.* Finish one objective of a quest with two: its dots go, the other's stay.
+    - *Switch.* Right-click a QuestieDB dot on the world map: "Hide QuestieDB spots" should remove them; tick "Include QuestieDB's spots for my quests" under Options > Spawns & Objectives to bring them back.
+    - *Known quests nearby.* Stand near quest givers you haven't talked to: faded "!" markers should show on the minimap (on by default now).
 
 ## Afterwards, send
 

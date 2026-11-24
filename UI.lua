@@ -1363,6 +1363,21 @@ function UI:CreateOptions()
 	Check(p, R.x, R:Next(), "Share quests with my party as I pick them up", function() return db.party.autoShare end,
 		function(v) db.party.autoShare = v end,
 		"Offers each quest you take from an NPC to your party. A quest that was shared to you isn't shared back, and nothing is sent in a raid.")
+	local function PartyRefresh() ns.Party:ForgetProbes() ns.Tracker:Refresh() ns.Pins:Refresh(true) end
+	Check(p, R.x, R:Next(), "Party view in the tracker", function() return db.tracker.partyView ~= false end,
+		function(v) db.tracker.partyView = v PartyRefresh() end,
+		"A Party section at the top of the tracker: each member and how they're doing on your quests, quests to hand in together, and what someone still needs that you can help with.")
+	Check(p, R.x, R:Next(), "See quests of members without NeverQuest", function() return db.party.probe ~= false end,
+		function(v) db.party.probe = v PartyRefresh() end,
+		"The game says which quests a party member is on even without NeverQuest (not how far along). Checked for your quests and the ones on offer near you.")
+	Check(p, R.x, R:Next(), "Party alerts in chat", function() return db.party.alerts ~= false end,
+		function(v) db.party.alerts = v end,
+		"A line in chat when someone on a quest you share finishes an objective or the quest, and when everyone is ready to hand it in. Needs them to run NeverQuest.")
+	Check(p, R.x + 16, R:Next(), "With a sound", function() return db.party.alertSound ~= false end,
+		function(v) db.party.alertSound = v end)
+	Check(p, R.x, R:Next(), "Map: what your party still needs", function() return db.party.mapHelp ~= false end,
+		function(v) db.party.mapHelp = v PartyRefresh() end,
+		"Blue markers on the world map and minimap where the work is for quests a party member is on that you've finished or don't have. Click one to point the arrow there.")
 
 	R:Next(10)
 	Heading(p, R.x, R:Next(), "Tooltips")
@@ -1755,7 +1770,9 @@ function UI:CreateOptions()
 	Heading(sp, R3.x, R3:Next(), "Maps")
 	Check(sp, R3.x, R3:Next(), "Show on the world map", function() return sc.worldmap end, function(v) sc.worldmap = v ns.Pins:Refresh(true) end)
 	Check(sp, R3.x, R3:Next(), "Show on the minimap", function() return sc.minimap end, function(v) sc.minimap = v ns.Pins:Refresh(true) end,
-		"Tiny dots for where your quests' mobs and objects are, and your own marks. Other learned spots and rares stay on the world map.")
+		"Tiny dots for where your quests' mobs, objects and item drops are, and your own marks. Other learned spots and rares stay on the world map.")
+	Check(sp, R3.x, R3:Next(), "Include QuestieDB's spots for my quests", function() return sc.library ~= false end, function(v) ns.Spawns:SetLibrary(v) end,
+		"Where QuestieDB says the mobs to kill, the mobs and objects that drop your quest items, and the objects to use are, before you've learned them yourself. Not with \"Build my own\".")
 	Cycle(sp, R3.x, R3:Next(30), "Dot size:", { { 0.75, "Tiny" }, { 1, "Small" }, { 1.4, "Medium" }, { 1.8, "Large" } },
 		function() return sc.dotSize end, function(v) sc.dotSize = v ns.Pins:Refresh(true) end)
 	Check(sp, R3.x, R3:Next(), "Show every known spawn, not just my quests", function() return sc.showAll end, function(v) sc.showAll = v Redraw() end,

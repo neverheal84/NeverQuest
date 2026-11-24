@@ -108,6 +108,22 @@ local function OpenSettings()
 	if ns.UI and ns.UI.OpenOptions then ns.UI:OpenOptions("tracker") end
 end
 
+-- Right-click on the Party header: its switches in one place.
+function T:PartyMenu(owner)
+	if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+	MenuUtil.CreateContextMenu(owner, function(_, root)
+		root:CreateTitle("Party")
+		for _, s in ipairs(ns.Party.SWITCHES) do
+			if s.key ~= "view" then
+				root:CreateCheckbox(s.label, function() return ns.Party:Get(s.key) end, function() ns.Party:Set(s.key) end)
+			end
+		end
+		root:CreateDivider()
+		root:CreateButton("Hide the party section", function() ns.Party:Set("view", false) end)
+		root:CreateButton("Party settings...", function() if ns.UI and ns.UI.OpenOptions then ns.UI:OpenOptions("general") end end)
+	end)
+end
+
 function T:HeaderMenu(owner)
 	if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
 	local cfg = Cfg()
@@ -221,6 +237,30 @@ end
 local function RowClick(row, button)
 	local d = row.data
 	if not d then return end
+	if d.party then
+		if button == "RightButton" then
+			T:PartyMenu(row)
+		else
+			Cfg().partyCollapsed = not Cfg().partyCollapsed
+			T:Refresh()
+		end
+		return
+	elseif d.member then
+		-- Point the arrow at them.
+		local m = d.mate
+		if m and m.m then
+			ns.Guide:Pin({ key = "party:" .. d.member.name, m = m.m, x = m.x, y = m.y, title = d.member.name, navTitle = d.member.name })
+		end
+		return
+	elseif d.help then
+		local h = d.help
+		if button == "RightButton" and h.mine then
+			T:QuestMenu(row, h.mine)
+		elseif h.spot then
+			ns.Guide:Pin({ key = "help:" .. h.questID, m = h.spot.m, x = h.spot.x, y = h.spot.y, title = h.title, questID = h.questID })
+		end
+		return
+	end
 	if d.kind == "zone" then
 		local collapsed = ZoneCollapsed(d.zone, d.here)
 		ns.char.trackerZones[d.zone] = not collapsed
@@ -238,6 +278,39 @@ end
 
 local function RowEnter(row)
 	local d = row.data
+	if d and d.party then
+		GameTooltip:SetOwner(row, "ANCHOR_LEFT")
+		GameTooltip:AddLine("Party", 1, 0.82, 0)
+		GameTooltip:AddLine("Click: fold. Right-click: alerts, sound, map help and more.", 0.5, 0.8, 1, true)
+		ns.TipShow("Right-click: party alerts and switches")
+		return
+	elseif d and d.member then
+		local r = d.member
+		GameTooltip:SetOwner(row, "ANCHOR_LEFT")
+		GameTooltip:AddLine(r.name .. (r.level and (", level " .. r.level) or ""), 1, 0.82, 0)
+		GameTooltip:AddLine(r.addon and "Runs NeverQuest: progress and objectives shared." or "Doesn't run NeverQuest: you see which quests they're on, not how far along.", 0.8, 0.8, 0.8, true)
+		local lines = {}
+		for qid, st in pairs(r.quests) do
+			local e = ns.Quests.byID[qid]
+			if e then
+				local left = ns.Party:LeftText(r.obj[qid])
+				table.insert(lines, (e.title or "?") .. ": " .. ns.Party.StateText(st) .. (left and (", " .. left) or ""))
+			end
+		end
+		table.sort(lines)
+		for _, l in ipairs(lines) do GameTooltip:AddLine(l, 1, 1, 1, true) end
+		GameTooltip:AddLine("Click: point the arrow at them.", 0.5, 0.8, 1)
+		ns.TipShow(#lines > 0 and (#lines .. " of your quests") or false)
+		return
+	elseif d and d.help then
+		local h = d.help
+		GameTooltip:SetOwner(row, "ANCHOR_LEFT")
+		GameTooltip:AddLine(h.title, 1, 0.82, 0, true)
+		for _, w in ipairs(h.who) do GameTooltip:AddLine(w, 1, 1, 1, true) end
+		GameTooltip:AddLine(h.spot and "Click: point the arrow where the work is." or "No spot known for this one yet.", 0.5, 0.8, 1, true)
+		ns.TipShow(table.concat(h.who, "; "))
+		return
+	end
 	if not d or not d.e then return end
 	local e = d.e
 	GameTooltip:SetOwner(row, "ANCHOR_LEFT")
@@ -390,9 +463,59 @@ end
 ---------------------------------------------------------------------------
 -- Drawing
 ---------------------------------------------------------------------------
+-- The party section at the top: who's with you and how they're doing, quests to hand in
+-- together, and what someone still needs that you can help with.
+local function PartyLines(out)
+	local cfg = Cfg()
+	if cfg.partyView == false or not ns.Party then return end
+	local roster = ns.Party:Roster()
+	if #roster == 0 then return end
+	local collapsed = cfg.partyCollapsed
+	table.insert(out, { kind = "zone", party = true, text = (collapsed and "+ " or "- ") .. "Party", right = tostring(#roster) })
+	if collapsed then return end
+	local mates = ns.Catchup and ns.Catchup:Mates() or {}
+	local where = {}
+	for _, m in ipairs(mates) do where[m.name] = m end
+	for _, r in ipairs(roster) do
+		local shared, ready = 0, 0
+		for qid, st in pairs(r.quests) do
+			if ns.Quests.byID[qid] then
+				shared = shared + 1
+				if st == "c" then ready = ready + 1 end
+			end
+		end
+		local c = r.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[r.class]
+		local bits = {}
+		if shared > 0 then table.insert(bits, shared .. " shared") end
+		if ready > 0 then table.insert(bits, ready .. " done") end
+		if not r.addon then table.insert(bits, "no NeverQuest") end
+		local m = where[r.name]
+		table.insert(out, { kind = "member", member = r, mate = m,
+			text = r.name .. (r.level and (" " .. r.level) or "") .. (#bits > 0 and ("  |cff999999" .. table.concat(bits, ", ") .. "|r") or ""),
+			right = (m and m.dist) and ns.Yards(m.dist) or "",
+			color = c and { c.r, c.g, c.b } or { 0.4, 0.8, 1 } })
+	end
+	local n = 0
+	for _, e in ipairs(ns.Party:ReadyTogether()) do
+		if n >= 3 then break end
+		n = n + 1
+		table.insert(out, { kind = "info", e = e, text = "Hand in together: " .. (e.title or "?"), color = { 0.4, 1, 0.4 } })
+	end
+	n = 0
+	for _, h in ipairs(ns.Party:HelpList()) do
+		if n >= 3 then break end
+		n = n + 1
+		table.insert(out, { kind = "info", help = h,
+			text = (h.mine and "Help: " or "They're on: ") .. h.title .. "  |cff999999" .. table.concat(h.who, "; ") .. "|r",
+			color = { 0.4, 0.8, 1 } })
+	end
+end
+T.PartyLines = PartyLines
+
 local function Lines(self)
 	local cfg = Cfg()
 	local out = {}
+	PartyLines(out)
 	local list = self:Entries()
 	local groups, here = self:Groups(list)
 	local shown, n = 0, 0
@@ -448,7 +571,8 @@ local function Lines(self)
 	return out, #list, shown
 end
 
-local FONT = { zone = "NeverQuestFontNormal", quest = "NeverQuestFontHighlight", objective = "NeverQuestFontSmall", info = "NeverQuestFontSmall" }
+local FONT = { zone = "NeverQuestFontNormal", quest = "NeverQuestFontHighlight", objective = "NeverQuestFontSmall", info = "NeverQuestFontSmall",
+	member = "NeverQuestFontSmall" }
 
 function T:Refresh()
 	if not ns.ready then return end
@@ -492,7 +616,7 @@ function T:Refresh()
 			if c then row.text:SetTextColor(c[1], c[2], c[3]) elseif line.kind == "zone" then row.text:SetTextColor(1, 0.82, 0) end
 			row.right:SetText(line.right or "")
 			row:ClearAllPoints()
-			local indent = (line.kind == "objective" or line.kind == "info") and INDENT or ((line.kind == "quest" and cfg.groupByZone) and 4 or 0)
+			local indent = (line.kind == "objective" or line.kind == "info") and INDENT or (((line.kind == "quest" and cfg.groupByZone) or line.kind == "member") and 4 or 0)
 			row:SetPoint("TOPLEFT", f.content, "TOPLEFT", indent, -y)
 			row:SetPoint("RIGHT", f.content, "RIGHT", 0, 0)
 			row:SetHeight(h)

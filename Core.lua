@@ -22,7 +22,8 @@ local DEFAULTS = {
 	tracker = { shown = true, blizzard = "hide", hideFrame = true, locked = false, scale = 1, width = 270, maxHeight = 520, bgAlpha = 0.45,
 	            sort = "priority", groupByZone = true, currentZoneFirst = true, collapseOther = false, collapsed = false,
 	            showObjectives = true, hideDoneObjectives = false, finishedFirst = true, showNumbers = true,
-	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 35 },
+	            showLevel = true, showDistance = true, showChains = true, showParty = true, showGray = true, maxQuests = 35,
+	            partyView = true, partyCollapsed = false },
 	drops  = { shown = false, locked = false, scale = 1, width = 250, maxHeight = 420, bgAlpha = 0.45,
 	           collapsed = false, showSource = true, sort = "progress" },  -- sort: progress | remaining | distance
 	auto   = { accept = true, turnin = true, gossip = true, skipGray = true, skipRepeatable = true, reward = "suggest",  -- reward: suggest | upgrade | value | off
@@ -31,7 +32,7 @@ local DEFAULTS = {
 	upkeep = { logFull = true, supplies = true, foodMin = 10, ammoMin = 200, bags = true, bagsMin = 3,
 	           rested = true, sessionAtLogout = false, upgrades = true, training = true },
 	travel = { flightPaths = true, hearth = true, hearthButton = true, hearthMinYards = 1500, setHearth = true },
-	questdb = { scan = true, worldmap = true, minimap = false, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true,
+	questdb = { scan = true, worldmap = true, minimap = true, ahead = 3, grayBelow = 6, share = true, deep = true, guild = true,
 	           bundled = true, fixes = true },  -- bundled: read QuestieDB (true) or build your own (false); fixes: note where QuestieDB is wrong
 	compat = { questie = true, questieNoted = false },   -- hide our quest giver and spawn pins while Questie runs
 	alerts = { complete = true, sound = true, trackTurnin = false },
@@ -49,13 +50,14 @@ local DEFAULTS = {
 	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, sources = false,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 0.6, wmScale = 1 },
 	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
-	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false },
+	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false,
+	           probe = true, alerts = true, alertSound = true, mapHelp = true },
 	tooltips = { units = true, items = true, party = true, npcs = true },   -- quest lines on mob and item tooltips
 	plates = { enabled = true, count = true, skull = true, npcs = true, scale = 1, side = "left" },   -- quest icons on nameplates (drawn by us; not raid markers)
 	flightTimes = {},   -- seconds each flight took, learned from your own flights
 	minimapButton = { shown = true, locked = false, angle = 210 },
 	givers = { worldmap = true, otherZones = true, gray = false, red = false, dailies = true, levels = true, turnins = false },
-	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = true, dotSize = 1,
+	spawns = { learn = true, nameplates = true, rares = true, share = true, worldmap = true, minimap = true, library = true, dotSize = 1,
 	           showAll = false, aim = true, markClick = true, levelFilter = true, levelBand = 8 },
 	spawnData = { npcs = {}, objs = {}, marks = {}, rares = {} },  -- learned spots and your marks, all characters
 	dungeonLearned = {}, dungeonChecked = {},   -- Dungeons.lua: quests known to belong to a dungeon, and quests already asked about
@@ -346,13 +348,14 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything."
 			.. ((ns.db.questdb.bundled ~= false and ns.Library and ns.Library:Installed()) and " Quest data by the Questie team (QuestieDB): /nq credits." or ""))
 	end
-	-- Quest givers you could take a quest from are a world map thing now; on the minimap they
-	-- are off unless asked for. Switched off once for everyone when this arrived, because it
-	-- had been on without anyone choosing it. /nq db minimap brings them back.
-	if not ns.db.questdb.minimapReset then
-		ns.db.questdb.minimapReset = true
-		ns.db.questdb.minimap = false
+	-- Known quest starts near you show on the minimap by default (1.26). 1.21 had switched them
+	-- off for everyone; they are switched back on once, and a choice made after that is kept.
+	-- /nq db minimap or Options > NeverQuest turns them off.
+	if not ns.db.questdb.minimapOn then
+		ns.db.questdb.minimapOn = true
+		ns.db.questdb.minimap = true
 	end
+	ns.db.questdb.minimapReset = nil
 	-- Before 1.22 there were two switches: the bundled library (/nq lib off) and the bundled
 	-- data as a whole. Now there is one, QuestieDB or build your own. Someone who had switched
 	-- the library off asked for NeverQuest's own data only, so they keep that.

@@ -37,7 +37,7 @@ local layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 local nextCache = {}
 local ancestors = {}
 local zoneTable, dungeonOf
-local xpTable, objCache = nil, {}
+local xpTable, objCache, spawnCache = nil, {}, {}
 
 function L:Reset()
 	ancestors = {}
@@ -46,7 +46,7 @@ function L:Reset()
 	layer, layerCount, nameOnly, warming = {}, 0, 0, nil
 	nextCache = {}
 	zoneTable, dungeonOf = nil, nil
-	xpTable, objCache = nil, {}
+	xpTable, objCache, spawnCache = nil, {}, {}
 end
 
 -- QuestieDB's API when it is installed and this version of NeverQuest can read it, whatever
@@ -452,6 +452,69 @@ function L:Objectives(questID)
 		end
 	end
 	objCache[questID] = res
+	return res
+end
+
+-- Every place for each of a quest's objectives, for the maps: a list of
+--   { kind = "npc" | "obj", name = the mob or object, match = the objective's own name (the mob,
+--     the item or the object), drop = the item it drops, if any, pts = { { m, x, y } } }
+-- At most SPAWN_CAP places per mob or object and DROP_SOURCES mobs or objects per item. nil when
+-- QuestieDB isn't in use. Kept for the session.
+function L:ObjectiveSpawns(questID)
+	questID = ns.Num(questID)
+	if not questID or not self:Get() then return nil end
+	local known = spawnCache[questID]
+	if known ~= nil then return known end
+	local res = {}
+	local ob = Field("Quest", questID, "objectives")
+	local function Name(kind, id)
+		local n = Field(kind, id, "name")
+		return (type(n) == "string" and n ~= "" and not ns.IsSecret(n)) and n or nil
+	end
+	local function Add(kind, id, match, drop)
+		local raw, pts = {}, {}
+		SpawnPoints(kind == "npc" and "Npc" or "Object", id, raw)
+		for _, s in ipairs(raw) do
+			local m = L:AreaMap(s.a)
+			if m then pts[#pts + 1] = { m = m, x = s.x, y = s.y } end
+		end
+		local name = Name(kind == "npc" and "Npc" or "Object", id)
+		if #pts > 0 and name then
+			res[#res + 1] = { kind = kind, id = id, name = name, match = match or name, drop = drop, pts = pts }
+		end
+	end
+	if type(ob) == "table" then
+		for _, c in ipairs(type(ob[1]) == "table" and ob[1] or {}) do
+			local id = IdOf(c)
+			if id then Add("npc", id) end
+		end
+		for _, c in ipairs(type(ob[2]) == "table" and ob[2] or {}) do
+			local id = IdOf(c)
+			if id then Add("obj", id) end
+		end
+		for _, c in ipairs(type(ob[3]) == "table" and ob[3] or {}) do
+			local id = IdOf(c)
+			local item = id and Name("Item", id)
+			if item then
+				local npcs, objs = Field("Item", id, "npcDrops"), Field("Item", id, "objectDrops")
+				for i = 1, math.min(type(npcs) == "table" and #npcs or 0, DROP_SOURCES) do
+					local n = ns.Num(npcs[i]) if n then Add("npc", n, item, item) end
+				end
+				for i = 1, math.min(type(objs) == "table" and #objs or 0, DROP_SOURCES) do
+					local o = ns.Num(objs[i]) if o then Add("obj", o, item, item) end
+				end
+			end
+		end
+		-- Kill credit: any of several mobs counts ({ { ids }, base mob, text }).
+		for _, c in ipairs(type(ob[5]) == "table" and ob[5] or {}) do
+			local ids = type(c) == "table" and c[1]
+			local text = type(c) == "table" and type(c[3]) == "string" and c[3] or nil
+			for i = 1, math.min(type(ids) == "table" and #ids or 0, DROP_SOURCES) do
+				local n = ns.Num(ids[i]) if n then Add("npc", n, text) end
+			end
+		end
+	end
+	spawnCache[questID] = res
 	return res
 end
 

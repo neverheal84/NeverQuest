@@ -27,6 +27,7 @@ local LOOT_WINDOW = 8       -- seconds a loot window stays linked to quest progr
 local VISITED_YARDS = 25    -- the guide moves on from a spot once you've been this close
 local VISITED_FOR = 180     -- ...and comes back to it after this many seconds
 local MAP_CAP = 300         -- most learned spots drawn on one world map
+local LIB_CAP = 400         -- most QuestieDB spots drawn on one world map
 
 local LINE_QUEST_TITLE = (Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.QuestTitle) or 17
 local LINE_QUEST_OBJECTIVE = (Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.QuestObjective) or 8
@@ -430,24 +431,44 @@ local function AddRef(idx, ent, qid, i)
 	table.insert(ent.refs, { q = qid, i = i })
 end
 
+-- Which of a quest's objectives a name from QuestieDB belongs to: index, finished. Matched by
+-- name ("Kobold Vermin", "Candle"); a quest with one objective takes it whatever the name. No
+-- match: nil, false (drawn for the quest as a whole while it is open).
+function S.MatchObjective(q, name)
+	local names = q and q.names or {}
+	local k = type(name) == "string" and Key(name) or nil
+	if k then
+		for i, nm in pairs(names) do
+			if nm.key == k then return i, nm.finished end
+		end
+		for i, nm in pairs(names) do
+			if nm.key and (nm.key:find(k, 1, true) or k:find(nm.key, 1, true)) then return i, nm.finished end
+		end
+	end
+	if #names == 1 then return 1, names[1].finished end
+	return nil, false
+end
+
 function S:Index()
 	if self.index then return self.index end
-	local idx = { quests = {}, entries = {}, points = {}, byQuest = {} }
+	local idx = { quests = {}, entries = {}, points = {}, byQuest = {}, lib = {} }
 	self.index = idx
 	local data, cfg = Data(), Cfg()
 
 	local n = 0
 	for _, e in ipairs(ns.Quests.log) do
 		if not e.complete and not e.failed then
-			local open = {}
+			local open, names = {}, {}
 			for i, o in ipairs(C_QuestLog.GetQuestObjectives(e.questID) or {}) do
+				local name = S.ObjectiveName(o.text)
+				names[i] = { key = name and Key(name), finished = o.finished and true or false }
 				if not o.finished then
-					open[i] = { text = Clean(o.text), type = o.type, name = S.ObjectiveName(o.text) }
+					open[i] = { text = Clean(o.text), type = o.type, name = name }
 				end
 			end
 			if next(open) then
 				n = n + 1
-				idx.quests[e.questID] = { e = e, open = open, color = S.PALETTE[(n - 1) % #S.PALETTE + 1] }
+				idx.quests[e.questID] = { e = e, open = open, names = names, color = S.PALETTE[(n - 1) % #S.PALETTE + 1] }
 			end
 		end
 	end
@@ -494,6 +515,33 @@ function S:Index()
 	if cfg.showAll then
 		for _, rec in pairs(npcs) do
 			if not byRec[rec] then Want(rec, "npc", rec.n) end
+		end
+	end
+
+	-- Where QuestieDB says the mobs, objects and drops for your open objectives are (1.26).
+	-- Kept apart from what you've learned: only the maps draw them (the arrow, the drops window
+	-- and tooltips go by learned spots as before), and a mob or object you have learned spots
+	-- for is drawn from those instead.
+	if cfg.library ~= false and ns.Library and ns.Library.ObjectiveSpawns then
+		local libEnts = {}
+		for qid, q in pairs(idx.quests) do
+			for _, o in ipairs(ns.Library:ObjectiveSpawns(qid) or {}) do
+				local i, done = S.MatchObjective(q, o.match)
+				local learned = (o.kind == "npc" and byRec[npcs[Key(o.name)] or false])
+					or (o.kind == "obj" and i and data.objs[qid] and data.objs[qid][i] and byRec[data.objs[qid][i]])
+				if not done and not learned then
+					local k = o.kind .. ":" .. o.id
+					local ent = libEnts[k]
+					if not ent then
+						ent = { kind = o.kind, name = o.name, drop = o.drop, lib = true, refs = {} }
+						libEnts[k] = ent
+						for _, s in ipairs(o.pts) do
+							table.insert(idx.lib, { m = s.m, x = s.x, y = s.y, w = 0, ent = ent, lib = true })
+						end
+					end
+					AddRef(idx, ent, qid, i)
+				end
+			end
 		end
 	end
 
@@ -633,6 +681,15 @@ function S:MapPoints(mapID)
 		Place(p, { kind = "spot" })
 		if #out > before then placed = placed + 1 end
 	end
+	if zoomedIn then
+		local libPlaced = 0
+		for _, p in ipairs(self:Index().lib) do
+			if libPlaced >= LIB_CAP then break end
+			local before = #out
+			Place(p, { kind = "spot" })
+			if #out > before then libPlaced = libPlaced + 1 end
+		end
+	end
 	if Cfg().rares then
 		for _, rec in pairs(Data().rares) do
 			local ent = { kind = "rare", rec = rec, name = rec.n, refs = {} }
@@ -661,6 +718,7 @@ function S:NearbyPoints(yards, cap)
 	for _, p in ipairs(self:Index().points) do
 		Consider(p, p.mark and "mark" or "spot")
 	end
+	for _, p in ipairs(self:Index().lib) do Consider(p, "spot") end
 	if Cfg().rares then
 		for _, rec in pairs(Data().rares) do
 			local ent = { kind = "rare", rec = rec, name = rec.n, refs = {} }
@@ -678,7 +736,7 @@ end
 
 function S:Signature()
 	local idx = self:Index()
-	return S.version .. ":" .. #idx.points
+	return S.version .. ":" .. #idx.points .. ":" .. #idx.lib
 end
 
 ---------------------------------------------------------------------------
@@ -734,6 +792,7 @@ function S:PointKind(p)
 		else drop = true end
 	end
 	local what = obj and "Quest object" or (kill and "Quest mob") or (drop and "Drops something you need") or "Seen here"
+	if ent.drop then what = (obj and "Has " or "Drops ") .. ent.drop end
 	local lv, src = self:PointLevel(p)
 	if lv and src == "mob" then what = what .. "  ·  level " .. lv end
 	return what
@@ -759,11 +818,22 @@ function S:Tooltip(tt, p)
 			tt:AddLine(q.e.title .. ((o and o.text) and (":  " .. o.text) or ""), c[1], c[2], c[3], true)
 		end
 	end
-	if ent.kind == "npc" or ent.kind == "obj" then
+	if ent.lib then
+		tt:AddLine("From QuestieDB", 0.8, 0.8, 0.8)
+	elseif ent.kind == "npc" or ent.kind == "obj" then
 		tt:AddLine(string.format("Seen here %d %s, last %s ago", p.w or 1, (p.w or 1) == 1 and "time" or "times", Ago(p.t)), 0.8, 0.8, 0.8)
 	end
 	local d = ns.Nav.Distance(p.m, p.x, p.y)
 	if d then tt:AddLine(ns.Yards(d), 0.8, 0.8, 0.8) end
+end
+
+-- QuestieDB's spots on the maps on or off.
+function S:SetLibrary(on)
+	Cfg().library = on and true or false
+	self.index = nil
+	ns:SendMessage("SPAWNS_UPDATED")
+	if ns.Pins and ns.Pins.Refresh then ns.Pins:Refresh(true) end
+	if ns.UI and ns.UI.RefreshOptions then ns.UI:RefreshOptions() end
 end
 
 function S:SetWaypoint(p)
@@ -774,13 +844,15 @@ function S:PointMenu(owner, p)
 	local title = self:PointTitle(p)
 	if not (MenuUtil and MenuUtil.CreateContextMenu) then
 		-- No menu system: right-click forgets learned spots and removes marks.
-		if p.mark then self:RemoveMark(p.mark) else self:ForgetSpot(p.spots, p.spot) end
+		if p.mark then self:RemoveMark(p.mark) elseif not p.lib then self:ForgetSpot(p.spots, p.spot) end
 		return
 	end
 	MenuUtil.CreateContextMenu(owner, function(_, root)
 		root:CreateTitle(title)
 		root:CreateButton("Set a waypoint here", function() S:SetWaypoint(p) end)
-		if p.mark then
+		if p.lib then
+			root:CreateButton("Hide QuestieDB spots", function() S:SetLibrary(false) end)
+		elseif p.mark then
 			root:CreateButton("Remove this mark", function() S:RemoveMark(p.mark) end)
 		else
 			root:CreateButton("Forget this spot", function() S:ForgetSpot(p.spots, p.spot) end)
@@ -1391,6 +1463,14 @@ ns:OnInit(function()
 		ns.db.spawns.minimap = true
 		if (ns.db.pins.mmScale or 1) == 1 then ns.db.pins.mmScale = 0.6 end
 		if ns.db.tracker.maxQuests == 25 then ns.db.tracker.maxQuests = 35 end
+	end
+	-- 1.26.0: the dots include QuestieDB's spots for your quests' mobs, objects and item drops,
+	-- and are on everywhere by default; switched on once more for everyone with this.
+	if not done.mapDots126 then
+		done.mapDots126 = true
+		ns.db.spawns.minimap, ns.db.spawns.worldmap, ns.db.spawns.library = true, true, true
+		ns.db.pins.minimap, ns.db.pins.mmQuests = true, true
+		S.index = nil
 	end
 end)
 

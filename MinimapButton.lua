@@ -94,6 +94,12 @@ function B:Menu(owner)
 			db.questdb.worldmap = not db.questdb.worldmap
 			ns:SendMessage("MAP_OFFERS_UPDATED")
 		end)
+		root:CreateCheckbox("Known quests on the minimap", function() return db.questdb.minimap end, function()
+			db.questdb.minimap = not db.questdb.minimap
+			if ns.QuestDB and ns.QuestDB.ClearNearby then ns.QuestDB:ClearNearby() end
+			ns:SendMessage("MAP_OFFERS_UPDATED")
+		end)
+		root:CreateCheckbox("Party alerts", function() return db.party.alerts ~= false end, function() ns.Party:Set("alerts") end)
 		root:CreateCheckbox("Party catch-up", function() return db.party.catchUp end, function()
 			db.party.catchUp = not db.party.catchUp
 			ns.Planner.dirty = true

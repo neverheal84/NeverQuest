@@ -12,6 +12,7 @@ local ATLAS = {
 	giver = "QuestNormal", turnin = "QuestTurnin", objective = ns.ICON_DO,
 	waypoint = "Waypoint-MapPin-Untracked", active = "Waypoint-MapPin-Tracked",
 	note = "minimap-genericevent-hornicon", rare = "VignetteKill",
+	party = "Interface\\WorldMap\\WorldMapPartyIcon",
 }
 P.ATLAS = ATLAS
 local CIRCLE_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
@@ -79,6 +80,20 @@ local function Inside(x, y)
 	return x and y and x >= 0 and x <= 1 and y >= 0 and y <= 1
 end
 
+-- What your party still needs that you can help with (Party:HelpList), one blue marker per
+-- quest where its work is: quests they're on that you've finished or don't have.
+function P:PartyPoints()
+	local out = {}
+	if ns.db.party.mapHelp == false or not ns.Party or not IsInGroup() or IsInRaid() then return out end
+	for _, h in ipairs(ns.Party:HelpList()) do
+		if h.spot and h.spot.m then
+			table.insert(out, { kind = "party", m = h.spot.m, x = h.spot.x, y = h.spot.y, questID = h.questID,
+				atlas = ATLAS.party, key = "help:" .. h.questID, title = "Party: " .. h.title, sub = table.concat(h.who, "; ") })
+		end
+	end
+	return out
+end
+
 ---------------------------------------------------------------------------
 -- Minimap
 ---------------------------------------------------------------------------
@@ -119,6 +134,7 @@ function P:MinimapPoints()
 				sub = k.sub, level = k.q.l })
 		end
 	end
+	for _, pt in ipairs(self:PartyPoints()) do table.insert(pts, pt) end
 	if cfg.mmQuests then
 		for _, e in ipairs(ns.Quests.log) do
 			if e.pos and not e.pos.waypoint then
@@ -389,6 +405,8 @@ function PinMethods:OnMouseEnter()
 		GameTooltip:AddLine("Click: make active.  Shift+click: remove.", 0.5, 0.8, 1)
 	elseif info.legPin then
 		GameTooltip:AddLine("Next stop on the way. The arrow goes here first.", 0.5, 0.8, 1)
+	elseif info.partyHelp then
+		GameTooltip:AddLine("Your party still needs this. Click: point the arrow here.", 0.5, 0.8, 1, true)
 	else
 		GameTooltip:AddLine("Guide step " .. (info.label or "") .. ".  Click: point the arrow here.", 0.5, 0.8, 1)
 	end
@@ -423,6 +441,8 @@ function PinMethods:OnClick(button)
 		end
 	elseif info.step then
 		ns.Guide:Pin(info.step)
+	elseif info.partyHelp then
+		ns.Guide:Pin({ key = "help:" .. info.questID, m = info.m, x = info.wx, y = info.wy, title = info.title, questID = info.questID })
 	end
 end
 
@@ -577,6 +597,19 @@ function provider:RefreshAllData()
 					x = qx, y = qy, m = mapID, wx = qx, wy = qy, turnin = true, questID = q.questID,
 					atlas = ATLAS.turnin, size = 18, label = "", frameLevel = "PIN_FRAME_LEVEL_TRACKED_CONTENT",
 					title = "Turn in: " .. title,
+				})
+			end
+		end
+	end
+
+	-- What your party still needs.
+	if zoomedIn then
+		for _, pt in ipairs(P:PartyPoints()) do
+			local x, y = ns.Nav.TranslatePoint(pt.m, pt.x, pt.y, mapID)
+			if Inside(x, y) then
+				map:AcquirePin("NeverQuestMapPinTemplate", {
+					x = x, y = y, m = pt.m, wx = pt.x, wy = pt.y, partyHelp = true, questID = pt.questID,
+					atlas = pt.atlas, size = 16, label = "", title = pt.title, sub = pt.sub,
 				})
 			end
 		end
@@ -740,6 +773,7 @@ for _, msg in ipairs({ "QUESTS_UPDATED", "WAYPOINTS_CHANGED", "GUIDE_UPDATED", "
 	ns:RegisterMessage(msg, function() ns.Debounce("pins", 0.2, function() P:Refresh() end) end)
 end
 ns:RegisterMessage("SPAWNS_UPDATED", function() ns.Debounce("spawnpins", 0.3, function() P:Refresh(true) end) end)
+ns:RegisterMessage("PARTY_UPDATED", function() ns.Debounce("partypins", 0.5, function() P:Refresh(true) end) end)
 ns:RegisterEvent("ZONE_CHANGED_NEW_AREA", function() ns.Debounce("pins", 0.5, function() P:Refresh(true) end) end)
 ns:RegisterEvent("ZONE_CHANGED", function() ns.Debounce("pins", 0.5, function() P:Refresh() end) end)
 ns:RegisterEvent("PLAYER_LOGIN", function() P:AttachWorldMap() end)
