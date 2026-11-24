@@ -153,6 +153,8 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Switch.* Right-click a QuestieDB dot on the world map: "Hide QuestieDB spots" should remove them; tick "Include QuestieDB's spots for my quests" under Options > Spawns & Objectives to bring them back.
     - *Known quests nearby.* Stand near quest givers you haven't talked to: faded "!" markers should show on the minimap (on by default now).
 
+65. **Quest icon tooltips (1.26.1).** Hover a "!" quest giver on the world map: two lines, the quest's name in its difficulty colour and "Level N", nothing else. Hover a dungeon quest's giver (the Deadmines quests in Westfall, say): "Level N, Dungeon". An elite quest should say "Elite". Do the same on the minimap and for a quest you're on (its objective marker) and one ready to hand in. Set Options > Display & Maps > Hover tooltips to Full: quest icons should still show only those lines. Set it to Off: nothing.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

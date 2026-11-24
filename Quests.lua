@@ -421,6 +421,26 @@ function Q:GiverName(questID)
 end
 function Q:TurnInName(questID) return questID and ns.db.npcs.turnin[questID] or nil end
 
+-- What kind of quest it is when it isn't an ordinary one: "Dungeon", "Raid", "Elite", "Group" or
+-- "PvP". nil for an ordinary quest. From the game's quest tag, your quest log, the dungeon list
+-- (QuestieDB files dungeon quests under the dungeon) and QuestieDB's raid flag.
+Q.KIND_TAGS = { [81] = "Dungeon", [62] = "Raid", [88] = "Raid", [89] = "Raid", [1] = "Elite", [41] = "PvP", [85] = "Dungeon" }
+function Q:Kind(questID)
+	questID = ns.Num(questID)
+	if not questID then return nil end
+	if C_QuestLog and C_QuestLog.GetQuestTagInfo then
+		local info = ns.SafeCall(C_QuestLog.GetQuestTagInfo, questID)
+		local id = type(info) == "table" and ns.Num(info.tagID)
+		if id and Q.KIND_TAGS[id] then return Q.KIND_TAGS[id] end
+	end
+	if ns.Dungeons and ns.Dungeons:QuestDungeon(questID) then return "Dungeon" end
+	if ns.Library and ns.Library.IsRaid and ns.Library:IsRaid(questID) then return "Raid" end
+	local e = self.byID[questID]
+	if e and e.elite then return "Elite" end
+	if e and e.group then return "Group" end
+	return nil
+end
+
 ns:RegisterEvent("QUEST_DETAIL", function()
 	local name, questID = NoteNPC(), GetQuestID()
 	if name and questID and questID > 0 then

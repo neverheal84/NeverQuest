@@ -518,6 +518,14 @@ function L:ObjectiveSpawns(questID)
 	return res
 end
 
+-- QuestieDB's raid flag (questFlags bit 64) for a quest. Read when asked, not kept in the layer.
+function L:IsRaid(questID)
+	questID = ns.Num(questID)
+	if not questID or not self:Get() then return false end
+	local flags = ns.Num(Field("Quest", questID, "questFlags"))
+	return flags ~= nil and math.floor(flags / 64) % 2 == 1
+end
+
 -- Only what has been worked out already, so a caller in a hurry never pays for it: the
 -- answer, false (no objectives), or nil (not yet; Advisor.lua works these out in the background).
 function L:ObjectivesKnown(questID)

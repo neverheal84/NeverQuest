@@ -88,7 +88,7 @@ function P:PartyPoints()
 	for _, h in ipairs(ns.Party:HelpList()) do
 		if h.spot and h.spot.m then
 			table.insert(out, { kind = "party", m = h.spot.m, x = h.spot.x, y = h.spot.y, questID = h.questID,
-				atlas = ATLAS.party, key = "help:" .. h.questID, title = "Party: " .. h.title, sub = table.concat(h.who, "; ") })
+				atlas = ATLAS.party, key = "help:" .. h.questID, title = "Party: " .. h.title, qtitle = h.title, sub = table.concat(h.who, "; ") })
 		end
 	end
 	return out
@@ -117,7 +117,7 @@ function P:MinimapPoints()
 	if cfg.mmGivers and not questie then
 		for _, o in ipairs(ns.Quests.offers) do
 			if ns.Quests:OfferShown(o) then
-				table.insert(pts, { kind = "giver", m = o.m, x = o.x, y = o.y, questID = o.questID, offer = o,
+				table.insert(pts, { kind = "giver", m = o.m, x = o.x, y = o.y, questID = o.questID, offer = o, qtitle = o.title,
 					key = "pickup:" .. o.questID, title = "Pick up: " .. LevelTag(o) .. o.title, atlas = GiverAtlas(o),
 					faded = o.trivial, sub = o.xp and ("+" .. ns.Comma(o.xp) .. " XP") or nil, level = o.level })
 			end
@@ -129,7 +129,7 @@ function P:MinimapPoints()
 	if ns.db.questdb.minimap and not questie and ns.QuestDB then
 		for _, k in ipairs(ns.QuestDB:NearbyPoints(400, 10)) do
 			table.insert(pts, { kind = "giver", m = k.m, x = k.x, y = k.y, questID = k.qid,
-				key = "known:" .. k.qid, faded = true, known = true, src = k.src,
+				key = "known:" .. k.qid, faded = true, known = true, src = k.src, qtitle = k.q.t,
 				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t,
 				sub = k.sub, level = k.q.l })
 		end
@@ -140,7 +140,7 @@ function P:MinimapPoints()
 			if e.pos and not e.pos.waypoint then
 				table.insert(pts, { kind = e.complete and "turnin" or "objective", m = e.pos.m, x = e.pos.x, y = e.pos.y,
 					atlas = (not e.complete) and ns.ObjectiveIcon(e) or nil,
-					questID = e.questID, key = (e.complete and "turnin:" or "objective:") .. e.questID,
+					questID = e.questID, key = (e.complete and "turnin:" or "objective:") .. e.questID, qtitle = e.title,
 					title = (e.complete and "Turn in: " or "") .. LevelTag(e) .. e.title, sub = (not e.complete) and e.objective or nil,
 					level = e.level })
 			end
@@ -182,8 +182,34 @@ local function PointClick(pt)
 	end
 end
 
+-- Every quest icon on both maps: the quest's name in its difficulty color, its level, and what
+-- kind of quest it is when it isn't an ordinary one (Dungeon, Raid, Elite, Group, PvP). Nothing
+-- else, whatever the tooltip setting (a party icon adds who needs it). Off hides it.
+function P:QuestTip(tt, questID, title, level, extra)
+	level = ns.Num(level)
+	local e = questID and ns.Quests.byID[questID]
+	local lib = questID and ns.Library and ns.Library.Entry and ns.Library:Entry(questID)
+	title = title or (e and e.title) or (lib and lib.t)
+		or (questID and C_QuestLog.GetTitleForQuestID and ns.SafeCall(C_QuestLog.GetTitleForQuestID, questID)) or ("Quest " .. tostring(questID))
+	level = level or (e and ns.Num(e.level)) or (lib and ns.Num(lib.l))
+	local r, g, b = ns.LevelColor(level, questID)
+	tt:AddLine(title, r, g, b, true)
+	local kind = ns.Quests:Kind(questID)
+	local line = level and ("Level " .. level) or nil
+	if kind then line = line and (line .. ", " .. kind) or kind end
+	if line then tt:AddLine(line, 1, 1, 1) end
+	if extra and extra ~= "" then tt:AddLine(extra, 0.8, 0.8, 0.8, true) end
+	return ns.TipShow(nil, true)
+end
+
+local QUEST_KINDS = { giver = true, turnin = true, objective = true, party = true }
+
 local function PointTooltip(owner, pt)
 	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	if pt.questID and QUEST_KINDS[pt.kind] then
+		P:QuestTip(GameTooltip, pt.questID, pt.qtitle, pt.level, pt.kind == "party" and pt.sub or nil)
+		return
+	end
 	if pt.spawn then
 		ns.Spawns:Tooltip(GameTooltip, pt.spawn)
 		GameTooltip:AddLine("Click: set a waypoint here", 0.5, 0.8, 1)
@@ -388,9 +414,8 @@ function PinMethods:OnMouseEnter()
 	local info = self.info
 	if not info then return end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	if info.offer or info.turnin then
-		P:QuestPinTooltip(info)
-		ns.TipShow()
+	if info.questID and (info.offer or info.turnin or info.known or info.partyHelp) then
+		P:QuestTip(GameTooltip, info.questID, info.qtitle, info.qlevel, info.partyHelp and info.sub or nil)
 		return
 	end
 	GameTooltip:AddLine(info.title or "", 1, 0.82, 0, true)
@@ -489,30 +514,6 @@ function SpawnPinMethods:OnClick(button)
 	end
 end
 
-function P:QuestPinTooltip(info)
-	local tt = GameTooltip
-	local c = info.labelColor or { 1, 0.82, 0 }
-	tt:AddLine(info.title or "", c[1], c[2], c[3], true)
-	local o = info.offer
-	if o then
-		local diff = o.difficulty and ns.Quests.DIFFICULTY_NAMES[o.difficulty]
-		if o.level then tt:AddLine("Level " .. o.level .. (diff and (" (" .. diff .. ")") or ""), 1, 1, 1) end
-		local giver = ns.Quests:GiverName(o.questID)
-		if giver then tt:AddLine("From " .. giver, 1, 1, 1) end
-		if o.xp then tt:AddLine("+" .. ns.Comma(o.xp) .. " XP", 0.8, 0.8, 0.8) end
-		local chain = ns.Chains and ns.Chains:Label(o.questID)
-		if chain then tt:AddLine(chain, 0.78, 0.64, 1, true)
-		elseif o.questLine then tt:AddLine("Story: " .. o.questLine, 0.78, 0.64, 1, true) end
-		if o.daily then tt:AddLine("Daily", 0.4, 0.7, 1) end
-	else
-		local npc = ns.Quests:TurnInName(info.questID)
-		if npc then tt:AddLine("To " .. npc, 1, 1, 1) end
-	end
-	local d = ns.Nav.Distance(info.m, info.wx, info.wy)
-	if d then tt:AddLine(ns.Yards(d), 0.8, 0.8, 0.8) end
-	tt:AddLine("Click: add a waypoint.  Shift+click: point the arrow here.", 0.5, 0.8, 1, true)
-end
-
 local provider = {}
 P.provider = provider
 
@@ -569,7 +570,7 @@ function provider:RefreshAllData()
 						atlas = GiverAtlas(o), size = 18, alpha = o.trivial and 0.6 or 1,
 						label = (givers.levels and o.level) and tostring(o.level) or "",
 						labelColor = { ns.QuestColor(o.questID) }, frameLevel = "PIN_FRAME_LEVEL_TRACKED_CONTENT",
-						title = "Pick up: " .. LevelTag(o) .. o.title,
+						title = "Pick up: " .. LevelTag(o) .. o.title, qtitle = o.title, qlevel = o.level,
 					})
 				end
 			end
@@ -584,6 +585,7 @@ function provider:RefreshAllData()
 				label = (givers.levels and k.q.l) and tostring(k.q.l) or "", labelColor = (function()
 					local r, g, b = ns.LevelColor(k.q.l, k.qid) return { r * 0.8, g * 0.8, b * 0.8 } end)(),
 				title = "Known quest: " .. (k.q.l and ("[" .. k.q.l .. "] ") or "") .. k.q.t, sub = k.sub, src = k.src,
+				qtitle = k.q.t, qlevel = k.q.l,
 			})
 		end
 	end
@@ -596,7 +598,7 @@ function provider:RefreshAllData()
 				map:AcquirePin("NeverQuestMapPinTemplate", {
 					x = qx, y = qy, m = mapID, wx = qx, wy = qy, turnin = true, questID = q.questID,
 					atlas = ATLAS.turnin, size = 18, label = "", frameLevel = "PIN_FRAME_LEVEL_TRACKED_CONTENT",
-					title = "Turn in: " .. title,
+					title = "Turn in: " .. title, qtitle = title,
 				})
 			end
 		end
@@ -609,7 +611,7 @@ function provider:RefreshAllData()
 			if Inside(x, y) then
 				map:AcquirePin("NeverQuestMapPinTemplate", {
 					x = x, y = y, m = pt.m, wx = pt.x, wy = pt.y, partyHelp = true, questID = pt.questID,
-					atlas = pt.atlas, size = 16, label = "", title = pt.title, sub = pt.sub,
+					atlas = pt.atlas, size = 16, label = "", title = pt.title, sub = pt.sub, qtitle = pt.qtitle,
 				})
 			end
 		end

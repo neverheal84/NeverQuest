@@ -96,6 +96,7 @@ Help.TOPICS = {
 		"",
 		Y .. "Quest givers" .. E,
 		"Quests you can pick up show on the world map with their level in the difficulty color (green, yellow, orange). Open another zone to plan ahead. Click one for a waypoint.",
+		"Hover any quest icon on either map for the quest's name and level. Dungeon, raid, elite, group and PvP quests say so; ordinary ones show nothing more.",
 		"",
 		Y .. "Spawns and objectives" .. E,
 		"NeverQuest learns as you play: where quest mobs died, what dropped quest items, and where explore objectives ticked over. Colored dots on the world map show the spots for your open objectives; hover one for details. The guide sends you to known spots and tours them.",
@@ -329,6 +330,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.26.1" .. E,
+		"  " .. Y .. "Quest icon tooltips" .. E .. ": hover a quest icon on the world map or the minimap (quest givers, known quests, objectives, turn-ins, party icons) and you get the quest's name and level, plus Dungeon, Raid, Elite, Group or PvP when it's one of those. Nothing else, whatever the tooltip setting; party icons also say who needs it.",
+		"",
 		Y .. "1.26.0" .. E,
 		"  " .. Y .. "Party view" .. E .. ": in a party, the tracker opens with a Party section: each member with how many quests you share and they've finished and how far away they are, quests to hand in together, and what they need that you can help with. Click a member to point the arrow at them, or a Help line to point it at the work.",
 		"  " .. Y .. "Works without NeverQuest" .. E .. ": party members who don't run NeverQuest are included. The game says which of your quests and nearby offers they're on, though not how far along.",
