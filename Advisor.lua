@@ -33,7 +33,6 @@ local STAY = 2                -- another zone must be this much better to leave 
 local PLAN_BONUS = 1.1        -- zones your 1-60 plan names for now
 local CROSS_CONTINENT = 1200  -- seconds: a boat or a zeppelin, with the walking at both ends
 local FAR_SHARE = 0.7         -- a zone across the sea also counts for this share: you'd be cut off from the rest
-local SMART_FROM = 10         -- below this the starting zones are the answer
 local MIN_QUESTS = 4          -- fewer known quests than this anywhere: keep to the plan
 local DROP_SHARE = 0.25       -- a quest under this share of the route's XP per hour is worth dropping
 
@@ -68,9 +67,9 @@ function A:Completionist()
 	return ns.Profiles and ns.Profiles:Style() == "zone" and Cfg().completionist ~= false or false
 end
 
+-- The quest data chooses zones in both styles (1.25; before, Optimized only).
 function A:SmartOn()
-	return ns.Profiles and ns.Profiles:Style() == "optimized" and Cfg().smartZones ~= false
-		and Cfg().profile ~= false or false
+	return ns.Profiles and Cfg().smartZones ~= false and Cfg().profile ~= false or false
 end
 
 function A:DropOn()
@@ -255,14 +254,21 @@ function A:ZoneScores(planZones)
 	if s and s.key == key and GetTime() - s.at < SCORE_TTL then return s.list end
 	local P = ns.Profiles
 	local side = UnitFactionGroup("player") == "Horde" and "H" or "A"
+	local hereMap = ns.SafeCall(C_Map.GetBestMapForUnit, "player")
+	local hereCont = hereMap and ns.Nav.GetContinentMap and ns.Nav.GetContinentMap(hereMap)
 	local list = {}
 	for name, z in pairs(P.ZONES) do
 		local id = P.ZoneID(name)
 		local isHere = id ~= nil and id == here
 		local fits = z[3] == "C" or z[3] == side
-		-- Starting zones (the Skyborne isle among them) are your own race's, from your plan, or
-		-- the one you're standing in: another race's is a long way for little XP.
-		if z[2] <= 12 or z[4] == "Z" then fits = fits and (isHere or (planZones and planZones[name]) or false) end
+		-- Starting zones: your own race's (your plan names it), the one you're standing in, and
+		-- the others on the continent you're on, so an Undead who sails to Kalimdor at 6 can use
+		-- Durotar. Another continent's are a long way for little XP, and the Skyborne isle only
+		-- counts from your plan or while you're on it.
+		if z[2] <= 12 or z[4] == "Z" then
+			local near = z[4] ~= "Z" and hereCont and id and ns.Nav.GetContinentMap(id) == hereCont
+			fits = fits and (isHere or (planZones and planZones[name]) or near or false)
+		end
 		if fits and id then
 			local minL, maxL = P.ZoneLevels(name)
 			-- Zones that fit your level now; one you've outleveled only while you're still in it.
@@ -276,17 +282,39 @@ function A:ZoneScores(planZones)
 	return list
 end
 
--- Optimized: put the best zone into the guide's focus (Profiles:Focus), unless too little is
--- known to judge, in which case the 1-60 plan's zone stands. The zone you're in is kept while
--- it is within a quarter of the best.
+-- The quest data chooses the guide's zone (Profiles:Focus) at every level and in both styles,
+-- from wherever you are; the 1-60 plan breaks ties, and stands when too little is known.
+--   Optimized: the best zone by XP per hour, but the zone you're in is kept while it is at
+--     least half as good, so going somewhere on purpose is followed rather than undone.
+--   Zone by zone: you stay wherever you are while it has quests for you (Profiles:Focus);
+--     once it's done, the next zone is the best one from here.
 function A:ApplyZones(f, level)
-	if not f or f.style ~= "optimized" or not self:SmartOn() or (level or 1) < SMART_FROM then return f end
+	if not f or not self:SmartOn() then return f end
 	local plan = {}
 	for name in pairs(f.zones or {}) do plan[name] = true end
 	local list = self:ZoneScores(plan)
 	local best = list[1]
 	if not best or best.n < MIN_QUESTS then return f end
 	local here = HereZone()
+	if f.style == "zone" then
+		f.scores = list
+		if not f.moveOn then return f end
+		local pick
+		for _, z in ipairs(list) do
+			if z.id ~= here and z.n > 0 then pick = z break end
+		end
+		if not pick then return f end
+		local planZone = f.primary
+		f.smart, f.planZone = true, planZone
+		f.primary, f.primaryID = pick.name, pick.id
+		f.zones = { [pick.name] = true }
+		f.reason = string.format("Zone by zone: %s next, with %d %s for you and the most XP per hour from here.",
+			pick.name, pick.n, pick.n == 1 and "quest" or "quests")
+		if planZone and not ns.Profiles.SameZone(planZone, pick.name) then
+			f.reason = f.reason .. " Your 1-60 plan has " .. planZone .. "."
+		end
+		return f
+	end
 	local pick = best
 	for _, z in ipairs(list) do
 		if z.id == here and z ~= best and z.n > 0 and z.score * STAY >= best.score then pick = z end
@@ -774,7 +802,7 @@ ns:AddSlash("zones", function()
 			z.n, z.n == 1 and "quest" or "quests", z.here and " (you're here)" or "", z.travel > 0 and string.format(", %s to get there%s", ns.Duration(z.travel), z.far and " by boat or zeppelin" or "") or ""))
 	end
 	if A:Pending() > 0 then ns.Print("still working out where " .. A:Pending() .. " quests' objectives are; these firm up in a moment.") end
-	if not A:SmartOn() then ns.Print("the guide isn't choosing zones this way right now: it does in the Optimized style with \"Choose zones from the quest data\" on.") end
+	if not A:SmartOn() then ns.Print("the guide isn't choosing zones this way right now: turn on \"Choose zones from the quest data\" (and following your 1-60 plan) under Options > Guide & Routes.") end
 end, "/nq zones - every zone that fits your level, by XP per hour")
 
 ns:AddSlash("drop", function()

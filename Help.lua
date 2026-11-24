@@ -56,8 +56,11 @@ Help.TOPICS = {
 	end },
 	{ key = "plan", title = "Leveling styles", text = function() return Lines(
 		Y .. "Two leveling styles" .. E,
-		"  " .. Y .. "Optimized 1-60" .. E .. ": from level 10 the guide picks the zone with the most XP per hour from the quests you can take there, travel included, and stays until another zone is clearly better. Your 1-60 plan's zones get a small edge and take over when the data is thin. Slow quests are left out and you're told which to drop.",
-		"  " .. Y .. "Zone by zone" .. E .. ": the completionist way. Every quest in a zone goes on the route, gray ones too, and nothing is left out for being slow. You move on when the zone is done, or when you're four levels past it.",
+		"  " .. Y .. "Optimized 1-60" .. E .. ": at every level the guide picks the zone with the most XP per hour from the quests you can take there, travel included, and stays until another zone is clearly better. Your 1-60 plan's zones get a small edge and take over when the data is thin. Slow quests are left out and you're told which to drop.",
+		"  " .. Y .. "Zone by zone" .. E .. ": the completionist way. Every quest in a zone goes on the route, gray ones too, and nothing is left out for being slow. You move on when the zone is done, or when you're four levels past it, to the best zone from where you are.",
+		"",
+		Y .. "It follows you" .. E,
+		"Go somewhere the plan didn't say (another race's starting zone, the Barrens instead of Silverpine, a boat to the other continent) and the guide works from there: it stays while that zone has quests for you, then picks the next zone from where you are. Your plan is a tiebreaker, not a leash.",
 		"",
 		Y .. "/nq zones" .. E .. " lists the zones that fit your level by XP per hour. Both halves can be switched off under Options > Guide & Routes.",
 		"",
@@ -313,6 +316,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.25.0" .. E,
+		"  " .. Y .. "Truly adaptive zones" .. E .. ": the guide chooses zones from the quest data at every level now, not just from 10, and in both styles. Wherever you go (another race's starting zone on your continent, the Barrens instead of Silverpine, a boat across the sea), it works from there: it stays while that zone has quests for you, then picks the next zone from where you are. The 1-60 plan only breaks ties, or takes over when too little is known.",
+		"  Zone by zone stays in whatever zone you're in until it's done, and picks the next zone by the quest data instead of strictly following the plan. In the simulator that was 1 to 5 hours faster to 60 with fewer boat trips; a character who sails to Teldrassil at level 5 now stays and carries on to Darkshore instead of being sent home.",
+		"",
 		Y .. "1.24.0" .. E,
 		"  " .. Y .. "Dropdowns" .. E .. ": every button and setting with choices opens a menu of them instead of stepping through them on click (leveling style, Race and Class in the plan view, gray quests, the Quests tab's view, the raid faction, and every setting in Options and the setup wizard).",
 		"  " .. Y .. "Resize by dragging" .. E .. ": the main window and the quest tracker have a corner to drag. The tracker lists every quest and scrolls when they don't all fit. " .. Y .. "/nq reset" .. E .. " puts the main window back to its standard size.",

@@ -534,11 +534,12 @@ function P:Focus(plan, level, zoneWork, zoneWorkAll)
 				end
 			end
 		end
-		-- Completionist: the zone you're in still has quests for you, and you haven't left it
-		-- far behind. Stay, even if your plan's band has moved on.
-		if not stay and zoneWorkAll and here and P.ZONES[here] then
-			local _, maxL = self.ZoneLevels(here)
-			if maxL and maxL >= level - COMPLETE_SLACK and maxL <= level + 10 and zoneWorkAll(here) > 0 then stay = here end
+		-- Wherever you are: the zone you're in still has quests for you and you haven't outleveled
+		-- it, so stay, whatever the plan says. You went there for a reason; when it's done, the
+		-- next zone comes from the quest data (Advisor:ApplyZones), or from the plan.
+		if not stay and here and P.ZONES[here] then
+			local minL, maxL = self.ZoneLevels(here)
+			if maxL and maxL >= level - slack and (not minL or minL <= level + 3) and work(here) > 0 then stay = here end
 		end
 		f.from, f.to, f.note = band.from, band.to, band.note
 		if stay then

@@ -1490,9 +1490,9 @@ function UI:CreateOptions()
 	local dqRow = L1:Next(26)
 	local dqPick = Button(g, "Choose dungeons...", 150, function() ns.Dungeons:OpenPicker() end)
 	dqPick:SetPoint("TOPLEFT", g, "TOPLEFT", L1.x + 16, dqRow)
-	Check(g, L1.x + 16, L1:Next(), "Optimized: choose zones from the quest data", function() return db.guide.smartZones ~= false end,
+	Check(g, L1.x + 16, L1:Next(), "Choose zones from the quest data (follows you)", function() return db.guide.smartZones ~= false end,
 		function(v) db.guide.smartZones = v ns.Guide.focusKey = nil ns.Planner.dirty = true Guide() end,
-		"Sends you to the zone with the most XP per hour for you right now, worked out from every quest you can take there (its XP, where its work is, where it's handed in, and the trip). Your 1-60 plan breaks ties and takes over when too little is known. /nq zones lists the zones.")
+		"At every level and in both styles: works from wherever you are, stays while your zone has quests for you, and picks the next zone by XP per hour from every quest you can take there (its XP, where its work is, and the trip). Your 1-60 plan breaks ties and takes over when too little is known. /nq zones lists the zones.")
 	Check(g, L1.x + 16, L1:Next(), "Optimized: suggest quests to drop", function() return db.guide.dropAdvice ~= false end,
 		function(v) db.guide.dropAdvice = v Guide() end,
 		"A note in the guide names quests in your log that aren't worth finishing: gray, too slow for their XP, or in a zone you've outleveled. Never finished quests, class or profession quests, your attunement or dungeon quests you're gathering. Nothing is dropped unless you confirm it.")

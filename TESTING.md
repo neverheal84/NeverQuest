@@ -136,6 +136,11 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
     - *Tracker right-click.* Right-click a quest: Share with party is greyed out when you're alone and works in a group, Abandon quest asks with the game's own box, and Link in chat and Show on the map work.
     - *Tooltips.* Hover the arrow: nothing shows. Hover a guide step: one line. Set Options > Display & Maps > Hover tooltips to Full: the old detail comes back. Set it to Off: nothing anywhere.
     - *Minimap.* With a kill quest in your log near its mobs, tiny dots show on the minimap where they've been seen. Rares and other spots don't.
+62. **Zones that follow you (1.25.0).**
+    - *Below 10.* On a new character, `/nq zones` should list zones with XP per hour from level 1, and the guide's reason should mention XP/hour rather than only your plan.
+    - *Another starting zone.* Walk or fly to another race's starting zone on your continent (a human to Dun Morogh, an orc to Mulgore) and take a few quests: the guide should stay there and not send you home while it has quests for you.
+    - *Across the sea.* Take the boat or zeppelin to the other continent (an Undead to the Barrens or Durotar): once you arrive, the guide should work from there, staying in that zone and picking the next zone on that continent.
+    - *Zone by zone.* In the Zone by zone style, stand in a zone your plan doesn't name that has quests for you: the guide stays and works through them. When it's done, the "Zone done" step names the best zone from where you are.
 
 ## Afterwards, send
 
