@@ -20,8 +20,8 @@
 --      and come back for them (the walking is the same either way; the XP isn't, and their
 --      follow-ups open up now). Not while you're working on an objective close by. And when the
 --      route passes a turn-in before it comes back for it, it's handed in the first time by.
---   7. The current first stop is kept unless a new plan is clearly better, so the arrow
---      doesn't flip back and forth.
+--   7. The current first stop is kept unless a new plan is clearly better (15% more XP per hour,
+--      or at least 20 seconds saved), so the arrow doesn't flip back and forth over a few yards.
 
 local ADDON, ns = ...
 local P = {}
@@ -34,7 +34,8 @@ local HORIZON = 1800        -- plan about 30 minutes ahead
 local MIN_SHARE = { optimized = 0.35, zone = 0.15, none = 0.3 }  -- leave out quests under this share of the best quest's XP per second
 local BREADCRUMB = 1.3      -- quests handed in at your next zone, near the end of a leg
 local CHAIN_STARTED = 1.15  -- follow-ups of quests you've done: finish chains you've started
-local KEEP_MARGIN = 1.15    -- a new first stop must make the plan 15% better
+local KEEP_MARGIN = 1.15    -- a new first stop must make the plan 15% better...
+local SWITCH_SECONDS = 20   -- ...or save this many seconds: walking saved counts even on a long plan
 local WORKING_YARDS = 60    -- this close to the current objective, you're working on it: keep it
 local REPLAN_MOVE = 120     -- yards moved before planning again
 local REPLAN_EVERY = 8      -- seconds between plans
@@ -793,7 +794,11 @@ function P:Make()
 		if keep then
 			local held = Build(bundles, start, keep)
 			local working = keep.stops[1].kind == "objective" and D(start, keep.stops[1]) <= WORKING_YARDS
-			if working or (not back and plan.rate <= held.rate * KEEP_MARGIN) then plan = held end
+			-- Seconds the new plan saves for the same XP. On a plan with a lot of killing and
+			-- collecting, a much shorter walk is only a few percent of the whole, so the 15% alone
+			-- would keep an old order long after you've walked past the point where it made sense.
+			local saved = held.rate > 0 and plan.seconds * (plan.rate / held.rate - 1) or math.huge
+			if working or (not back and plan.rate <= held.rate * KEEP_MARGIN and saved < SWITCH_SECONDS) then plan = held end
 		end
 	end
 

@@ -35,7 +35,7 @@ Help.TOPICS = {
 		"The Guide tab always shows your best next move. Steps are objectives, turn-ins, quest pickups and tips such as \"Time to move on\".",
 		"",
 		Y .. "Route planner" .. E,
-		"Your objectives, turn-ins and nearby pickups are put into one short route so you don't walk back and forth. Quests worth too little XP for the trip wait for later, while a worthwhile quest right on the way is done on the same visit. Quests more than 3 levels above you wait until you're within 3 levels (the guide lists them for later with the level they open at); finished ones are handed in whatever their level. Stops are put in the shortest order that keeps every turn-in after its objective. Quests ready to hand in where you stand (anywhere in town when you're in a town or city) are handed in before you leave, unless you're working on an objective close by, and a turn-in the route passes is handed in the first time by, not on a later visit. The \"Route:\" row shows the trip's time, XP and XP per hour; " .. Y .. "/nq route" .. E .. " lists it in chat.",
+		"Your objectives, turn-ins and nearby pickups are put into one short route so you don't walk back and forth. Quests worth too little XP for the trip wait for later, while a worthwhile quest right on the way is done on the same visit. Quests more than 3 levels above you wait until you're within 3 levels (the guide lists them for later with the level they open at); finished ones are handed in whatever their level. Stops are put in the shortest order that keeps every turn-in after its objective. Quests ready to hand in where you stand (anywhere in town when you're in a town or city) are handed in before you leave, unless you're working on an objective close by, and a turn-in the route passes is handed in the first time by, not on a later visit. As you move, the order changes when another one saves 20 seconds or more, but not over a few yards, so the arrow doesn't flip back and forth. The \"Route:\" row shows the trip's time, XP and XP per hour; " .. Y .. "/nq route" .. E .. " lists it in chat.",
 		"",
 		Y .. "Quest chains" .. E,
 		"Quests that open follow-ups count for more, so chains you start get finished. Steps show \"chain: Name 3/7\".",
@@ -333,6 +333,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.27.2" .. E,
+		"  " .. Y .. "Route order as you move" .. E .. ": the route used to stick with its first stop unless a new order made the whole trip 15% better, so after you walked on it could keep sending you the long way round (west to one hand-in, north-east to a camp, then back down). Now it also changes when another order saves 20 seconds or more. It still won't flip back and forth over a few yards.",
+		"  " .. Y .. "Map line" .. E .. ": with the world map open, the route line's first leg now starts where you are, and follows you as you walk.",
+		"",
 		Y .. "1.27.1" .. E,
 		"  " .. Y .. "Hand in before you leave" .. E .. ": quests ready to hand in where you stand are handed in first, so the route doesn't send you out of town and back for them. In a town or city that covers the whole town. A turn-in the route passes on the way out is handed in then, not when you come back. Not while you're working on an objective close by.",
 		"",

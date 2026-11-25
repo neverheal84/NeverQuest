@@ -523,6 +523,20 @@ function provider:RemoveAllData()
 	if self.lines then
 		for _, line in ipairs(self.lines) do line:Hide() end
 	end
+	self.liveLine = nil
+end
+
+-- The route line's first leg starts where you stand. The map only redraws when the route changes,
+-- so while it's open and you walk, this moves that start with you.
+function provider:FollowPlayer()
+	local line = self.liveLine
+	if not line or not WorldMapFrame or not WorldMapFrame:IsShown() then return end
+	local map = self:GetMap()
+	if not map or map:GetMapID() ~= self.liveMap then return end
+	local lx, ly = ns.Nav.PlayerXY(self.liveMap)
+	if not lx then return end
+	local canvas = map:GetCanvas()
+	line:SetStartPoint("TOPLEFT", canvas, lx * canvas:GetWidth(), -ly * canvas:GetHeight())
 end
 
 function provider:Line(i)
@@ -646,6 +660,8 @@ function provider:RefreshAllData()
 		local lx, ly = ns.Nav.PlayerXY(mapID)
 		local thickness = (ns.db.pins.lineWidth or 3) / math.max(0.1, map:GetCanvasScale())
 		local n, lines = 0, 0
+		local fromYou = lx ~= nil
+		self.liveMap = mapID
 		local function Segment(x, y)
 			if lx and ns.db.pins.routeLine then
 				lines = lines + 1
@@ -654,6 +670,7 @@ function provider:RefreshAllData()
 				line:SetStartPoint("TOPLEFT", canvas, lx * cw, -ly * ch)
 				line:SetEndPoint("TOPLEFT", canvas, x * cw, -y * ch)
 				line:Show()
+				if lines == 1 and fromYou then self.liveLine = line end
 			end
 			lx, ly = x, y
 		end
@@ -796,6 +813,7 @@ ns:OnInit(function()
 		sinceRebuild = sinceRebuild + elapsed
 		if acc < 0.05 then return end
 		acc = 0
+		if P.attached then provider:FollowPlayer() end
 		if not ns.db.pins.minimap then return end
 		-- Which known spawns are near changes as you move.
 		if sinceRebuild >= 4 and ns.db.spawns.minimap then
