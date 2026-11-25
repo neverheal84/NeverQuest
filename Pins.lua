@@ -671,21 +671,25 @@ function provider:RefreshAllData()
 				Segment(x, y)
 			end
 		end
-		-- Where you need to go next: objectives, finished turn-ins and pickups. Turn-ins for quests
-		-- that aren't done yet (and the NPC standing in for an unknown objective area) wait, and
-		-- quests left for later aren't part of the route.
+		-- Where you need to go next: objectives, finished turn-ins and pickups, numbered. Turn-ins
+		-- for quests that aren't done yet (and the NPC standing in for an unknown objective area)
+		-- are still stops on the route, so the line goes through them, as small unnumbered
+		-- markers unless "turn-ins on the route" is on. Quests left for later aren't on the route.
 		local withTurnins = ns.db.pins.routeTurnins
 		for _, step in ipairs(ns.Guide.steps) do
 			if n >= (ns.db.pins.routeSteps or 5) then break end
-			local skip = step.later or ((step.predicted or step.npcOnly) and not withTurnins)
-			if step.m and step.x and not skip then
+			local quiet = (step.predicted or step.npcOnly) and not withTurnins
+			if step.m and step.x and not step.later then
 				local x, y = ns.Nav.TranslatePoint(step.m, step.x, step.y, mapID)
 				if Inside(x, y) then
-					n = n + 1
-					local pin = map:AcquirePin("NeverQuestMapPinTemplate", {
-						x = x, y = y, step = step, label = tostring(n), atlas = StepAtlas(step),
-						title = step.title, sub = step.sub,
-					})
+					local info = { x = x, y = y, step = step, atlas = StepAtlas(step), title = step.title, sub = step.sub }
+					if quiet then
+						info.label, info.size, info.alpha = "", 14, 0.7
+					else
+						n = n + 1
+						info.label = tostring(n)
+					end
+					local pin = map:AcquirePin("NeverQuestMapPinTemplate", info)
 					firstPin = firstPin or pin
 					Segment(x, y)
 				end

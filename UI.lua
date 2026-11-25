@@ -1265,6 +1265,9 @@ function UI:CreateOptions()
 
 	Heading(p, L.x, L:Next(), "Automation")
 	Check(p, L.x, L:Next(), "Auto-accept quests", function() return db.auto.accept end, function(v) db.auto.accept = v end)
+	Cycle(p, L.x, L:Next(30), "Which quests:", { { "all", "Every quest" }, { "route", "Only ones the route will do" } },
+		function() return db.auto.acceptOnly end, function(v) db.auto.acceptOnly = v end,
+		"Only ones the route will do: quests the guide plans to do, class and profession quests, quests for your chosen dungeons and attunement, and others worth their time against your route. The rest you can still accept by hand.")
 	Check(p, L.x, L:Next(), "Auto turn in finished quests", function() return db.auto.turnin end, function(v) db.auto.turnin = v end)
 	Check(p, L.x, L:Next(), "Handle NPC dialog windows", function() return db.auto.gossip end, function(v) db.auto.gossip = v end,
 		"Picks finished quests to turn in, then new quests, when an NPC offers several.")

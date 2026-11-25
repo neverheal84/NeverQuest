@@ -13,6 +13,15 @@ local function IsGray(questID)
 	return questID and questID > 0 and C_QuestLog.IsQuestTrivial(questID)
 end
 
+-- Which quests auto-accept takes: every one (the default), or only the ones the route will do
+-- (Advisor:WorthTaking). A quest it leaves can still be accepted by hand.
+local function Wanted(questID, title)
+	if ns.db.auto.acceptOnly ~= "route" then return true end
+	if not questID or questID == 0 then return false end
+	return ns.Advisor and ns.Advisor:WorthTaking(questID, title) or false
+end
+A.Wanted = Wanted
+
 ---------------------------------------------------------------------------
 -- Quest dialog
 ---------------------------------------------------------------------------
@@ -24,6 +33,7 @@ ns:RegisterEvent("QUEST_DETAIL", function(_, questStartItemID)
 	if not questID or questID == 0 then return end
 	if QuestFlagsPVP and QuestFlagsPVP() then return end            -- PvP quests need a confirmation
 	if cfg.skipGray and IsGray(questID) then return end
+	if not Wanted(questID, GetTitleText and GetTitleText()) then return end
 	if QuestGetAutoAccept() then
 		if QuestIsFromAreaTrigger and QuestIsFromAreaTrigger() then return end
 		AcknowledgeAutoAcceptQuest()
@@ -142,7 +152,7 @@ ns:RegisterEvent("GOSSIP_SHOW", function()
 	if cfg.accept then
 		for _, q in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do
 			if q.questID and not q.isIgnored and not (cfg.skipGray and q.isTrivial) and not (cfg.skipRepeatable and q.repeatable)
-				and FreshPick("n" .. q.questID) then
+				and Wanted(q.questID, q.title) and FreshPick("n" .. q.questID) then
 				return C_GossipInfo.SelectAvailableQuest(q.questID)
 			end
 		end
@@ -160,9 +170,10 @@ ns:RegisterEvent("QUEST_GREETING", function()
 	end
 	if cfg.accept then
 		for i = 1, GetNumAvailableQuests() do
-			local isTrivial, _, isRepeatable = GetAvailableQuestInfo(i)
+			local isTrivial, _, isRepeatable, _, questID = GetAvailableQuestInfo(i)
+			local title = GetAvailableTitle and GetAvailableTitle(i)
 			if not (cfg.skipGray and isTrivial) and not (cfg.skipRepeatable and isRepeatable)
-				and FreshPick("gn" .. tostring(GetAvailableTitle and GetAvailableTitle(i) or i)) then
+				and Wanted(ns.Num(questID), title) and FreshPick("gn" .. tostring(title or i)) then
 				return SelectAvailableQuest(i)
 			end
 		end

@@ -3,19 +3,23 @@
 -- A plan is built from these parts:
 --   * two zone routes for your race and faction, one per leveling style:
 --       zone by zone   bands of zones; you stay in a zone until its quests run out
---       optimized      a zone-hopping route with exact level windows, the way current leveling
---                      guides move you: leave when the window ends, come back later for the rest
+--       optimized      a route of zones with level windows, worked out from the quest data:
+--                      leave when the window ends, come back later when the rest is worth it
 --   * class milestones (class quests, talents, riding, dual spec)
 --   * dungeon windows (when a dungeon is worth running for your level)
 -- Inside each zone the live guide picks the quests. Zone level ranges reported by the game
 -- client always win over the fallback ranges listed here.
 --
 -- Facts (zone levels, travel links, class quest levels, dungeon levels, race/class combos) were
--- cross-checked against published WoW Forever references in November 2026. The optimized route
--- follows where several published Forever leveling guides agree (zone order, the hops back to
--- Westfall, Redridge, the Barrens and Duskwood, Riverglades in the late 30s); the exact windows
--- and notes are NeverQuest's own. Levels 31-60 weren't part of the Forever beta, so expect those
--- legs to be tuned as the game settles.
+-- cross-checked against published WoW Forever references in November 2026. The optimized routes
+-- (1.27) are worked out from QuestieDB's quest data for WoW Forever: every quest each race can
+-- take, with its level, giver, objective areas and turn-in, levelled 1-60 in a simulator that
+-- routes each zone visit the way the in-game planner does. Each route is the order of zones and
+-- level windows that kept the simulated character questing (time with nothing to do counted
+-- double), with legs of at least two levels in zones that fit them, the starting zone first, and
+-- no early trip to the other continent people don't already make. Skyborne keep the older
+-- route. Levels 31-60 weren't part of the Forever beta, so expect those legs to be tuned as the
+-- game settles.
 
 local ADDON, ns = ...
 local P = {}
@@ -255,45 +259,124 @@ local function Legs(...)
 end
 
 P.FAST_ROUTES = {
-	human = Legs({
-		{ 1, 10, "Elwynn Forest", "Your starting zone. Goldshire's guards send you on to Westfall at 9-10." },
-		{ 10, 15, "Westfall", "Sentinel Hill's first round of quests." },
-		{ 15, 18, "Redridge Mountains", "Walk in through Three Corners for Lakeshire's lower quests." },
-		{ 18, 20, "Westfall", "Hop back to finish Sentinel Hill. The Deadmines (18-22)." },
-	}, FAST_ALLIANCE_20, FAST_SHARED),
-	dwarf = Legs({
-		{ 1, 10, "Dun Morogh", "Your starting zone." },
-		{ 10, 15, "Loch Modan", "Thelsamar. The Hall of Thanes (14-17) is in Dun Morogh." },
-		{ 15, 18, "Redridge Mountains", "Deeprun Tram to Stormwind, then the road east to Lakeshire." },
-		{ 18, 20, "Westfall", "Sentinel Hill's quests and The Deadmines (18-22)." },
-	}, FAST_ALLIANCE_20, FAST_SHARED),
-	nightelf = Legs({
+	human = {
+		{ 1, 11, "Elwynn Forest", "Your starting zone." },
+		{ 11, 15, "Loch Modan", "Thelsamar." },
+		{ 15, 20, "Westfall", "Sentinel Hill." },
+		{ 20, 23, "Redridge Mountains", "Lakeshire." },
+		{ 23, 28, "Wetlands", "Menethil Harbor. The boat continues to Southshore." },
+		{ 28, 31, "Ashenvale", "Astranaar." },
+		{ 31, 35, "Desolace", "Nijel's Point." },
+		{ 35, 42, "Riverglades", "By road from northern Redridge." },
+		{ 42, 45, "Stranglethorn Vale", "The camps in the north, then Booty Bay." },
+		{ 45, 48, "Tanaris", "Gadgetzan." },
+		{ 48, 50, "Feralas", "Feathermoon." },
+		{ 50, 52, "Azshara", "Talrendis Point." },
+		{ 52, 54, "Felwood", "Emerald Sanctuary, then Timbermaw Hold." },
+		{ 54, 56, "Western Plaguelands", "Chillwind Camp." },
+		{ 56, 60, "Eastern Plaguelands", "Light's Hope Chapel." },
+		{ 60, 60, "Mount Hyjal", "Level 60: through Darkwhisper Gorge in Winterspring." },
+	},
+	dwarf = {
+		{ 1, 11, "Dun Morogh", "Your starting zone." },
+		{ 11, 15, "Loch Modan", "Thelsamar." },
+		{ 15, 20, "Westfall", "Sentinel Hill." },
+		{ 20, 23, "Redridge Mountains", "Lakeshire." },
+		{ 23, 28, "Wetlands", "Menethil Harbor. The boat continues to Southshore." },
+		{ 28, 31, "Ashenvale", "Astranaar." },
+		{ 31, 35, "Desolace", "Nijel's Point." },
+		{ 35, 42, "Riverglades", "By road from northern Redridge." },
+		{ 42, 44, "Stranglethorn Vale", "The camps in the north, then Booty Bay." },
+		{ 44, 48, "Tanaris", "Gadgetzan." },
+		{ 48, 50, "Feralas", "Feathermoon." },
+		{ 50, 52, "Azshara", "Talrendis Point." },
+		{ 52, 54, "Felwood", "Emerald Sanctuary, then Timbermaw Hold." },
+		{ 54, 56, "Western Plaguelands", "Chillwind Camp." },
+		{ 56, 60, "Eastern Plaguelands", "Light's Hope Chapel." },
+		{ 60, 60, "Mount Hyjal", "Level 60: through Darkwhisper Gorge in Winterspring." },
+	},
+	nightelf = {
 		{ 1, 10, "Teldrassil", "Your starting zone." },
-		{ 10, 17, "Darkshore", "Auberdine." },
-		{ 17, 20, "Westfall", "Ship from Auberdine to Stormwind Harbor. The Deadmines (18-22)." },
-	}, FAST_ALLIANCE_20, FAST_SHARED),
+		{ 10, 17, "Darkshore", "Auberdine. A ship links Auberdine and Stormwind Harbor." },
+		{ 17, 20, "Westfall", "Sentinel Hill." },
+		{ 20, 24, "Redridge Mountains", "Lakeshire." },
+		{ 24, 29, "Wetlands", "Menethil Harbor. The boat continues to Southshore." },
+		{ 29, 31, "Duskwood", "Darkshire." },
+		{ 31, 34, "Arathi Highlands", "Refuge Pointe." },
+		{ 34, 43, "Riverglades", "By road from northern Redridge." },
+		{ 43, 45, "Stranglethorn Vale", "The camps in the north, then Booty Bay." },
+		{ 45, 48, "Tanaris", "Gadgetzan." },
+		{ 48, 50, "Feralas", "Feathermoon." },
+		{ 50, 52, "Un'Goro Crater", "Marshal's Refuge." },
+		{ 52, 54, "Azshara", "Talrendis Point." },
+		{ 54, 56, "Western Plaguelands", "Chillwind Camp." },
+		{ 56, 60, "Eastern Plaguelands", "Light's Hope Chapel." },
+		{ 60, 60, "Mount Hyjal", "Level 60: through Darkwhisper Gorge in Winterspring." },
+	},
+	orc = {
+		{ 1, 11, "Durotar", "Your starting zone." },
+		{ 11, 19, "The Barrens", "The Crossroads, then Ratchet and Camp Taurajo." },
+		{ 19, 22, "Stonetalon Mountains", "Sun Rock Retreat." },
+		{ 22, 24, "The Barrens", "Back to The Barrens for its later quests." },
+		{ 24, 26, "Ashenvale", "Splintertree Post." },
+		{ 26, 29, "Thousand Needles", "Freewind Post and the Shimmering Flats." },
+		{ 29, 31, "Stranglethorn Vale", "Grom'gol, then Booty Bay." },
+		{ 31, 34, "Alterac Mountains", "On the way between Hillsbrad and Arathi." },
+		{ 34, 38, "Arathi Highlands", "Hammerfall." },
+		{ 38, 43, "Riverglades", "By road from northern Redridge, or by ship from Steamwheedle Port in Tanaris." },
+		{ 43, 45, "Stranglethorn Vale", "Back to Stranglethorn Vale for its later quests." },
+		{ 45, 48, "Tanaris", "Gadgetzan." },
+		{ 48, 50, "Feralas", "Camp Mojache." },
+		{ 50, 52, "Azshara", "Valormok." },
+		{ 52, 54, "Felwood", "Bloodvenom Post, then Timbermaw Hold." },
+		{ 54, 56, "Western Plaguelands", "The Bulwark." },
+		{ 56, 60, "Eastern Plaguelands", "Light's Hope Chapel." },
+		{ 60, 60, "Mount Hyjal", "Level 60: through Darkwhisper Gorge in Winterspring." },
+	},
+	tauren = {
+		{ 1, 11, "Mulgore", "Your starting zone." },
+		{ 11, 20, "The Barrens", "The Crossroads, then Ratchet and Camp Taurajo." },
+		{ 20, 22, "Stonetalon Mountains", "Sun Rock Retreat." },
+		{ 22, 25, "The Barrens", "Back to The Barrens for its later quests." },
+		{ 25, 27, "Ashenvale", "Splintertree Post." },
+		{ 27, 31, "Hillsbrad Foothills", "Tarren Mill." },
+		{ 31, 35, "Arathi Highlands", "Hammerfall." },
+		{ 35, 43, "Riverglades", "By road from northern Redridge, or by ship from Steamwheedle Port in Tanaris." },
+		{ 43, 45, "Stranglethorn Vale", "Grom'gol, then Booty Bay." },
+		{ 45, 48, "Tanaris", "Gadgetzan." },
+		{ 48, 50, "Feralas", "Camp Mojache." },
+		{ 50, 52, "Un'Goro Crater", "Marshal's Refuge." },
+		{ 52, 54, "Azshara", "Valormok." },
+		{ 54, 56, "Felwood", "Bloodvenom Post, then Timbermaw Hold." },
+		{ 56, 60, "Eastern Plaguelands", "Light's Hope Chapel." },
+		{ 60, 60, "Mount Hyjal", "Level 60: through Darkwhisper Gorge in Winterspring." },
+	},
+	undead = {
+		{ 1, 11, "Tirisfal Glades", "Your starting zone." },
+		{ 11, 19, "The Barrens", "The Crossroads, then Ratchet and Camp Taurajo." },
+		{ 19, 23, "Hillsbrad Foothills", "Tarren Mill." },
+		{ 23, 26, "Stonetalon Mountains", "Sun Rock Retreat." },
+		{ 26, 28, "Ashenvale", "Splintertree Post." },
+		{ 28, 32, "Thousand Needles", "Freewind Post and the Shimmering Flats." },
+		{ 32, 35, "Arathi Highlands", "Hammerfall." },
+		{ 35, 38, "Stranglethorn Vale", "Grom'gol, then Booty Bay." },
+		{ 38, 42, "Riverglades", "By road from northern Redridge, or by ship from Steamwheedle Port in Tanaris." },
+		{ 42, 44, "Stranglethorn Vale", "Back to Stranglethorn Vale for its later quests." },
+		{ 44, 48, "Tanaris", "Gadgetzan." },
+		{ 48, 50, "Feralas", "Camp Mojache." },
+		{ 50, 52, "Azshara", "Valormok." },
+		{ 52, 54, "Felwood", "Bloodvenom Post, then Timbermaw Hold." },
+		{ 54, 56, "Western Plaguelands", "The Bulwark." },
+		{ 56, 60, "Eastern Plaguelands", "Light's Hope Chapel." },
+		{ 60, 60, "Mount Hyjal", "Level 60: through Darkwhisper Gorge in Winterspring." },
+	},
+
 	skyborne_a = Legs({
 		{ 1, 12, "Zephras Isle", "Your starting zone." },
 		{ 12, 15, "Westfall", "Elwynn's leftover quests on the way are worth grabbing." },
 		{ 15, 18, "Redridge Mountains", "Lakeshire's lower quests." },
 		{ 18, 20, "Westfall", "Hop back to finish Sentinel Hill. The Deadmines (18-22)." },
 	}, FAST_ALLIANCE_20, FAST_SHARED),
-	orc = Legs({
-		{ 1, 10, "Durotar", "Your starting zone." },
-		{ 10, 19, "The Barrens", "The Crossroads, then Ratchet's chains. Ragefire Chasm (13-15) in Orgrimmar." },
-	}, FAST_HORDE_19, FAST_SHARED),
-	tauren = Legs({
-		{ 1, 10, "Mulgore", "Your starting zone." },
-		{ 10, 19, "The Barrens", "The Crossroads, then Ratchet's chains. Ragefire Chasm (13-15) in Orgrimmar." },
-	}, FAST_HORDE_19, FAST_SHARED),
-	undead = Legs({
-		{ 1, 10, "Tirisfal Glades", "Your starting zone." },
-		{ 10, 19, "Silverpine Forest", "The Sepulcher. Ruins of Lordaeron (15-20) is above the Undercity." },
-		{ 19, 23, "Hillsbrad Foothills", "Tarren Mill. Shadowfang Keep (22-25) is back in Silverpine." },
-		{ 23, 26, "Stonetalon Mountains", "Zeppelin to Orgrimmar, then Sun Rock Retreat.", alt = "The Barrens" },
-		{ 26, 29, "Ashenvale", "Splintertree Post. Blackfathom Deeps (23-26)." },
-		{ 29, 31, "Thousand Needles", "Freewind Post.", alt = "Hillsbrad Foothills" },
-	}, FAST_SHARED),
 	skyborne_h = Legs({
 		{ 1, 12, "Zephras Isle", "Your starting zone. The skyboat takes you to Mulgore." },
 		{ 12, 19, "The Barrens", "The Crossroads, then Ratchet's chains." },

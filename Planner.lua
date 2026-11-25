@@ -12,8 +12,11 @@
 --      much less than the best quest on offer are left out ("not on this route"). Finished
 --      quests handed in near each other are judged as one trip: alone, none of them pays for
 --      the walk across the map, while the pile of them sitting in one town plainly does.
---   4. The order is then tightened (segments reversed where that shortens the trip).
---   5. The current first stop is kept unless a new plan is clearly better, so the arrow
+--   4. Quests right on the way that are still worth their time go in too, even past the half
+--      hour the plan looks ahead: if the route takes you there, you do them while you're there.
+--   5. The order is then tightened: stretches reversed, and single stops or runs of up to
+--      three moved, wherever that shortens the trip (a turn-in never before its objective).
+--   6. The current first stop is kept unless a new plan is clearly better, so the arrow
 --      doesn't flip back and forth.
 
 local ADDON, ns = ...
@@ -32,6 +35,9 @@ local WORKING_YARDS = 60    -- this close to the current objective, you're worki
 local REPLAN_MOVE = 120     -- yards moved before planning again
 local REPLAN_EVERY = 8      -- seconds between plans
 local MAX_STOPS = 30
+local TOO_HIGH = 3          -- quests more than this many levels above you wait until you're within it (finished ones are handed in whatever their level)
+local ONTHEWAY = 150        -- yards of extra walking: a quest this close to the route is done on the same visit
+local ONTHEWAY_BAR = 0.5    -- ...when it's worth at least half the usual bar for its time
 local TURNIN_RUN = 600      -- yards: finished quests handed in this close to each other are one trip
 local BANKED_PER_LEVEL = 0.06  -- finished quests lose XP as you out-level them, so they move up the list
 local BANKED_MAX = 1.5
@@ -94,8 +100,18 @@ local function WorkFor(e)
 	end
 	if t <= 0 then t = 30 end
 	if e.elite or e.group then t = t * 1.6 end
+	-- A quest above your level takes longer: tougher mobs, more deaths.
+	local over = (ns.Num(e.level) or 0) - (UnitLevel("player") or 1)
+	if over > 0 then t = t * (1 + 0.15 * over) end
 	return t
 end
+
+-- Too far above you to send you there yet: more than TOO_HIGH levels over your level.
+function P.TooHigh(level)
+	level = ns.Num(level)
+	return level ~= nil and level - (UnitLevel("player") or 1) > TOO_HIGH
+end
+P.TOO_HIGH = TOO_HIGH
 
 local function Stop(kind, questID, e, pos, cont, work, extra)
 	if not pos then return nil end
@@ -161,7 +177,8 @@ function P:Bundles(cont)
 		-- did the work at, and all that's left is to walk over and collect it.
 		-- A dungeon quest waits for the dungeon: the route doesn't send you to its entrance alone.
 		local gray = e.trivial and not (cfg.showGray or e.complete or (complete and InFocus(ns.Quests:ZoneOf(e))))
-		if not e.failed and not gray and not WaitsForDungeon(e) and not Skipped(e.questID) then
+		local tooHigh = not e.complete and P.TooHigh(e.level)
+		if not e.failed and not gray and not tooHigh and not WaitsForDungeon(e) and not Skipped(e.questID) then
 			local xp = (e.xp and e.xp > 0) and e.xp or avg
 			local chain, ups = 0, 0
 			if ns.Chains then chain, ups = ns.Chains:Value(e.questID, avg) end
@@ -224,7 +241,7 @@ function P:Bundles(cont)
 	if cfg.planPickups then
 		for _, o in ipairs(ns.Quests.offers) do
 			-- Zone by zone takes the gray ones in its zone too; red (too high) ones wait either way.
-			local shown = ns.Quests:OfferShown(o, true)
+			local shown = ns.Quests:OfferShown(o, true) and not P.TooHigh(o.level)
 				or (complete and (o.trivial or o.difficulty == 0) and o.difficulty ~= 4 and InFocus(ns.Quests:ZoneOf(o)))
 			if shown and not Skipped(o.questID) then
 				local chain, ups = 0, 0
@@ -338,7 +355,7 @@ function P:AheadBundles(bundles, cont, focus, avg)
 			doneZone[zid] = true
 			local picks = {}
 			for _, k in ipairs(ns.QuestDB:OpenIn(zid)) do
-				if not taken[k.qid] then
+				if not taken[k.qid] and not P.TooHigh(k.q.l) then
 					picks[#picks + 1] = { k = k, d = ns.Nav.Distance(k.q.m, k.q.x, k.q.y) or math.huge }
 				end
 			end
@@ -425,7 +442,8 @@ end
 -- first: the first position that may move (2 keeps a forced first stop where it is).
 local function Tighten(route, start, first)
 	local n = #route
-	if n < 3 then return end
+	if n < 3 then return false end
+	local changed = false
 	for _ = 1, 40 do
 		local improved = false
 		for i = first or 1, n - 1 do
@@ -454,6 +472,79 @@ local function Tighten(route, start, first)
 			end
 		end
 		if not improved then break end
+		changed = true
+	end
+	return changed
+end
+
+-- Every turn-in after its objective.
+local function Valid(route)
+	local at = {}
+	for k, s in ipairs(route) do if s.order == 1 then at[s.bundle] = k end end
+	for k, s in ipairs(route) do
+		if s.order == 2 and at[s.bundle] and at[s.bundle] > k then return false end
+	end
+	return true
+end
+
+-- Move single stops, or runs of two or three in a row, to wherever they save the most travel.
+-- Reversing stretches can't do this when a stretch holds both stops of a quest, and a route
+-- full of objectives and their turn-ins is mostly made of those. A run keeps its own order.
+local function Relocate(route, start, first)
+	first = first or 1
+	local n = #route
+	if n < 2 then return false end
+	local changed = false
+	for _ = 1, 40 do
+		local improved = false
+		for len = 1, 3 do
+			for i = first, n - len + 1 do
+				local j = i + len - 1
+				local prev = (i == 1) and start or route[i - 1]
+				local nxt = route[j + 1]
+				local gain = D(prev, route[i]) + (nxt and (D(route[j], nxt) - D(prev, nxt)) or 0)
+				local bestK, bestSave
+				for k = first - 1, n do
+					-- the gap after route[k] (k = 0: right after where you stand), outside the run
+					if k < i - 1 or k > j then
+						local u = (k == 0) and start or route[k]
+						local v = route[k + 1]
+						local cost = D(u, route[i]) + (v and (D(route[j], v) - D(u, v)) or 0)
+						local save = gain - cost
+						if save > 0.5 and (not bestSave or save > bestSave) then
+							-- only if no turn-in ends up before its objective
+							local moved = {}
+							for x = 1, n do
+								if x < i or x > j then moved[#moved + 1] = route[x] end
+								if x == k then for y = i, j do moved[#moved + 1] = route[y] end end
+							end
+							if k == 0 then
+								local front = {}
+								for y = i, j do front[#front + 1] = route[y] end
+								for _, s in ipairs(moved) do front[#front + 1] = s end
+								moved = front
+							end
+							if Valid(moved) then bestK, bestSave = moved, save end
+						end
+					end
+				end
+				if bestK then
+					for x = 1, n do route[x] = bestK[x] end
+					improved, changed = true, true
+				end
+			end
+		end
+		if not improved then break end
+	end
+	return changed
+end
+
+-- Both, until neither finds anything more.
+local function Improve(route, start, first)
+	for _ = 1, 8 do
+		local a = Tighten(route, start, first)
+		local b = Relocate(route, start, first)
+		if not a and not b then break end
 	end
 end
 
@@ -567,7 +658,22 @@ local function Build(bundles, start, forced)
 		if Travel(route, start) * DETOUR / speed + work > HORIZON then break end
 	end
 
-	Tighten(route, start, from)
+	-- While you're there: a quest right on the way is done on the same visit, even past the half
+	-- hour this plan looks ahead, as long as it's still worth its time.
+	for _, b in ipairs(bundles) do
+		if #route >= MAX_STOPS then break end
+		if not used[b] and #b.stops > 0 and #route + #b.stops <= MAX_STOPS then
+			local d, i, j = Insertion(route, start, b, false, from)
+			local rate = b.value / max(5, d * DETOUR / speed + b.work)
+			if d <= ONTHEWAY and rate >= bar * ONTHEWAY_BAR then
+				Apply(route, b, i, j)
+				used[b] = true
+				value, work = value + b.value, work + b.work
+			end
+		end
+	end
+
+	Improve(route, start, from)
 	local yards = Travel(route, start)
 	local secs = yards * DETOUR / speed + work
 	local skipped = {}

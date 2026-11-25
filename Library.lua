@@ -518,6 +518,15 @@ function L:ObjectiveSpawns(questID)
 	return res
 end
 
+-- A class or profession quest (QuestieDB lists the classes, or the skill it needs).
+function L:ClassOrProfession(questID)
+	questID = ns.Num(questID)
+	if not questID or not self:Get() then return false end
+	if (ns.Num(Field("Quest", questID, "requiredClasses")) or 0) > 0 then return true end
+	local skill = Field("Quest", questID, "requiredSkill")
+	return type(skill) == "table" and ns.Num(skill[1]) ~= nil
+end
+
 -- QuestieDB's raid flag (questFlags bit 64) for a quest. Read when asked, not kept in the layer.
 function L:IsRaid(questID)
 	questID = ns.Num(questID)

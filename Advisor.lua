@@ -359,6 +359,42 @@ local function Changed()
 	ns:SendMessage("ADVISOR_UPDATED")
 end
 
+-- Auto-accept's "only the ones the route will do": a quest is taken when the route already
+-- plans to pick it up, when it's for a dungeon you chose or the attunement you follow, when it's
+-- a class or profession quest, or when what it's worth for its time keeps up with your route
+-- (the same test the guide uses before suggesting you drop one, so nothing is taken only to be
+-- dropped), counting what its follow-ups are worth. Elite, group, dungeon and raid quests wait
+-- for a group unless your dungeon plan wants them. Quests you skipped are never taken.
+function A:WorthTaking(qid, title)
+	qid = ns.Num(qid)
+	if not qid then return false end
+	if self:IsSkipped(qid) then return false end
+	if self:IsGoingBack(qid) then return true end
+	local plan = ns.Planner and ns.Planner.plan
+	if plan and plan.rank and plan.rank[qid] then return true end
+	local dplan = ns.Dungeons and ns.Dungeons:On() and ns.Dungeons:Plan() or nil
+	if dplan and (dplan.byQuest[qid] or dplan.wait[qid] or dplan.prep[qid]) then return true end
+	local followed = ns.Attune and ns.Attune:Following()
+	if followed and title and ns.Attune.Matches then
+		for _, step in ipairs(followed.steps) do if ns.Attune.Matches(step, title) then return true end end
+	end
+	if ns.Library and ns.Library.ClassOrProfession and ns.Library:ClassOrProfession(qid) then return true end
+	-- Too far above you: the route won't send you there yet.
+	local q = ns.QuestDB and ns.QuestDB:Get(qid)
+	local lib = ns.Library and ns.Library.Entry and ns.Library:Entry(qid)
+	local qlevel = (q and q.l) or (lib and lib.l)
+	if ns.Planner and ns.Planner.TooHigh and ns.Planner.TooHigh(qlevel) then return false end
+	local kind = ns.Quests:Kind(qid)
+	if kind and kind ~= "PvP" and not IsInGroup() then return false end
+	local planRate = plan and plan.rate or 0
+	if planRate <= 0 then return true end
+	local x = self:Estimate(qid)
+	local chain = 0
+	if ns.Chains and ns.db.guide.chains then chain = ns.Chains:Value(qid, self:AverageXP()) or 0 end
+	local rate = (x.xp + chain) / math.max(30, x.secs) * 3600
+	return rate >= planRate * DROP_SHARE
+end
+
 function A:IsSkipped(qid) return qid ~= nil and ns.char.skipped[qid] ~= nil end
 function A:IsGoingBack(qid) return qid ~= nil and ns.char.goBack[qid] == true end
 

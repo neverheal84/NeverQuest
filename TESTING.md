@@ -155,6 +155,14 @@ About 75 minutes. Do the steps in order; skip any that don't apply to where you 
 
 65. **Quest icon tooltips (1.26.1).** Hover a "!" quest giver on the world map: two lines, the quest's name in its difficulty colour and "Level N", nothing else. Hover a dungeon quest's giver (the Deadmines quests in Westfall, say): "Level N, Dungeon". An elite quest should say "Elite". Do the same on the minimap and for a quest you're on (its objective marker) and one ready to hand in. Set Options > Display & Maps > Hover tooltips to Full: quest icons should still show only those lines. Set it to Off: nothing.
 
+66. **Route order and the map line (1.27.0).** Take four or five quests in a zone with a town in the middle (the Barrens from the Crossroads, or Westfall from Sentinel Hill), work spread around the zone and turn-ins back in town.
+    - *The line.* Open the world map: the yellow line should go through every stop in order, with small unnumbered markers where unfinished quests will be handed in. It should never cut straight across the map between two numbered stops when the route goes back to town between them.
+    - *The order.* Follow the guide: it shouldn't zigzag (north, then south, then back north) when there's an order that covers the same stops with less walking. `/nq route` lists every stop.
+    - *While you're there.* With a long quest on the route, take a short quest whose mobs are right beside it: it should go on the route next to it, even if the route already runs past half an hour.
+    - *Too high.* Take a quest 5 or more levels above you: the guide should list it for later ("level 25, too high for now: on the route from level 22") and never point the arrow at it until you're within 3 levels. A finished one should still be handed in.
+67. **Auto-accept only the quests the route will do (1.27.0).** Options > NeverQuest > Which quests: "Only ones the route will do". Talk to a quest giver with several quests: the ones the route would do (and class, profession, dungeon and attunement quests) should open and be accepted; a slow one far away should be left for you. An elite quest should be left while you're alone and taken in a group. Set it back to "Every quest": everything (not gray) is accepted again.
+68. **The new 1-60 plans (1.27.0).** Guide tab > 1-60 plan: browse each race. Every leg should name a zone that fits its levels and your faction, with the legs running from 1 to 60 without gaps. Untick "Choose zones from the quest data" under Options > Guide & Routes and level a few levels: the guide should follow the plan's legs and not run out of quests in the zone it sends you to.
+
 ## Afterwards, send
 
 - The `/nq check` text from step 1.

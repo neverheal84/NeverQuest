@@ -249,7 +249,13 @@ function G:BuildPlanned(steps, plan)
 				table.insert(waiting, { step = s, here = hereZone ~= nil and ns.Quests:ZoneOf(e) == hereZone })
 			else
 				s.later = true
-				s.sub = "|cff999999later:|r " .. (s.sub or "")
+				local ql = ns.Num(e.level)
+				if ns.Planner and ns.Planner.TooHigh and ns.Planner.TooHigh(ql) then
+					-- Too high for now: on the route once you're within a few levels of it.
+					s.sub = string.format("|cff999999later:|r level %d, too high for now: on the route from level %d", ql, ql - ns.Planner.TOO_HIGH)
+				else
+					s.sub = "|cff999999later:|r " .. (s.sub or "")
+				end
 				table.insert(steps, s)
 			end
 		end
