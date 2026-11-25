@@ -138,7 +138,7 @@ function A:Estimate(qid, q)
 	end
 	if prev and finish and not (e and e.complete) then yards = yards + Dist(prev, finish) end
 	if e and not e.complete then work = work * math.max(0.15, 1 - (e.progress or 0)) end
-	if e and (e.elite or e.group) then work = work * 1.6 end
+	if e and (e.elite or e.group) and not IsInGroup() then work = work * 1.6 end
 	if qlevel and qlevel > level then work = work * (1 + 0.15 * (qlevel - level)) end
 	local secs = yards * DETOUR / Speed() + work + 2 * STOP
 	c = { level = level, objs = objs, key = key, xp = xp, secs = secs, rate = xp / math.max(30, secs), guessed = guessed }
@@ -386,7 +386,7 @@ function A:WorthTaking(qid, title)
 	if ns.Planner and ns.Planner.TooHigh and ns.Planner.TooHigh(qlevel) then return false end
 	local kind = ns.Quests:Kind(qid)
 	if kind and kind ~= "PvP" and not IsInGroup() then return false end
-	local planRate = plan and plan.rate or 0
+	local planRate = plan and (plan.plainRate or plan.rate) or 0
 	if planRate <= 0 then return true end
 	local x = self:Estimate(qid)
 	local chain = 0
@@ -534,7 +534,7 @@ end
 function A:DropCandidates(limit)
 	if not self:DropOn() then return {} end
 	local plan = ns.Planner and ns.Planner.plan
-	local planRate = plan and plan.rate or 0
+	local planRate = plan and (plan.plainRate or plan.rate) or 0
 	local focus = ns.Guide and ns.Guide.focus
 	local dplan = ns.Dungeons and ns.Dungeons:On() and ns.Dungeons:Plan() or nil
 	local followed = ns.Attune and ns.Attune:Following()

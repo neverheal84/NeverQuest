@@ -218,7 +218,7 @@ function G:BuildPlanned(steps, plan)
 	if cfg.routeSummary and #plan.stops > 0 then
 		table.insert(steps, { kind = "tip", key = "tip:route",
 			title = string.format("Route: %d stops, ~%s", #plan.stops, ns.Duration(plan.seconds)),
-			sub = string.format("~%s XP for the trip (about %s XP/hour)%s", ns.Comma(plan.value), ns.Comma(plan.rate),
+			sub = string.format("~%s XP for the trip (about %s XP/hour)%s", ns.Comma(plan.xp or plan.value), ns.Comma(plan.xpRate or plan.rate),
 				#plan.skipped > 0 and ("  ·  " .. #plan.skipped .. " quest(s) left for later") or ""),
 			color = { 0.6, 0.85, 1 } })
 	end

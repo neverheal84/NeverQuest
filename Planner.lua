@@ -16,12 +16,15 @@
 --      hour the plan looks ahead: if the route takes you there, you do them while you're there.
 --   5. The order is then tightened: stretches reversed, and single stops or runs of up to
 --      three moved, wherever that shortens the trip (a turn-in never before its objective).
---   6. Finished quests handed in right where you stand go first, so you don't walk out of town
---      and come back for them (the walking is the same either way; the XP isn't, and their
---      follow-ups open up now). Not while you're working on an objective close by. And when the
---      route passes a turn-in before it comes back for it, it's handed in the first time by.
---   7. The current first stop is kept unless a new plan is clearly better (15% more XP per hour,
---      or at least 20 seconds saved), so the arrow doesn't flip back and forth over a few yards.
+--   6. Finished quests handed in right where you stand go first, and so do quests worth taking
+--      that are given there, so you don't walk out of town and come back for them (the walking
+--      is the same either way; the XP isn't, their follow-ups open up now, and a quest taken
+--      now can be done on this trip). Not while you're working on an objective close by. And
+--      when the route passes a turn-in or a quest giver before it comes back for it, that's done
+--      the first time by.
+--   7. The current first stop is kept unless that costs 20 seconds or more over the same stops in
+--      a better order, and a stop you were sent away from isn't gone back to until your quests
+--      change, so the arrow doesn't flip back and forth (see Make).
 
 local ADDON, ns = ...
 local P = {}
@@ -34,8 +37,8 @@ local HORIZON = 1800        -- plan about 30 minutes ahead
 local MIN_SHARE = { optimized = 0.35, zone = 0.15, none = 0.3 }  -- leave out quests under this share of the best quest's XP per second
 local BREADCRUMB = 1.3      -- quests handed in at your next zone, near the end of a leg
 local CHAIN_STARTED = 1.15  -- follow-ups of quests you've done: finish chains you've started
-local KEEP_MARGIN = 1.15    -- a new first stop must make the plan 15% better...
-local SWITCH_SECONDS = 20   -- ...or save this many seconds: walking saved counts even on a long plan
+local SWITCH_SECONDS = 20   -- the first stop changes when keeping it first would cost this many seconds more for the same stops
+local KEEP_MARGIN = 1.15    -- ...or, when the new plan has dropped it altogether, when that plan is 15% better
 local WORKING_YARDS = 60    -- this close to the current objective, you're working on it: keep it
 local REPLAN_MOVE = 120     -- yards moved before planning again
 local REPLAN_EVERY = 8      -- seconds between plans
@@ -110,7 +113,8 @@ local function WorkFor(e)
 		end
 	end
 	if t <= 0 then t = 30 end
-	if e.elite or e.group then t = t * 1.6 end
+	-- Elite and group quests are slow and risky alone; in a group they're ordinary quests.
+	if (e.elite or e.group) and not IsInGroup() then t = t * 1.6 end
 	-- A quest above your level takes longer: tougher mobs, more deaths.
 	local over = (ns.Num(e.level) or 0) - (UnitLevel("player") or 1)
 	if over > 0 then t = t * (1 + 0.15 * over) end
@@ -193,8 +197,8 @@ function P:Bundles(cont)
 			local xp = (e.xp and e.xp > 0) and e.xp or avg
 			local chain, ups = 0, 0
 			if ns.Chains then chain, ups = ns.Chains:Value(e.questID, avg) end
-			local b = { questID = e.questID, e = e, value = xp + chain, chainCount = ups, stops = {} }
-			if e.elite or e.group then b.value = b.value * 0.7 end
+			local b = { questID = e.questID, e = e, value = xp + chain, xp = xp, chainCount = ups, stops = {} }
+			if (e.elite or e.group) and not IsInGroup() then b.value = b.value * 0.7 end
 			b.value = b.value * StyleWeight(e.questID, ns.Quests:ZoneOf(e), focus, e.complete)
 			if ns.Catchup then b.value = b.value * ns.Catchup:Weight(e.questID, e.complete, false) end
 			-- A quest that opens a dungeon quest you're gathering: done first.
@@ -263,7 +267,7 @@ function P:Bundles(cont)
 					-- not only by its XP: a quest whose work is across the map counts for less.
 					local xp = o.xp or (AD and AD:XP(o.questID)) or avg
 					local fit = AD and AD:PickupFactor(o.questID) or 1
-					local b = { questID = o.questID, e = o, value = (xp + chain) * PICKUP_SHARE * fit, chainCount = ups,
+					local b = { questID = o.questID, e = o, value = (xp + chain) * PICKUP_SHARE * fit, xp = xp, chainCount = ups,
 						stops = { s }, work = STOP_WORK, pickup = true }
 					if Back(o.questID) then b.value = b.value * GOBACK end
 					b.value = b.value * StyleWeight(o.questID, ns.Quests:ZoneOf(o), focus, false)
@@ -296,7 +300,7 @@ function P:BackBundles(bundles, cont, avg)
 					dist = ns.Nav.Distance(q.m, q.x, q.y), back = true }
 				local s = Stop("pickup", qid, o, o, cont, STOP_WORK)
 				if s then
-					local b = { questID = qid, e = o, value = (AD:XP(qid) or avg) * GOBACK, chainCount = 0,
+					local b = { questID = qid, e = o, value = (AD:XP(qid) or avg) * GOBACK, xp = AD:XP(qid) or avg, chainCount = 0,
 						stops = { s }, work = STOP_WORK, pickup = true, back = true }
 					s.bundle, s.order = b, 1
 					table.insert(bundles, b)
@@ -332,7 +336,7 @@ function P:DungeonBundles(bundles, cont, avg, dplan)
 					dist = ns.Nav.Distance(q.m, q.x, q.y) }
 				local s = Stop("pickup", pick.qid, o, o, cont, STOP_WORK)
 				if s then
-					b = { questID = pick.qid, e = o, value = worth, chainCount = 0, stops = { s }, work = STOP_WORK,
+					b = { questID = pick.qid, e = o, value = worth, xp = avg, chainCount = 0, stops = { s }, work = STOP_WORK,
 						pickup = true, dungeon = pick.dungeon }
 					s.bundle, s.order = b, 1
 					table.insert(bundles, b)
@@ -386,7 +390,7 @@ function P:AheadBundles(bundles, cont, focus, avg)
 				if ns.Chains then chain, ups = ns.Chains:Value(k.qid, avg) end
 				local s = Stop("pickup", k.qid, o, o, cont, STOP_WORK)
 				if s then
-					local b = { questID = k.qid, e = o, value = ((o.xp or avg) + chain) * PICKUP_SHARE * AHEAD_SHARE,
+					local b = { questID = k.qid, e = o, value = ((o.xp or avg) + chain) * PICKUP_SHARE * AHEAD_SHARE, xp = o.xp or avg,
 						chainCount = ups, stops = { s }, work = STOP_WORK, pickup = true, ahead = true }
 					b.value = b.value * StyleWeight(k.qid, zoneName, focus, false)
 					s.bundle, s.order = b, 1
@@ -559,15 +563,17 @@ local function Improve(route, start, first)
 	end
 end
 
--- Hand in the first time the route passes by, not on a later visit: each turn-in moves to the
--- earliest place it fits for at most EARLY more yards (never before its objective). When you're
--- coming back anyway the walking is the same, but the XP comes sooner and the follow-ups open up.
+-- Hand in, and pick up, the first time the route passes by, not on a later visit: each turn-in
+-- and pickup moves to the earliest place it fits for at most EARLY more yards (a turn-in never
+-- before its objective). When you're coming back anyway the walking is the same, but the XP comes
+-- sooner, the follow-ups open up, and a quest picked up on the way out can be done on this trip
+-- instead of the next one.
 -- Runs last, since the passes above would move them back to save those few yards.
 local function Earlier(route, start, first)
 	first = first or 1
 	for k = first + 1, #route do
 		local s = route[k]
-		if s.kind == "turnin" then
+		if s.kind == "turnin" or s.kind == "pickup" then
 			local prev, nxt = route[k - 1], route[k + 1]
 			local saved = D(prev, s) + (nxt and (D(s, nxt) - D(prev, nxt)) or 0)
 			for p = first, k - 1 do
@@ -584,6 +590,8 @@ local function Earlier(route, start, first)
 		end
 	end
 end
+
+P._Earlier = Earlier  -- for the tests
 
 ---------------------------------------------------------------------------
 -- Building a plan
@@ -635,11 +643,12 @@ local function RunRate(cluster, b, d, speed)
 	return value / max(5, (d + inner) * DETOUR / speed + work)
 end
 
--- Finished quests handed in where you stand, nearest first, each within HERE yards of the one
--- before (you first), none more than HERE_MAX from you; further in a town or city, where you're
--- resting and the NPCs are spread out. None while you're working on an objective: one still to
--- do is close by and closer than any of these turn-ins.
-local function HereFirst(bundles, start)
+-- Finished quests handed in where you stand, and quests worth taking that are given there,
+-- nearest first, each within HERE yards of the one before (you first), none more than HERE_MAX
+-- from you; further in a town or city, where you're resting and the NPCs are spread out. None
+-- while you're working on an objective: one still to do is close by and closer than any of
+-- these turn-ins.
+local function HereFirst(bundles, start, bar, speed)
 	local town = IsResting and ns.SafeCall(IsResting) == true
 	local step, reach = town and HERE_TOWN or HERE, town and HERE_TOWN_MAX or HERE_MAX
 	local work, turnin = math.huge, math.huge
@@ -656,7 +665,8 @@ local function HereFirst(bundles, start)
 		local best, bestD
 		for _, b in ipairs(bundles) do
 			local s = b.stops[1]
-			if not taken[b] and not b.pickup and #b.stops == 1 and s.kind == "turnin" then
+			local ok = not taken[b] and #b.stops == 1 and (s.kind == "turnin" or (s.kind == "pickup" and bar and b.value / (D(at, s) * DETOUR / speed + b.work) >= bar))
+			if ok then
 				local d = D(at, s)
 				if d <= step and D(start, s) <= reach and (not bestD or d < bestD) then best, bestD = b, d end
 			end
@@ -667,6 +677,14 @@ local function HereFirst(bundles, start)
 		at = best.stops[1]
 	end
 	return list
+end
+
+local function Rates(plan)
+	local secs = plan.seconds
+	plan.rate = secs > 0 and (plan.value / secs * 3600) or 0
+	plan.xpRate = secs > 0 and (plan.xp / secs * 3600) or 0
+	plan.plainRate = secs > 0 and (plan.plain / secs * 3600) or 0
+	return plan
 end
 
 local function Build(bundles, start, forced)
@@ -688,7 +706,7 @@ local function Build(bundles, start, forced)
 	if P.completionist and style == "zone" then bar = 0 end
 
 	-- Hand in what's ready right here before going anywhere, a forced first stop included.
-	for _, b in ipairs(HereFirst(bundles, start) or {}) do
+	for _, b in ipairs(HereFirst(bundles, start, bar, speed) or {}) do
 		Apply(route, b, #route + 1)
 		used[b] = true
 		value, work = value + b.value, work + b.work
@@ -759,10 +777,20 @@ local function Build(bundles, start, forced)
 	for _, b in ipairs(bundles) do
 		if not used[b] and not b.pickup then table.insert(skipped, b) end
 	end
-	return {
-		stops = route, yards = yards, seconds = secs, value = value,
-		rate = secs > 0 and (value / secs * 3600) or 0, skipped = skipped, bar = bar,
-	}
+	-- value and rate are what the planner ranks by: XP weighted for your leveling style, chains,
+	-- going back for a quest and so on. xp is the plain XP of the quests this trip works on, and
+	-- plainRate the unweighted XP per hour (a pickup counting for its share), which is what other
+	-- quests are measured against and what you're shown.
+	local xp, plain = 0, 0
+	for b in pairs(used) do
+		if b.pickup then plain = plain + (b.xp or 0) * PICKUP_SHARE
+		else xp = xp + (b.xp or 0) end
+	end
+	plain = plain + xp
+	return Rates({
+		stops = route, yards = yards, seconds = secs, value = value, xp = xp, plain = plain,
+		skipped = skipped, bar = bar, here = here,
+	})
 end
 
 function P:Make()
@@ -782,23 +810,55 @@ function P:Make()
 	end
 	local plan = Build(bundles, start, back and back.b)
 
-	-- Keep the current first stop unless the new plan is clearly better. Going back for a quest
-	-- waits only for an objective you're standing in.
+	-- Keep the current first stop unless changing is clearly better, so the arrow doesn't flip
+	-- back and forth. Going back for a quest waits only for an objective you're standing in.
+	--
+	-- Two builds of the route are not a fair comparison: each leaves out different quests at the
+	-- half-hour mark, and the one that happens to drop a slow quest looks better for it. Walking
+	-- a few yards could flip which one won, and the arrow with it. So where the new plan still
+	-- has the old first stop, the question asked is the plain one: the same stops, with the old
+	-- one first, how much longer is that? Only when the new plan has dropped the old stop
+	-- altogether are two builds compared, and then it takes the full 15%.
+	-- And a stop you were sent away from isn't gone back to until something changes in your
+	-- quests, whatever the sums say: one change of mind is planning, two is pacing up and down.
+	local sig = #bundles
+	for _, b in ipairs(bundles) do sig = sig + b.questID * (b.pickup and 7 or (b.e.complete and 3 or 1)) end
+	if sig ~= self.leftSig then self.leftSig, self.left = sig, {} end
 	local old = self.plan and self.plan.stops[1]
 	local first = plan.stops[1]
-	if old and first and old.key ~= first.key then
+	if old and first and old.key ~= first.key and (plan.here or 0) == 0 then
 		local keep
 		for _, b in ipairs(bundles) do
 			if b.stops[1].key == old.key then keep = b break end
 		end
 		if keep then
-			local held = Build(bundles, start, keep)
 			local working = keep.stops[1].kind == "objective" and D(start, keep.stops[1]) <= WORKING_YARDS
-			-- Seconds the new plan saves for the same XP. On a plan with a lot of killing and
-			-- collecting, a much shorter walk is only a few percent of the whole, so the 15% alone
-			-- would keep an old order long after you've walked past the point where it made sense.
-			local saved = held.rate > 0 and plan.seconds * (plan.rate / held.rate - 1) or math.huge
-			if working or (not back and plan.rate <= held.rate * KEEP_MARGIN and saved < SWITCH_SECONDS) then plan = held end
+			local stay = working or (not back and self.left[first.key])
+			local at
+			for k, s in ipairs(plan.stops) do if s.key == old.key then at = k break end end
+			if not stay and not back and at then
+				local route = {}
+				for k, s in ipairs(plan.stops) do route[k] = s end
+				table.insert(route, 1, table.remove(route, at))
+				Improve(route, start, 2)
+				Earlier(route, start, 2)
+				local speed = Speed()
+				local yards = Travel(route, start)
+				if (yards - plan.yards) * DETOUR / speed < SWITCH_SECONDS then
+					local secs = plan.seconds + (yards - plan.yards) * DETOUR / speed
+					plan.stops, plan.yards, plan.seconds = route, yards, secs
+					Rates(plan)
+				else
+					self.left[old.key] = true
+				end
+			elseif stay or not back then
+				local held = Build(bundles, start, keep)
+				if stay or plan.rate <= held.rate * KEEP_MARGIN then
+					plan = held
+				else
+					self.left[old.key] = true
+				end
+			end
 		end
 	end
 
@@ -825,7 +885,7 @@ function P:Get()
 		self.plan = self:Make()
 		if self.plan then
 			ns.Debug(string.format("planner: %d stops, %s, ~%s XP (%s XP/h)", #self.plan.stops,
-				ns.Duration(self.plan.seconds), ns.Comma(self.plan.value), ns.Comma(self.plan.rate)))
+				ns.Duration(self.plan.seconds), ns.Comma(self.plan.xp), ns.Comma(self.plan.xpRate)))
 		end
 	end
 	return self.plan
@@ -849,7 +909,7 @@ ns:AddSlash("route", function()
 		return
 	end
 	ns.Print(string.format("route: %d stops, ~%s, ~%s XP (%s XP/hour).", #plan.stops, ns.Duration(plan.seconds),
-		ns.Comma(plan.value), ns.Comma(plan.rate)))
+		ns.Comma(plan.xp), ns.Comma(plan.xpRate)))
 	for i, s in ipairs(plan.stops) do
 		local title = s.e and (s.e.title or "?") or "?"
 		local what = s.kind == "objective" and "do" or s.predicted and "then turn in" or s.kind == "turnin" and "turn in" or "pick up"
