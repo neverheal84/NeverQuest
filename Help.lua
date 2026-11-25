@@ -35,7 +35,7 @@ Help.TOPICS = {
 		"The Guide tab always shows your best next move. Steps are objectives, turn-ins, quest pickups and tips such as \"Time to move on\".",
 		"",
 		Y .. "Route planner" .. E,
-		"Your objectives, turn-ins and nearby pickups are put into one short route so you don't walk back and forth. Quests worth too little XP for the trip wait for later, while a worthwhile quest right on the way is done on the same visit. Quests more than 3 levels above you wait until you're within 3 levels (the guide lists them for later with the level they open at); finished ones are handed in whatever their level. Stops are put in the shortest order that keeps every turn-in after its objective. The \"Route:\" row shows the trip's time, XP and XP per hour; " .. Y .. "/nq route" .. E .. " lists it in chat.",
+		"Your objectives, turn-ins and nearby pickups are put into one short route so you don't walk back and forth. Quests worth too little XP for the trip wait for later, while a worthwhile quest right on the way is done on the same visit. Quests more than 3 levels above you wait until you're within 3 levels (the guide lists them for later with the level they open at); finished ones are handed in whatever their level. Stops are put in the shortest order that keeps every turn-in after its objective. Quests ready to hand in where you stand (anywhere in town when you're in a town or city) are handed in before you leave, unless you're working on an objective close by, and a turn-in the route passes is handed in the first time by, not on a later visit. The \"Route:\" row shows the trip's time, XP and XP per hour; " .. Y .. "/nq route" .. E .. " lists it in chat.",
 		"",
 		Y .. "Quest chains" .. E,
 		"Quests that open follow-ups count for more, so chains you start get finished. Steps show \"chain: Name 3/7\".",
@@ -333,6 +333,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.27.1" .. E,
+		"  " .. Y .. "Hand in before you leave" .. E .. ": quests ready to hand in where you stand are handed in first, so the route doesn't send you out of town and back for them. In a town or city that covers the whole town. A turn-in the route passes on the way out is handed in then, not when you come back. Not while you're working on an objective close by.",
+		"",
 		Y .. "1.27.0" .. E,
 		"  " .. Y .. "Route order" .. E .. ": stops go in the shortest order that keeps every turn-in after its objective. Besides reversing stretches, the route now moves single stops or runs of up to three to wherever they save walking, so it doesn't zigzag across a zone when a straighter order covers the same stops.",
 		"  " .. Y .. "While you're there" .. E .. ": a worthwhile quest right on the way is done on the same visit, even when the route already fills its half hour.",

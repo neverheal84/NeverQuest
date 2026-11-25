@@ -16,7 +16,11 @@
 --      hour the plan looks ahead: if the route takes you there, you do them while you're there.
 --   5. The order is then tightened: stretches reversed, and single stops or runs of up to
 --      three moved, wherever that shortens the trip (a turn-in never before its objective).
---   6. The current first stop is kept unless a new plan is clearly better, so the arrow
+--   6. Finished quests handed in right where you stand go first, so you don't walk out of town
+--      and come back for them (the walking is the same either way; the XP isn't, and their
+--      follow-ups open up now). Not while you're working on an objective close by. And when the
+--      route passes a turn-in before it comes back for it, it's handed in the first time by.
+--   7. The current first stop is kept unless a new plan is clearly better, so the arrow
 --      doesn't flip back and forth.
 
 local ADDON, ns = ...
@@ -38,6 +42,12 @@ local MAX_STOPS = 30
 local TOO_HIGH = 3          -- quests more than this many levels above you wait until you're within it (finished ones are handed in whatever their level)
 local ONTHEWAY = 150        -- yards of extra walking: a quest this close to the route is done on the same visit
 local ONTHEWAY_BAR = 0.5    -- ...when it's worth at least half the usual bar for its time
+local HERE = 200            -- yards: finished quests handed in this close to you (or to the last one) are handed in first
+local HERE_MAX = 500        -- ...as long as they're within this many yards of where you stand
+local HERE_TOWN = 350       -- in a town or city (resting), where the NPCs are further apart
+local HERE_TOWN_MAX = 900
+local NEAR_WORK = 150       -- an objective still to do this close, and closer than any turn-in: you finish it first
+local EARLY = 25            -- yards: a turn-in moves earlier in the route when that costs no more walking than this
 local TURNIN_RUN = 600      -- yards: finished quests handed in this close to each other are one trip
 local BANKED_PER_LEVEL = 0.06  -- finished quests lose XP as you out-level them, so they move up the list
 local BANKED_MAX = 1.5
@@ -548,6 +558,32 @@ local function Improve(route, start, first)
 	end
 end
 
+-- Hand in the first time the route passes by, not on a later visit: each turn-in moves to the
+-- earliest place it fits for at most EARLY more yards (never before its objective). When you're
+-- coming back anyway the walking is the same, but the XP comes sooner and the follow-ups open up.
+-- Runs last, since the passes above would move them back to save those few yards.
+local function Earlier(route, start, first)
+	first = first or 1
+	for k = first + 1, #route do
+		local s = route[k]
+		if s.kind == "turnin" then
+			local prev, nxt = route[k - 1], route[k + 1]
+			local saved = D(prev, s) + (nxt and (D(s, nxt) - D(prev, nxt)) or 0)
+			for p = first, k - 1 do
+				local u = (p == 1) and start or route[p - 1]
+				local v = route[p]
+				if D(u, s) + D(s, v) - D(u, v) - saved <= EARLY then
+					table.remove(route, k)
+					table.insert(route, p, s)
+					if Valid(route) then break end
+					table.remove(route, p)
+					table.insert(route, k, s)
+				end
+			end
+		end
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Building a plan
 ---------------------------------------------------------------------------
@@ -598,6 +634,40 @@ local function RunRate(cluster, b, d, speed)
 	return value / max(5, (d + inner) * DETOUR / speed + work)
 end
 
+-- Finished quests handed in where you stand, nearest first, each within HERE yards of the one
+-- before (you first), none more than HERE_MAX from you; further in a town or city, where you're
+-- resting and the NPCs are spread out. None while you're working on an objective: one still to
+-- do is close by and closer than any of these turn-ins.
+local function HereFirst(bundles, start)
+	local town = IsResting and ns.SafeCall(IsResting) == true
+	local step, reach = town and HERE_TOWN or HERE, town and HERE_TOWN_MAX or HERE_MAX
+	local work, turnin = math.huge, math.huge
+	for _, b in ipairs(bundles) do
+		local s = b.stops[1]
+		if s and not b.pickup then
+			if s.kind == "objective" then work = min(work, D(start, s))
+			elseif #b.stops == 1 and s.kind == "turnin" then turnin = min(turnin, D(start, s)) end
+		end
+	end
+	if work <= NEAR_WORK and work < turnin then return nil end
+	local list, taken, at = {}, {}, start
+	while true do
+		local best, bestD
+		for _, b in ipairs(bundles) do
+			local s = b.stops[1]
+			if not taken[b] and not b.pickup and #b.stops == 1 and s.kind == "turnin" then
+				local d = D(at, s)
+				if d <= step and D(start, s) <= reach and (not bestD or d < bestD) then best, bestD = b, d end
+			end
+		end
+		if not best then break end
+		taken[best] = true
+		list[#list + 1] = best
+		at = best.stops[1]
+	end
+	return list
+end
+
 local function Build(bundles, start, forced)
 	local speed = Speed()
 	local route, used, value, work = {}, {}, 0, 0
@@ -616,15 +686,22 @@ local function Build(bundles, start, forced)
 	-- in the next half hour.
 	if P.completionist and style == "zone" then bar = 0 end
 
-	if forced then
-		local d, i, j = Insertion(route, start, forced, true)
-		Apply(route, forced, i, j)
+	-- Hand in what's ready right here before going anywhere, a forced first stop included.
+	for _, b in ipairs(HereFirst(bundles, start) or {}) do
+		Apply(route, b, #route + 1)
+		used[b] = true
+		value, work = value + b.value, work + b.work
+	end
+	local here = #route
+
+	if forced and not used[forced] then
+		Apply(route, forced, #route + 1, forced.stops[2] and #route + 2 or nil)
 		used[forced] = true
 		value, work = value + forced.value, work + forced.work
 	end
 
-	-- A forced first stop stays first: everything else goes in after it.
-	local from = forced and 2 or 1
+	-- The turn-ins here and a forced first stop stay first: everything else goes in after them.
+	local from = here + ((forced and route[here + 1] == forced.stops[1]) and 1 or 0) + 1
 	while #route < MAX_STOPS do
 		local best, bestR, bi, bj, bestRun
 		for _, b in ipairs(bundles) do
@@ -674,6 +751,7 @@ local function Build(bundles, start, forced)
 	end
 
 	Improve(route, start, from)
+	Earlier(route, start, from)
 	local yards = Travel(route, start)
 	local secs = yards * DETOUR / speed + work
 	local skipped = {}
