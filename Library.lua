@@ -399,15 +399,17 @@ function L:Objectives(questID)
 	local ob = Field("Quest", questID, "objectives")
 	if type(ob) == "table" then
 		local spots, count = {}, 0
-		local function Add(kind, points)
+		local killish = 0   -- objectives done by killing things: mobs, and items that mobs drop
+		local function Add(kind, points, kills)
 			count = count + 1
+			if kills then killish = killish + 1 end
 			local c = Centre(points)
 			if c then c.kind = kind spots[#spots + 1] = c end
 		end
 		for _, c in ipairs(type(ob[1]) == "table" and ob[1] or {}) do
 			local id, pts = IdOf(c), {}
 			if id then SpawnPoints("Npc", id, pts) end
-			Add("monster", pts)
+			Add("monster", pts, true)
 		end
 		for _, c in ipairs(type(ob[2]) == "table" and ob[2] or {}) do
 			local id, pts = IdOf(c), {}
@@ -416,8 +418,10 @@ function L:Objectives(questID)
 		end
 		for _, c in ipairs(type(ob[3]) == "table" and ob[3] or {}) do
 			local id, pts = IdOf(c), {}
+			local dropped = false
 			if id then
 				local npcs, objs = Field("Item", id, "npcDrops"), Field("Item", id, "objectDrops")
+				dropped = type(npcs) == "table" and #npcs > 0
 				for i = 1, math.min(type(npcs) == "table" and #npcs or 0, DROP_SOURCES) do
 					local n = ns.Num(npcs[i]) if n then SpawnPoints("Npc", n, pts) end
 				end
@@ -425,7 +429,7 @@ function L:Objectives(questID)
 					local o = ns.Num(objs[i]) if o then SpawnPoints("Object", o, pts) end
 				end
 			end
-			Add("item", pts)
+			Add("item", pts, dropped)
 		end
 		-- Kill credit: any of several mobs counts ({ { ids }, base mob, text }).
 		for _, c in ipairs(type(ob[5]) == "table" and ob[5] or {}) do
@@ -434,7 +438,7 @@ function L:Objectives(questID)
 			for i = 1, math.min(type(ids) == "table" and #ids or 0, DROP_SOURCES) do
 				local n = ns.Num(ids[i]) if n then SpawnPoints("Npc", n, pts) end
 			end
-			Add("monster", pts)
+			Add("monster", pts, true)
 		end
 		if count > 0 then
 			-- How many: the numbers in the objective text ("Kill 10 Kobold Vermin").
@@ -448,7 +452,7 @@ function L:Objectives(questID)
 					end
 				end
 			end
-			res = { spots = spots, count = count, units = math.min(60, math.max(units, count)) }
+			res = { spots = spots, count = count, units = math.min(60, math.max(units, count)), killShare = killish / count }
 		end
 	end
 	objCache[questID] = res

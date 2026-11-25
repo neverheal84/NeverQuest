@@ -41,7 +41,7 @@ local DEFAULTS = {
 	guide  = { autoTrack = true, showGray = false, nearbyYards = 200, maxOffers = 4,
 	           profile = true, milestones = true, dungeonTips = true,
 	           dungeonQuests = true, dungeonSkip = {},   -- Dungeons.lua: gather dungeon quests and pre-quests; dungeons left out
-	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true,
+	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true, learnPace = true,
 	           nearbyFirst = true, zoneAdvice = true, outleveledTip = true, restedTip = true,
 	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
 	           classTab = true, profQuests = true, profMine = true,
@@ -96,6 +96,7 @@ local CHAR_DEFAULTS = {
 	goBack = {},                             -- [quest] = true quests from the missed list you're going back for
 	visited = {},                            -- [zone map] = highest level you quested there at
 	missedHidden = {},                       -- [quest] = true taken off the missed list
+	pace = {},                               -- what Pace.lua has learned: seconds per kill/item/object, XP per kill, kills per item
 }
 
 local function Merge(dst, src)

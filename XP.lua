@@ -64,6 +64,7 @@ function XP:Classify(delta, when)
 	PushSample(self.killSamples, delta)
 	local rec = self:LevelRecord(level)
 	rec.kill = rec.kill + delta
+	ns:SendMessage("KILL_XP", delta)
 end
 
 function XP:OnXPUpdate()

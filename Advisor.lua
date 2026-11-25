@@ -113,8 +113,12 @@ function A:Estimate(qid, q)
 	local objs = L and L:ObjectivesKnown(qid)
 	local e = ns.Quests and ns.Quests.byID[qid]
 	local key = (e and ((e.complete and "c" or "") .. string.format("%.2f", e.progress or 0))) or ""
+	-- What Pace.lua has learned about you: your pace against the standard, and XP per kill.
+	local Pc = ns.Pace
+	local scale, killXP = Pc and Pc:Scale() or 1, Pc and Pc:KillXP() or nil
+	local pace = math.floor(scale * 20 + 0.5) * 100000 + math.floor((killXP or 0) / 10)
 	local c = est[qid]
-	if c and c.level == level and c.objs == objs and c.key == key then return c end
+	if c and c.level == level and c.objs == objs and c.key == key and c.pace == pace then return c end
 	q = q or (ns.QuestDB and ns.QuestDB:Get(qid))
 	local xp = self:XP(qid)
 	local qlevel = (q and q.l) or (e and ns.Num(e.level))
@@ -138,10 +142,17 @@ function A:Estimate(qid, q)
 	end
 	if prev and finish and not (e and e.complete) then yards = yards + Dist(prev, finish) end
 	if e and not e.complete then work = work * math.max(0.15, 1 - (e.progress or 0)) end
+	work = work * scale
+	-- The kills' own XP: what's left of a quest in your log, or the killing share of one you
+	-- don't have yet. Nothing for a quest that's gone gray.
+	if killXP then
+		if e then xp = xp + Pc:KillXPFor(e)
+		elseif objs and not (qlevel and level - qlevel > 5) then xp = xp + objs.units * (objs.killShare or 0) * killXP end
+	end
 	if e and (e.elite or e.group) and not IsInGroup() then work = work * 1.6 end
 	if qlevel and qlevel > level then work = work * (1 + 0.15 * (qlevel - level)) end
 	local secs = yards * DETOUR / Speed() + work + 2 * STOP
-	c = { level = level, objs = objs, key = key, xp = xp, secs = secs, rate = xp / math.max(30, secs), guessed = guessed }
+	c = { level = level, objs = objs, key = key, pace = pace, xp = xp, secs = secs, rate = xp / math.max(30, secs), guessed = guessed }
 	est[qid] = c
 	return c
 end

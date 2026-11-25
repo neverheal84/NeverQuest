@@ -6,7 +6,9 @@
 --      turn-in spot, or where you picked it up, which is usually the same NPC). Finished
 --      quests are just the turn-in. Quest givers nearby are cheap one-stop bundles.
 --   2. Each bundle is worth its XP plus part of the XP of the quests it opens up (Chains.lua)
---      and costs the extra travel to fit it into the route plus the time to do it.
+--      and costs the extra travel to fit it into the route plus the time to do it. Pace.lua
+--      watches you play: once it knows them, the time is your own seconds per kill and per
+--      item, and the XP includes what the kills themselves give you.
 --   3. Bundles go in one at a time, best XP per second first, each at the place in the route
 --      where it adds the least travel (the objective always before its turn-in). Quests worth
 --      much less than the best quest on offer are left out ("not on this route"). Finished
@@ -62,7 +64,7 @@ local AHEAD_MAX = 6         -- of those, at most this many per zone, nearest fir
 local DUNGEON_SHARE = 1.0   -- a dungeon quest, or the pre-quest that opens it: worth the dungeon quest's XP
 local PREP_BOOST = 2.0      -- and doubled, so they're done before the dungeon (Dungeons.lua)
 local GOBACK = 6            -- a quest you chose to go back for from the missed list (Advisor.lua): next, unless something is right beside you
--- Seconds per objective unit, by objective type.
+-- Seconds per objective unit, by objective type, until Pace.lua has measured yours.
 local WORK = { monster = 22, item = 30, object = 15, event = 30, log = 20, progressbar = 150 }
 
 P.plan = nil
@@ -102,7 +104,7 @@ local function WorkFor(e)
 	for _, o in ipairs(C_QuestLog.GetQuestObjectives(e.questID) or {}) do
 		if not o.finished then
 			local need, have = ns.Num(o.numRequired) or 0, ns.Num(o.numFulfilled) or 0
-			local per = WORK[o.type] or 25
+			local per = (ns.Pace and ns.Pace:Secs(o.type)) or WORK[o.type] or 25
 			if o.type == "progressbar" then
 				t = t + per * max(0.1, 1 - (e.progress or 0))
 			elseif need > 0 then
@@ -197,7 +199,9 @@ function P:Bundles(cont)
 			local xp = (e.xp and e.xp > 0) and e.xp or avg
 			local chain, ups = 0, 0
 			if ns.Chains then chain, ups = ns.Chains:Value(e.questID, avg) end
-			local b = { questID = e.questID, e = e, value = xp + chain, xp = xp, chainCount = ups, stops = {} }
+			-- XP from the kills themselves, once Pace.lua has seen what a kill gives you.
+			local kill = ns.Pace and ns.Pace:KillXPFor(e) or 0
+			local b = { questID = e.questID, e = e, value = xp + chain + kill, xp = xp + kill, kill = kill, chainCount = ups, stops = {} }
 			if (e.elite or e.group) and not IsInGroup() then b.value = b.value * 0.7 end
 			b.value = b.value * StyleWeight(e.questID, ns.Quests:ZoneOf(e), focus, e.complete)
 			if ns.Catchup then b.value = b.value * ns.Catchup:Weight(e.questID, e.complete, false) end
