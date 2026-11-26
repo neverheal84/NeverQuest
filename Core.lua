@@ -41,7 +41,7 @@ local DEFAULTS = {
 	guide  = { autoTrack = true, showGray = false, nearbyYards = 200, maxOffers = 4,
 	           profile = true, milestones = true, dungeonTips = true,
 	           dungeonQuests = true, dungeonSkip = {},   -- Dungeons.lua: gather dungeon quests and pre-quests; dungeons left out
-	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true, learnPace = true, paths = true,
+	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true, learnPace = true, walk = false,
 	           nearbyFirst = true, zoneAdvice = true, outleveledTip = true, restedTip = true,
 	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
 	           classTab = true, profQuests = true, profMine = true,

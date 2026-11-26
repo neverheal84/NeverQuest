@@ -441,6 +441,24 @@ function Q:Kind(questID)
 	return nil
 end
 
+-- An unfinished dungeon or raid quest with nothing to do out in the world: no marker, or one
+-- that only marks the NPC you hand it to. The work is inside the instance, so it's no stop on
+-- the route and nothing for the arrow until it's done.
+local INSIDE_YARDS = 80
+function Q:Inside(e)
+	if not e or e.complete or e.failed or not e.questID then return false end
+	local kind = self:Kind(e.questID)
+	if kind ~= "Dungeon" and kind ~= "Raid" then return false end
+	local pos = e.pos
+	if not pos or pos.npc then return true end
+	if pos.spawn then return false end  -- a spot you've learned out in the world
+	for _, at in ipairs({ self:TurnInSpot(e.questID) or false, ns.db.npcs.giverAt[e.questID] or false }) do
+		if at and at.m and at.x and at.source ~= "zone"
+			and (ns.Nav.DistanceBetween(pos.m, pos.x, pos.y, at.m, at.x, at.y) or 1e9) <= INSIDE_YARDS then return true end
+	end
+	return false
+end
+
 ns:RegisterEvent("QUEST_DETAIL", function()
 	local name, questID = NoteNPC(), GetQuestID()
 	if name and questID and questID > 0 then

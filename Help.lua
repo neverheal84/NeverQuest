@@ -333,6 +333,11 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.2" .. E,
+		"  " .. Y .. "The route stops sending you back and forth" .. E .. ": the walking distances added in 1.28.0 jumped by a whole map cell (about 33 yards) as you moved, and that kept flipping which stop was \"close enough to do first\". The arrow could swap between two stops for as long as you stood there. Walking distances are now " .. Y .. "off unless you switch them on" .. E .. " (Options > Guide & Routes, or " .. Y .. "/nq paths on" .. E .. "), so the route measures the way it did in 1.27.4.",
+		"  " .. Y .. "And for those who switch them on" .. E .. ": distances now change smoothly as you walk, two NPCs standing together keep their own distances, the route is never built from a mix of straight and walked measures, and it keeps at most 24 spots' distances in memory (the Barrens could run past 100 MB).",
+		"  " .. Y .. "Dungeon quests, properly this time" .. E .. ": when a dungeon quest was the only thing left to do nearby, the guide fell back to its plain nearest-first list and pointed the arrow at the turn-in NPC anyway. That list and the arrow now leave unfinished dungeon and raid quests alone too.",
+		"",
 		Y .. "1.28.1" .. E,
 		"  " .. Y .. "Dungeon quests" .. E .. ": an unfinished dungeon or raid quest whose only map marker is the NPC you hand it to (Blueleaf Tubers at Ratchet, for one) no longer sends you to that NPC. The work is inside the instance, so it stays off the route until it's done; the guide lists it for later.",
 		"",
@@ -340,7 +345,7 @@ Help.TOPICS = {
 		"  " .. Y .. "Real walking distances" .. E .. ": NeverQuest now knows the ground in 43 zones: where the cliffs are, where the water is deep enough to swim, where lava and tar are, and the way round a mountain. The route measures the walk over that ground, not a straight line, so the quest just across a ridge no longer counts as next door. It's worked out from the game's own terrain.",
 		"  " .. Y .. "The map line follows the way" .. E .. ": on a zone's map the route line now bends round cliffs and lakes the way you'd actually walk.",
 		"  " .. Y .. "1-60 plans re-run" .. E .. " with real zone sizes and walking distances. The simulator that builds each race's Optimized route now uses every zone's real size and the real walk between quest spots, so big zones and long hauls cost what they should. Every race's route changed a little: for example humans now stay in Loch Modan until 17 and Redridge until 25, and do Searing Gorge at 45 instead of Tanaris.",
-		"  Distances are worked out in the background a moment after the route first appears. Cities, caves and buildings aren't covered yet and use straight lines. Switch: Options > Guide & Routes > \"Measure distances along walkable ground\", or " .. Y .. "/nq paths off" .. E .. ".",
+		"  Distances are worked out in the background a moment after the route first appears. Cities, caves and buildings aren't covered yet and use straight lines. From 1.28.2 this is off unless you switch it on: Options > Guide & Routes > \"Measure distances along walkable ground\", or " .. Y .. "/nq paths on" .. E .. ".",
 		"",
 		Y .. "1.27.4" .. E,
 		"  " .. Y .. "The route watches how you play" .. E .. ": it now measures how long a kill, a quest item and an object really take you, and how much XP your kills give, and plans with those instead of standard figures (22 seconds a kill for everyone, and no XP but the quest reward). Stops to gather, drink or fight an extra mob are in the measurement, so the time estimates fit how you actually play. Kill and drop quests count the XP from the kills themselves, in the route, in drop suggestions and in the Route row.",

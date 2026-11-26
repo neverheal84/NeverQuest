@@ -46,6 +46,8 @@ local WORKING_YARDS = 60    -- this close to the current objective, you're worki
 local REPLAN_MOVE = 120     -- yards moved before planning again
 local REPLAN_EVERY = 8      -- seconds between plans
 local MAX_STOPS = 30
+local WALK_STOPS = 24        -- the nearest stops whose walking distances are asked for (Paths.lua keeps that many)
+local WALK_READY = 0.9       -- walking distances are used once this share of them is known
 local TOO_HIGH = 3          -- quests more than this many levels above you wait until you're within it (finished ones are handed in whatever their level)
 local ONTHEWAY = 150        -- yards of extra walking: a quest this close to the route is done on the same visit
 local ONTHEWAY_BAR = 0.5    -- ...when it's worth at least half the usual bar for its time
@@ -95,10 +97,11 @@ end
 -- Yards between two stops (or you and a stop). Where Paths.lua knows the walk over real ground
 -- (PathData.lua: cliffs, water, the way round a mountain), that counts when it's longer than the
 -- straight line's usual allowance; otherwise the straight line, as ever.
+local walkOK = false
 local function D(a, b)
 	local dx, dy = a.cx - b.cx, a.cy - b.cy
 	local d = sqrt(dx * dx + dy * dy)
-	if a.m and a.m == b.m and a.x and b.x then
+	if walkOK and a.m and a.m == b.m and a.x and b.x then
 		if b.key == "start" then a, b = b, a end
 		local walk = ns.Paths:Yards(a.m, a.x, a.y, b.x, b.y)
 		if walk and walk / DETOUR > d then return walk / DETOUR end
@@ -246,13 +249,8 @@ function P:Bundles(cont)
 				-- A dungeon or raid quest whose only marker is the quest NPC: the work is inside the
 				-- instance, so there's nowhere out here to send you. It's no stop until it's done
 				-- (the dungeon planner, Dungeons.lua, says when to run it).
-				local kind = ns.Quests:Kind(e.questID)
-				local inside = kind == "Dungeon" or kind == "Raid"
-				if inside and e.pos and not e.pos.npc then
-					-- (a marker of its own, away from the NPC: something to do outside first)
-					local at = ns.Quests:TurnInSpot(e.questID)
-					inside = at and at.m and at.x and ns.Nav.DistanceBetween(e.pos.m, e.pos.x, e.pos.y, at.m, at.x, at.y) <= 80 or false
-				end
+				-- (Quests:Inside. One with a marker of its own, away from the NPC, keeps its stop.)
+				local inside = ns.Quests:Inside(e)
 				local s1 = not inside and Stop("objective", e.questID, e, e.pos, cont, WorkFor(e))
 				if s1 then
 					table.insert(b.stops, s1)
@@ -822,7 +820,31 @@ function P:Make()
 	local cont, cx, cy = Locate(m, x, y)
 	if not cont then return nil end
 	local start = { cx = cx, cy = cy, key = "start", m = m, x = x, y = y }
+	walkOK = false
 	local bundles = self:Bundles(cont)
+	-- Walking distances (Paths.lua): say which stops matter, nearest first. They're used once
+	-- nearly all of them are known; until then every distance is a straight line, so the route
+	-- is never built from a mix of the two (a stop measured straight looks nearer than it is
+	-- beside ones measured on foot).
+	if ns.Paths and ns.Paths:On() and not self.straight then  -- (.straight: the test harness's switch)
+		local list = {}
+		for _, b in ipairs(bundles) do
+			for _, s in ipairs(b.stops) do
+				if s.m and s.x then list[#list + 1] = s s.sd = D(start, s) end
+			end
+		end
+		table.sort(list, function(p, q) return p.sd < q.sd end)
+		ns.Paths:Begin()
+		local known, total = 0, 0
+		for _, s in ipairs(list) do
+			local got = ns.Paths:Want(s.m, s.x, s.y)
+			if got ~= nil and total < WALK_STOPS then
+				total = total + 1
+				if got then known = known + 1 end
+			end
+		end
+		walkOK = total > 0 and known >= total * WALK_READY
+	end
 	-- A quest you chose to go back for (Advisor.lua) is where you go next: the nearest one is
 	-- the first stop, wherever cheapest insertion would have put it.
 	local back

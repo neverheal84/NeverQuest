@@ -83,14 +83,13 @@ function G:MakeStep(kind, e)
 		table.insert(parts, e.objective or "Complete the objectives")
 		if e.pos and e.pos.spawn and e.pos.label then
 			table.insert(parts, "|cffffd070known spot: " .. e.pos.label .. "|r")
+		elseif ns.Quests:Inside(e) then
+			-- Nothing to walk to: the marker (if any) is the NPC it's handed to. Not for the arrow.
+			s.npcOnly, s.inside, s.noAuto = true, true, true
+			table.insert(parts, "|cff999999done inside the " .. (ns.Quests:Kind(e.questID) or "dungeon"):lower() .. ": on the route once it's finished|r")
 		elseif e.pos and e.pos.npc then
 			s.npcOnly = true
-			local k = ns.Quests:Kind(e.questID)
-			if k == "Dungeon" or k == "Raid" then
-				table.insert(parts, "|cff999999done inside the " .. k:lower() .. ": on the route once it's finished|r")
-			else
-				table.insert(parts, "|cff999999the map only marks the quest NPC; NeverQuest learns the objective area as you play|r")
-			end
+			table.insert(parts, "|cff999999the map only marks the quest NPC; NeverQuest learns the objective area as you play|r")
 		end
 		local party = cfg.partyInSteps and ns.Party and ns.Party:Summary(e.questID)
 		if party then table.insert(parts, "|cff66ccffparty: " .. party .. "|r") end
@@ -113,7 +112,7 @@ end
 function G:BuildSimple(steps)
 	local cfg = ns.db.guide
 	local near = cfg.nearbyYards or 200
-	local turnins, objectives, pickups = {}, {}, {}
+	local turnins, objectives, pickups, inside = {}, {}, {}, {}
 	local AD = ns.Advisor
 	local function Skipped(qid) return AD and AD:IsSkipped(qid) end
 	for _, e in ipairs(ns.Quests.log) do
@@ -121,6 +120,9 @@ function G:BuildSimple(steps)
 			-- Skipped: on the missed list, not in the guide.
 		elseif e.complete then
 			table.insert(turnins, e)
+		elseif ns.Quests:Inside(e) then
+			-- Done inside a dungeon: listed last, never where the arrow goes.
+			table.insert(inside, e)
 		elseif not e.failed then
 			table.insert(objectives, e)
 		end
@@ -185,6 +187,14 @@ function G:BuildSimple(steps)
 			table.insert(steps, self:MakeStep("pickup", o))
 			count = count + 1
 		end
+	end
+
+	-- 5. Dungeon quests still to do: for the run, not for the walk.
+	for _, e in ipairs(inside) do
+		local s = self:MakeStep("objective", e)
+		s.later = true
+		s.sub = "|cff999999later:|r " .. (s.sub or "")
+		table.insert(steps, s)
 	end
 end
 
@@ -859,7 +869,7 @@ function G:AutoTrack()
 		local cur = ns.Nav.guideTarget
 		if not pick and cur and cur.key ~= dismissed then
 			for i = 1, math.min(2, #self.steps) do
-				if self.steps[i].key == cur.key and self.steps[i].m then pick = self.steps[i] break end
+				if self.steps[i].key == cur.key and self.steps[i].m and not self.steps[i].noAuto then pick = self.steps[i] break end
 			end
 		end
 		if not pick then
