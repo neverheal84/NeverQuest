@@ -85,7 +85,12 @@ function G:MakeStep(kind, e)
 			table.insert(parts, "|cffffd070known spot: " .. e.pos.label .. "|r")
 		elseif e.pos and e.pos.npc then
 			s.npcOnly = true
-			table.insert(parts, "|cff999999the map only marks the quest NPC; NeverQuest learns the objective area as you play|r")
+			local k = ns.Quests:Kind(e.questID)
+			if k == "Dungeon" or k == "Raid" then
+				table.insert(parts, "|cff999999done inside the " .. k:lower() .. ": on the route once it's finished|r")
+			else
+				table.insert(parts, "|cff999999the map only marks the quest NPC; NeverQuest learns the objective area as you play|r")
+			end
 		end
 		local party = cfg.partyInSteps and ns.Party and ns.Party:Summary(e.questID)
 		if party then table.insert(parts, "|cff66ccffparty: " .. party .. "|r") end

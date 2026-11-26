@@ -243,7 +243,17 @@ function P:Bundles(cont)
 				local s = Stop("turnin", e.questID, e, pos, cont, STOP_WORK)
 				if s then table.insert(b.stops, s) end
 			else
-				local s1 = Stop("objective", e.questID, e, e.pos, cont, WorkFor(e))
+				-- A dungeon or raid quest whose only marker is the quest NPC: the work is inside the
+				-- instance, so there's nowhere out here to send you. It's no stop until it's done
+				-- (the dungeon planner, Dungeons.lua, says when to run it).
+				local kind = ns.Quests:Kind(e.questID)
+				local inside = kind == "Dungeon" or kind == "Raid"
+				if inside and e.pos and not e.pos.npc then
+					-- (a marker of its own, away from the NPC: something to do outside first)
+					local at = ns.Quests:TurnInSpot(e.questID)
+					inside = at and at.m and at.x and ns.Nav.DistanceBetween(e.pos.m, e.pos.x, e.pos.y, at.m, at.x, at.y) <= 80 or false
+				end
+				local s1 = not inside and Stop("objective", e.questID, e, e.pos, cont, WorkFor(e))
 				if s1 then
 					table.insert(b.stops, s1)
 					if e.pos.waypoint then b.value = b.value * 0.8 end  -- the real area is past this point

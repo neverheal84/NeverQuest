@@ -333,6 +333,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.1" .. E,
+		"  " .. Y .. "Dungeon quests" .. E .. ": an unfinished dungeon or raid quest whose only map marker is the NPC you hand it to (Blueleaf Tubers at Ratchet, for one) no longer sends you to that NPC. The work is inside the instance, so it stays off the route until it's done; the guide lists it for later.",
+		"",
 		Y .. "1.28.0" .. E,
 		"  " .. Y .. "Real walking distances" .. E .. ": NeverQuest now knows the ground in 43 zones: where the cliffs are, where the water is deep enough to swim, where lava and tar are, and the way round a mountain. The route measures the walk over that ground, not a straight line, so the quest just across a ridge no longer counts as next door. It's worked out from the game's own terrain.",
 		"  " .. Y .. "The map line follows the way" .. E .. ": on a zone's map the route line now bends round cliffs and lakes the way you'd actually walk.",
