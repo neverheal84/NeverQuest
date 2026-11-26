@@ -1543,6 +1543,9 @@ function UI:CreateOptions()
 		"Quests that open up follow-ups are worth more, and steps show where a quest sits in its chain. Chains come from the game's quest lines and from what you've seen after turn-ins.")
 	Check(g, R1.x, R1:Next(), "Pick up quests along the way", function() return db.guide.planPickups end,
 		function(v) db.guide.planPickups = v ns.Planner.dirty = true Guide() end)
+	Check(g, R1.x, R1:Next(), "Measure distances along walkable ground", function() return db.guide.paths ~= false end,
+		function(v) db.guide.paths = v ns.Planner.dirty = true ns:SendMessage("PATHS_READY") Guide() end,
+		"Uses terrain data for each zone (cliffs, water, the way round a mountain) so the route knows how far a walk really is, and the map line follows it. Off: straight lines.")
 	Check(g, R1.x, R1:Next(), "Learn from my XP gain and pace", function() return db.guide.learnPace ~= false end,
 		function(v) db.guide.learnPace = v ns.Planner.dirty = true if ns.Advisor then ns.Advisor:Forget() end Guide() end,
 		"Watches how long a kill, an item and an object really take you (stops to gather or drink included) and how much XP your kills give, and plans the route with those instead of standard figures. /nq pace shows what it has learned.")

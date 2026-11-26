@@ -662,15 +662,22 @@ function provider:RefreshAllData()
 		local n, lines = 0, 0
 		local fromYou = lx ~= nil
 		self.liveMap = mapID
+		local function Straight(x, y)
+			lines = lines + 1
+			local line = self:Line(lines)
+			line:SetThickness(thickness)
+			line:SetStartPoint("TOPLEFT", canvas, lx * cw, -ly * ch)
+			line:SetEndPoint("TOPLEFT", canvas, x * cw, -y * ch)
+			line:Show()
+			if lines == 1 and fromYou then self.liveLine = line end
+			lx, ly = x, y
+		end
+		-- The line follows the walk over real ground where Paths.lua knows it (this zone's own map).
 		local function Segment(x, y)
 			if lx and ns.db.pins.routeLine then
-				lines = lines + 1
-				local line = self:Line(lines)
-				line:SetThickness(thickness)
-				line:SetStartPoint("TOPLEFT", canvas, lx * cw, -ly * ch)
-				line:SetEndPoint("TOPLEFT", canvas, x * cw, -y * ch)
-				line:Show()
-				if lines == 1 and fromYou then self.liveLine = line end
+				local way = ns.Paths:Route(mapID, lx, ly, x, y)
+				for i = 1, way and #way or 0, 2 do Straight(way[i], way[i + 1]) end
+				Straight(x, y)
 			end
 			lx, ly = x, y
 		end
@@ -792,7 +799,7 @@ end
 for _, msg in ipairs({ "OFFERS_UPDATED", "MAP_OFFERS_UPDATED" }) do
 	ns:RegisterMessage(msg, function() ns.Debounce("giverpins", 0.3, function() P:Refresh(true) end) end)
 end
-for _, msg in ipairs({ "QUESTS_UPDATED", "WAYPOINTS_CHANGED", "GUIDE_UPDATED", "ROUTE_CHANGED" }) do
+for _, msg in ipairs({ "QUESTS_UPDATED", "WAYPOINTS_CHANGED", "GUIDE_UPDATED", "ROUTE_CHANGED", "PATHS_READY" }) do
 	ns:RegisterMessage(msg, function() ns.Debounce("pins", 0.2, function() P:Refresh() end) end)
 end
 ns:RegisterMessage("SPAWNS_UPDATED", function() ns.Debounce("spawnpins", 0.3, function() P:Refresh(true) end) end)

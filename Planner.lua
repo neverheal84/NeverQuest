@@ -24,6 +24,7 @@
 --      now can be done on this trip). Not while you're working on an objective close by. And
 --      when the route passes a turn-in or a quest giver before it comes back for it, that's done
 --      the first time by.
+--   Distances are walks over real ground where PathData.lua covers the zone (see D below).
 --   7. The current first stop is kept unless that costs 20 seconds or more over the same stops in
 --      a better order, and a stop you were sent away from isn't gone back to until your quests
 --      change, so the arrow doesn't flip back and forth (see Make).
@@ -91,9 +92,18 @@ local function Locate(m, x, y)
 	return cont, cx * size[1], cy * size[2]
 end
 
+-- Yards between two stops (or you and a stop). Where Paths.lua knows the walk over real ground
+-- (PathData.lua: cliffs, water, the way round a mountain), that counts when it's longer than the
+-- straight line's usual allowance; otherwise the straight line, as ever.
 local function D(a, b)
 	local dx, dy = a.cx - b.cx, a.cy - b.cy
-	return sqrt(dx * dx + dy * dy)
+	local d = sqrt(dx * dx + dy * dy)
+	if a.m and a.m == b.m and a.x and b.x then
+		if b.key == "start" then a, b = b, a end
+		local walk = ns.Paths:Yards(a.m, a.x, a.y, b.x, b.y)
+		if walk and walk / DETOUR > d then return walk / DETOUR end
+	end
+	return d
 end
 
 ---------------------------------------------------------------------------
@@ -801,7 +811,7 @@ function P:Make()
 	local m, x, y = ns.Nav.GetPlayerPosition()
 	local cont, cx, cy = Locate(m, x, y)
 	if not cont then return nil end
-	local start = { cx = cx, cy = cy, key = "start" }
+	local start = { cx = cx, cy = cy, key = "start", m = m, x = x, y = y }
 	local bundles = self:Bundles(cont)
 	-- A quest you chose to go back for (Advisor.lua) is where you go next: the nearest one is
 	-- the first stop, wherever cheapest insertion would have put it.
