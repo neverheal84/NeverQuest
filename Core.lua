@@ -47,7 +47,7 @@ local DEFAULTS = {
 	           classTab = true, profQuests = true, profMine = true,
 	           smartZones = true, dropAdvice = true, completionist = true, missedList = true },  -- Advisor.lua
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
-	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, mmLine = true, pathLine = true, sources = false,
+	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, mmLine = false, pathLine = true, sources = false,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 0.6, wmScale = 1 },
 	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
 	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false,
@@ -354,6 +354,12 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 	if not ns.db.guide.walkOn then
 		ns.db.guide.walkOn = true
 		ns.db.guide.walk = true
+	end
+	-- The route line on the minimap: on in 1.28.3 to 1.28.9, off by default from 1.28.10. Switched
+	-- off once for everyone who had it on from those versions; a choice made after that is kept.
+	if not ns.db.pins.mmLineOff then
+		ns.db.pins.mmLineOff = true
+		ns.db.pins.mmLine = false
 	end
 	-- Known quest starts near you show on the minimap by default (1.26). 1.21 had switched them
 	-- off for everyone; they are switched back on once, and a choice made after that is kept.

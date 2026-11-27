@@ -27,7 +27,7 @@ Setup.PAGES = {
 			"What you'll see:\n" ..
 			"  |cffffd100Main window|r (|cffffd100/nq|r or the minimap button): your next steps, quest log, nearby quests, raid attunements and journal.\n" ..
 			"  |cffffd100Arrow|r: points at the guide's top step, a waypoint, or your corpse.\n" ..
-			"  |cffffd100Route line|r on the world map and the minimap: the way to your next stops, round cliffs and water.\n" ..
+			"  |cffffd100Route line|r on the world map (and the minimap, if you switch it on): the way to your next stops, round cliffs and water.\n" ..
 			"  |cffffd100Tracker|r on the right: your quests in the order the guide will do them.\n" ..
 			"  |cffffd100XP panel|r: XP per hour and time to level.\n\n" ..
 			"Happy with the defaults? Click |cffffd100Use recommended|r and you're done.",
@@ -77,7 +77,7 @@ Setup.PAGES = {
 			U.Check(p, 0, row(), "Route lines on the world map", function() return db.pins.routeLine end, function(v) db.pins.routeLine = v Pins() end,
 				"Joins the guide's next steps on the world map. The numbered pins stay either way.")
 			U.Check(p, 0, row(), "Route line on the minimap", function() return db.pins.mmLine end, function(v) db.pins.mmLine = v Pins() end,
-				"The same line on the minimap, cut off at its edge. /nq mmline switches it too.")
+				"Off by default. The same line on the minimap, cut off at its edge. /nq mmline switches it too.")
 			U.Check(p, 0, row(), "Lines follow the walkable way", function() return db.pins.pathLine ~= false end,
 				function(v) db.pins.pathLine = v and true or false if ns.Paths and not ns.Paths:On() then ns.Paths:Reset() end ns:SendMessage("PATHS_READY") Pins() end,
 				"The lines bend round cliffs, deep water and mountains instead of running straight over them. A line is straight for a second or two after the route changes while the way is worked out.")

@@ -333,6 +333,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.10" .. E,
+		"  " .. Y .. "Minimap route line off by default" .. E .. ": the line on the minimap is now off unless you want it. Everyone who had it from 1.28.5 has it switched off once; turn it back on with Options > Display & Maps > Minimap > \"Route line on the minimap\", or " .. Y .. "/nq mmline" .. E .. ". The world map's line is unchanged.",
+		"",
 		Y .. "1.28.9" .. E,
 		"  " .. Y .. "Quieter chat" .. E .. ": the quest database's background scan no longer announces itself. \"quest database scan done\" and \"learned N more quests from your chains\" are off unless you tick Options > NeverQuest > \"Say in chat when a scan finishes\". A scan you start yourself with " .. Y .. "/nq db scan" .. E .. " still says when it's done, and " .. Y .. "/nq db status" .. E .. " tells you where things stand.",
 		"  " .. Y .. "No more trips back to a zone you've nearly outgrown" .. E .. ": in the Optimized style the guide could send a level 29 back to Ashenvale (18 to 30), because the zone still counted as fitting your level and its leftover quests scored well. Now a zone you'd have to travel to needs at least two levels left in it. The zone you're standing in and the zones your 1-60 plan names for now are not affected. " .. Y .. "/nq zones" .. E .. " shows the scores.",
@@ -359,7 +362,7 @@ Help.TOPICS = {
 		"  A line is straight for a moment after the route changes, while the way is worked out, and always straight in cities, caves and buildings. Tunnels and bridges that are buildings rather than ground (Dun Algaz, for one) show as costly ground, not as the easy way they are.",
 		"",
 		Y .. "1.28.3" .. E,
-		"  " .. Y .. "Route line on the minimap" .. E .. ": the gold line that joins the guide's next steps on the world map is now on the minimap too, from where you stand to your next stop and on towards the ones after, cut off at the minimap's edge. It turns with a rotating minimap. With a waypoint of your own set, it goes to that. Remove it with Options > Display & Maps > Minimap > \"Route line on the minimap\", or " .. Y .. "/nq mmline" .. E .. ".",
+		"  " .. Y .. "Route line on the minimap" .. E .. ": the gold line that joins the guide's next steps on the world map is now on the minimap too, from where you stand to your next stop and on towards the ones after, cut off at the minimap's edge. It turns with a rotating minimap. With a waypoint of your own set, it goes to that. Off by default from 1.28.10: Options > Display & Maps > Minimap > \"Route line on the minimap\", or " .. Y .. "/nq mmline" .. E .. ".",
 		"",
 		Y .. "1.28.2" .. E,
 		"  " .. Y .. "The route stops sending you back and forth" .. E .. ": the walking distances added in 1.28.0 jumped by a whole map cell (about 33 yards) as you moved, and that kept flipping which stop was \"close enough to do first\". The arrow could swap between two stops for as long as you stood there. Walking distances are now " .. Y .. "off unless you switch them on" .. E .. " (Options > Guide & Routes, or " .. Y .. "/nq paths on" .. E .. "), so the route measures the way it did in 1.27.4.",
