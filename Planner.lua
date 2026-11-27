@@ -826,7 +826,7 @@ function P:Make()
 	-- nearly all of them are known; until then every distance is a straight line, so the route
 	-- is never built from a mix of the two (a stop measured straight looks nearer than it is
 	-- beside ones measured on foot).
-	if ns.Paths and ns.Paths:On() and not self.straight then  -- (.straight: the test harness's switch)
+	if ns.Paths and ns.Paths:Planning() and not self.straight then  -- (.straight: the test harness's switch)
 		local list = {}
 		for _, b in ipairs(bundles) do
 			for _, s in ipairs(b.stops) do

@@ -1543,9 +1543,9 @@ function UI:CreateOptions()
 		"Quests that open up follow-ups are worth more, and steps show where a quest sits in its chain. Chains come from the game's quest lines and from what you've seen after turn-ins.")
 	Check(g, R1.x, R1:Next(), "Pick up quests along the way", function() return db.guide.planPickups end,
 		function(v) db.guide.planPickups = v ns.Planner.dirty = true Guide() end)
-	Check(g, R1.x, R1:Next(), "Measure distances along walkable ground (experimental)", function() return db.guide.walk == true end,
-		function(v) db.guide.walk = v and true or false if not v then ns.Paths:Reset() end ns.Planner.dirty = true ns:SendMessage("PATHS_READY") Guide() end,
-		"Off by default. Uses terrain data for each zone (cliffs, water, the way round a mountain) so the route knows how far a walk really is, and the map line follows it. Off: straight lines, as before 1.28.")
+	Check(g, R1.x, R1:Next(), "Plan the route by walking distance (experimental)", function() return db.guide.walk == true end,
+		function(v) db.guide.walk = v and true or false if not ns.Paths:On() then ns.Paths:Reset() end ns.Planner.dirty = true ns:SendMessage("PATHS_READY") Guide() end,
+		"Off by default. The order of your stops is worked out from how far the walk really is (round cliffs, water and mountains), not straight lines. The route lines follow the walkable way either way: Display & Maps > World map.")
 	Check(g, R1.x, R1:Next(), "Learn from my XP gain and pace", function() return db.guide.learnPace ~= false end,
 		function(v) db.guide.learnPace = v ns.Planner.dirty = true if ns.Advisor then ns.Advisor:Forget() end Guide() end,
 		"Watches how long a kill, an item and an object really take you (stops to gather or drink included) and how much XP your kills give, and plans the route with those instead of standard figures. /nq pace shows what it has learned.")
@@ -1714,6 +1714,9 @@ function UI:CreateOptions()
 		"Numbered pins for the guide's next steps.")
 	Check(d, R2.x, R2:Next(), "Lines joining the route steps", function() return db.pins.routeLine end, function(v) db.pins.routeLine = v ns.Pins:Refresh(true) end,
 		"The line from where you stand through each numbered step. Off: just the numbered pins.")
+	Check(d, R2.x, R2:Next(), "Route lines follow the walkable way", function() return db.pins.pathLine ~= false end,
+		function(v) db.pins.pathLine = v and true or false if not ns.Paths:On() then ns.Paths:Reset() end ns:SendMessage("PATHS_READY") ns.Pins:Refresh(true) end,
+		"On the world map and the minimap, the line bends round cliffs, deep water and mountains instead of running straight over them. Off: straight lines. Cities, caves and buildings are always straight.")
 	Check(d, R2.x, R2:Next(), "Include turn-ins for unfinished quests", function() return db.pins.routeTurnins end, function(v) db.pins.routeTurnins = v ns.Pins:Refresh(true) end,
 		"Off (default): the map route goes to objectives, finished turn-ins and pickups only. On: it also shows where each unfinished quest will be handed in.")
 	Cycle(d, R2.x, R2:Next(30), "Line thickness:", { { 1.5, "Thin" }, { 3, "Normal" }, { 5, "Thick" } },

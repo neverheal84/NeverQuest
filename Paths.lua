@@ -15,7 +15,15 @@
 --  * A distance to where you stand is read between the cells around you, not from the one cell
 --    you're in, so it changes smoothly as you walk instead of jumping 30 yards at every cell edge
 --    (those jumps flipped the route's "is it close enough to do first" tests on and off).
---  * Only the route planner asks for a spot's distances (Want), nearest stops first, and no more
+--
+-- 1.28.4, after a line drawn over the side of a mountain in the Wetlands:
+--  * The data is now edges, not just cells: what the walk from each cell to each neighbour costs,
+--    measured on the fine map. Two open cells with a ridge between them are no longer joined.
+--  * Hillsides cost more than gentle ground, so the way goes by the valley when there is one.
+--  * Drawing the route line along the walk (pins.pathLine, on) is separate from planning the
+--    route by walking distance (guide.walk, off).
+--
+--  * Only the route planner and the map lines ask for a spot's distances (Want), nearest stops first, and no more
 --    than KEEP at once: the Barrens has 60,000 cells, and 48 spots' worth was over 100 MB.
 --    A spot over the limit is measured in a straight line, and stays that way: nothing is thrown
 --    away to make room for it while the route still wants what's kept.
@@ -26,6 +34,7 @@ ns.Paths = P
 
 local CELL = 100 / 3          -- yards a cell
 local COST = { a = 1, b = 1.3, c = 1.6, d = 2, e = 3, f = 4, g = 8, h = 25, i = 40 }
+local MAX_ZONES = 2           -- zones kept unpacked (the Barrens is 60,000 cells, five numbers each)
 local ROUGH = 25              -- cost from which a cell is no place to stand: spots snap off it
 local SNAP = 3                -- cells a spot may be moved to reach standable ground
 local SLICE = 1500            -- cells settled per slice of work
@@ -39,22 +48,45 @@ local queue = {}              -- fields being worked out, oldest first
 local stamp, count, round = 0, 0, 0
 
 -- paused: set by the test harness, whose older sections were written against straight lines.
--- Off unless switched on (guide.walk; 1.28.0 and 1.28.1 had it on for everyone under another name).
-function P:On() return not self.paused and ns.db.guide.walk == true and ns.PathData ~= nil end
+-- Two uses, two switches: the route planner measuring by the walk (guide.walk, off unless you
+-- switch it on) and the map lines following it (pins.pathLine, on).
+function P:Planning() return not self.paused and ns.db.guide.walk == true and ns.PathData ~= nil end
+function P:Lines() return not self.paused and ns.db.pins.pathLine ~= false and ns.PathData ~= nil end
+function P:On() return self:Planning() or self:Lines() end
+
+-- A run-length coded string into an array: f(letter) for each cell (false where it gives nothing,
+-- so the array stays a plain one).
+local function Unpack(s, f)
+	local out, i = {}, 0
+	for n, ch in s:gmatch("(%d*)(%D)") do
+		n = tonumber(n) or 1
+		local v = f(ch) or false
+		for k = i + 1, i + n do out[k] = v end
+		i = i + n
+	end
+	return out
+end
+local EDGE = {}
+for k = 0, 25 do EDGE[string.char(97 + k)] = 2 ^ ((k - 4) / 4) end
+local function Cost(ch) return COST[ch] end
+local function Edge(ch) return EDGE[ch] end
 
 local function Zone(m)
 	local z = zones[m]
 	if z == nil then
 		local d = ns.PathData and ns.PathData[m]
-		if not d then zones[m] = false return false end
-		z = { w = d.w, h = d.h, sx = d.yw / CELL, sy = d.yh / CELL, yw = d.yw, yh = d.yh, cost = {}, fields = {} }
-		local i, cost = 0, z.cost
-		for n, ch in d[1]:gmatch("(%d*)(%D)") do
-			n = tonumber(n) or 1
-			local c = COST[ch]
-			if c then for k = i + 1, i + n do cost[k] = c end end
-			i = i + n
+		if not d or not d[5] then zones[m] = false return false end
+		-- Room for it: zones with nothing being kept for them are packed away again.
+		local n = 0
+		for _, zz in pairs(zones) do if zz then n = n + 1 end end
+		if n >= MAX_ZONES then
+			for id, zz in pairs(zones) do
+				if zz and not next(zz.fields) then zones[id] = nil end
+			end
 		end
+		z = { w = d.w, h = d.h, sx = d.yw / CELL, sy = d.yh / CELL, yw = d.yw, yh = d.yh, fields = {},
+			cost = Unpack(d[1], Cost),
+			e1 = Unpack(d[2], Edge), e2 = Unpack(d[3], Edge), e3 = Unpack(d[4], Edge), e4 = Unpack(d[5], Edge) }
 		zones[m] = z
 	end
 	return z
@@ -119,42 +151,42 @@ local function Pop(heap, n)
 end
 
 -- One slice of a field's work. True when it's finished.
+-- A cell's eight ways out: its own four edges (east, southeast, south, southwest) and the four
+-- its neighbours hold to it. An edge off the side of the map was never written, so a plain lookup
+-- is enough: no bounds to check.
 local function Step(z, f)
-	local cost, dist, heap, n, w, h = z.cost, f.dist, f.heap, f.n, z.w, z.h
+	local dist, heap, n, w = f.dist, f.heap, f.n, z.w
+	local e1, e2, e3, e4 = z.e1, z.e2, z.e3, z.e4
 	local budget = SLICE
 	while n > 0 and budget > 0 do
 		local cell, d
 		cell, d, n = Pop(heap, n)
 		if d <= dist[cell] then
 			budget = budget - 1
-			local c = cost[cell]
-			local x = (cell - 1) % w
-			local y = (cell - 1 - x) / w
-			for dy = -1, 1 do
-				local ny = y + dy
-				if ny >= 0 and ny < h then
-					for dx = -1, 1 do
-						local nx = x + dx
-						if (dx ~= 0 or dy ~= 0) and nx >= 0 and nx < w then
-							local nc = ny * w + nx + 1
-							local k = cost[nc]
-							-- (no cutting a corner past ground that isn't there)
-							if k and (dx == 0 or dy == 0 or (cost[y * w + nx + 1] and cost[ny * w + x + 1])) then
-								local nd = d + (c + k) / 2 * ((dx ~= 0 and dy ~= 0) and SQ2 or 1)
-								if nd < dist[nc] then
-									dist[nc] = nd
-									n = Push(heap, n, nc, nd)
-								end
-							end
-						end
-					end
-				end
-			end
+			local k, nc, nd
+			k = e1[cell] if k then nc = cell + 1 nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			k = e2[cell] if k then nc = cell + w + 1 nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			k = e3[cell] if k then nc = cell + w nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			k = e4[cell] if k then nc = cell + w - 1 nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			nc = cell - 1 k = e1[nc] if k then nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			nc = cell - w - 1 k = e2[nc] if k then nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			nc = cell - w k = e3[nc] if k then nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
+			nc = cell - w + 1 k = e4[nc] if k then nd = d + k if nd < dist[nc] then dist[nc] = nd n = Push(heap, n, nc, nd) end end
 		end
 	end
 	f.n = n
 	if n == 0 then f.done, f.heap = true, nil end
 	return f.done
+end
+
+-- What the step between two neighbouring cells costs, or nil when there's no way.
+local function StepCost(z, a, b)
+	local d, w = b - a, z.w
+	if d == 1 then return z.e1[a] or nil elseif d == -1 then return z.e1[b] or nil
+	elseif d == w + 1 then return z.e2[a] or nil elseif d == -w - 1 then return z.e2[b] or nil
+	elseif d == w then return z.e3[a] or nil elseif d == -w then return z.e3[b] or nil
+	elseif d == w - 1 then return z.e4[a] or nil elseif d == -w + 1 then return z.e4[b] or nil end
+	return nil
 end
 
 local function Field(z, cell, start)
@@ -202,7 +234,7 @@ function P:Work()
 		table.remove(queue, 1)
 		if #queue == 0 then
 			-- What the route was guessing at, it now knows.
-			if ns.Planner then ns.Planner.dirty = true end
+			if ns.Planner and P:Planning() then ns.Planner.dirty = true end
 			ns:SendMessage("PATHS_READY")
 		end
 	end
@@ -265,7 +297,7 @@ end
 -- whose distances are used (a quest stop the planner has asked for with Want); the first can be
 -- anywhere, you included. Two spots very close together: nil, a straight line says it better.
 function P:Yards(m, x1, y1, x2, y2)
-	if not self:On() then return nil end
+	if not self:Planning() then return nil end
 	local z = Zone(m)
 	if not z then return nil end
 	if not x1 or not x2 then return nil end
@@ -297,21 +329,27 @@ function P:Yards(m, x1, y1, x2, y2)
 	return n * r * CELL
 end
 
--- A straight walk between two cells that stays on ground no worse than `worst`.
-local function Clear(z, x0, y0, x1, y1, worst)
-	local n = math.max(math.abs(x1 - x0), math.abs(y1 - y0)) * 2
-	for s = 1, n - 1 do
+-- What walking straight from one cell to another costs, cell by cell, or nil when the straight
+-- line has no way through.
+local function Straight(z, x0, y0, x1, y1)
+	local n = math.max(math.abs(x1 - x0), math.abs(y1 - y0))
+	local sum, at = 0, y0 * z.w + x0 + 1
+	for s = 1, n do
 		local x, y = floor(x0 + (x1 - x0) * s / n + 0.5), floor(y0 + (y1 - y0) * s / n + 0.5)
-		local c = z.cost[y * z.w + x + 1]
-		if not c or c > worst then return false end
+		local to = y * z.w + x + 1
+		if to ~= at then
+			local k = StepCost(z, at, to)
+			if not k then return nil end
+			sum, at = sum + k, to
+		end
 	end
-	return true
+	return sum
 end
 
 -- The way to walk from the first spot to the second, as the corners between them on the zone's
 -- map: { x, y, x, y, ... } (empty when it's a straight walk), or nil when it isn't known.
 function P:Route(m, x1, y1, x2, y2)
-	if not self:On() then return nil end
+	if not self:Lines() then return nil end
 	local z = Zone(m)
 	if not z then return nil end
 	local a, b = CellOf(z, x1, y1), CellOf(z, x2, y2)
@@ -322,35 +360,37 @@ function P:Route(m, x1, y1, x2, y2)
 		f, from, back = Field(z, a), b, true
 		if not (f and f.done and f.dist[b] < huge) then return nil end
 	end
-	-- Downhill on the distances, cell by cell.
+	-- Downhill on the distances, cell by cell, along the edges.
 	local w, h, dist = z.w, z.h, f.dist
-	local xs, ys, worst = {}, {}, 0
+	local xs, ys, ds = {}, {}, {}
 	local cell = from
 	for _ = 1, w * h do
 		local x = (cell - 1) % w
-		local y = (cell - 1 - x) / w
-		xs[#xs + 1], ys[#ys + 1] = x, y
-		worst = math.max(worst, z.cost[cell])
+		xs[#xs + 1], ys[#ys + 1], ds[#ds + 1] = x, (cell - 1 - x) / w, dist[cell]
 		if dist[cell] == 0 then break end
 		local best, bestD = nil, dist[cell]
 		for dy = -1, 1 do
 			for dx = -1, 1 do
-				local nx, ny = x + dx, y + dy
-				if nx >= 0 and nx < w and ny >= 0 and ny < h then
-					local nc = ny * w + nx + 1
-					local d = dist[nc]
-					if d and d < huge and d < bestD and (dx == 0 or dy == 0 or (z.cost[y * w + nx + 1] and z.cost[ny * w + x + 1])) then best, bestD = nc, d end
+				local nx = x + dx
+				if (dx ~= 0 or dy ~= 0) and nx >= 0 and nx < w then
+					local nc = cell + dy * w + dx
+					local d = nc >= 1 and dist[nc]
+					if d and d < bestD and StepCost(z, cell, nc) then best, bestD = nc, d end
 				end
 			end
 		end
 		if not best then break end
 		cell = best
 	end
-	-- Pulled tight: keep a corner only where a straight walk would cross worse ground.
+	-- Pulled tight: a corner goes when walking straight past it costs no more than going by it.
 	local keep, i, n = {}, 1, #xs
 	while i < n do
 		local j = n
-		while j > i + 1 and not Clear(z, xs[i], ys[i], xs[j], ys[j], worst) do j = j - 1 end
+		while j > i + 1 do
+			local s = Straight(z, xs[i], ys[i], xs[j], ys[j])
+			if s and s <= (ds[i] - ds[j]) * 1.02 + 0.01 then break end
+			j = j - 1
+		end
 		if j < n then keep[#keep + 1] = j end
 		i = j
 	end
@@ -368,6 +408,22 @@ function P:CellOf(m, x, y) local z = Zone(m) return z and CellOf(z, x, y) or nil
 function P:Reset() zones, queue, count, round = {}, {}, 0, 0 end
 function P:Count() return count end
 function P:Has(m) return self:On() and Zone(m) and true or false end
+-- (for the tests: what walking dead straight between two spots would cost, and what the way costs,
+-- both in cells of open ground; nil where there's no way or it isn't known)
+function P:Compare(m, x1, y1, x2, y2)
+	local z = Zone(m)
+	local a, b = z and CellOf(z, x1, y1), z and CellOf(z, x2, y2)
+	if not a or not b then return nil end
+	local f = Field(z, b)
+	local w = z.w
+	return Straight(z, (a - 1) % w, floor((a - 1) / w), (b - 1) % w, floor((b - 1) / w)), f and f.done and f.dist[a] < huge and f.dist[a] or nil
+end
+-- (for the tests: what the ground costs where you'd stand in the cell at a point; nil for no ground)
+function P:CostAt(m, x, y)
+	local z = Zone(m)
+	if not z or x < 0 or x >= 1 or y < 0 or y >= 1 then return nil end
+	return z.cost[floor(y * z.sy) * z.w + floor(x * z.sx) + 1] or nil
+end
 
 ns:OnInit(function()
 	ns.Ticker(0.02, "paths", function() P:Work() end)
@@ -377,15 +433,21 @@ ns:AddSlash("paths", function(rest)
 	rest = (rest or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
 	if rest == "on" or rest == "off" then
 		ns.db.guide.walk = rest == "on"
-		if rest == "off" then P:Reset() end
+		if rest == "off" and not P:Lines() then P:Reset() end
 		if ns.Planner then ns.Planner.dirty = true end
 		ns:SendMessage("PATHS_READY")
-		ns.Print("walking paths are " .. rest .. (rest == "off" and ": distances are straight lines again." or "."))
+		ns.Print("planning the route by walking distance is " .. rest .. (rest == "off" and ": it measures in straight lines." or "."))
+		return
+	elseif rest == "line" then
+		ns.db.pins.pathLine = not P:Lines()
+		if not P:On() then P:Reset() end
+		ns:SendMessage("PATHS_READY")
+		ns.Print("route lines " .. (ns.db.pins.pathLine and "follow the walkable way." or "are straight."))
 		return
 	end
 	local m = ns.Nav.GetPlayerPosition()
 	local n = 0
 	for _ in pairs(ns.PathData or {}) do n = n + 1 end
-	ns.Print(string.format("walking paths are %s. %d zones have path data; this zone %s. /nq paths on|off.",
-		P:On() and "on" or "off", n, (m and ns.PathData and ns.PathData[m]) and "does" or "doesn't"))
-end, "/nq paths [on|off] - measure quest distances along walkable ground, not straight lines")
+	ns.Print(string.format("route lines %s (/nq paths line). Planning by walking distance is %s (/nq paths on|off). %d zones have path data; this zone %s.",
+		P:Lines() and "follow the walkable way" or "are straight", P:Planning() and "on" or "off", n, (m and ns.PathData and ns.PathData[m]) and "does" or "doesn't"))
+end, "/nq paths [line|on|off] - route lines along walkable ground; plan the route by walking distance")

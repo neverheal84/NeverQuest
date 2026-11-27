@@ -304,6 +304,15 @@ local function MinimapLine(i)
 	return line
 end
 
+-- The stops a route line runs through, told to Paths.lua so it works out the way to each (when
+-- lines follow the walkable way). The planner does its own asking when it plans by the walk.
+function P.WantWays(m, list)
+	local Pa = ns.Paths
+	if not (Pa and Pa:Lines()) then return end
+	if not Pa:Planning() then Pa:Begin() end
+	for _, s in ipairs(list) do Pa:Want(m, s.rx or s.x, s.ry or s.y) end
+end
+
 -- The stops the line runs through, on the map you're standing on: the active target's next leg,
 -- then the guide's steps (not the ones left for later), as many as the world map numbers.
 function P:MinimapRoute(ref)
@@ -321,6 +330,7 @@ function P:MinimapRoute(ref)
 	if wp then
 		-- Your own waypoint is where you're going: the line goes there and stops.
 		Add(wp.m, wp.x, wp.y)
+		P.WantWays(ref, out)
 		return out
 	end
 	local n = 0
@@ -330,6 +340,7 @@ function P:MinimapRoute(ref)
 			if Add(step.m, step.x, step.y) and not (step.predicted or step.npcOnly) then n = n + 1 end
 		end
 	end
+	P.WantWays(ref, out)
 	return out
 end
 
@@ -344,7 +355,7 @@ local function DrawMinimapRoute(px, py, pxPerYard, cf, sf, limit)
 	-- Paths.lua) the way round to the first one: worked out again every 15 yards, not every frame.
 	local pts = mm.pts
 	local moved = mm.ptsX and sqrt(((px - mm.ptsX) * mm.w) ^ 2 + ((py - mm.ptsY) * mm.h) ^ 2) or 1e9
-	if mm.ptsFor ~= route or (moved > 15 and ns.Paths and ns.Paths:On()) then
+	if mm.ptsFor ~= route or (moved > 15 and ns.Paths and ns.Paths:Lines()) then
 		pts = {}
 		local lx, ly = px, py
 		for _, pt in ipairs(route) do
@@ -641,6 +652,11 @@ function provider:FollowPlayer()
 	if not map or map:GetMapID() ~= self.liveMap then return end
 	local lx, ly = ns.Nav.PlayerXY(self.liveMap)
 	if not lx then return end
+	-- Along the walkable way, the corners ahead change as you move: drawn again every 40 yards.
+	if self.drawnX and ns.Paths and ns.Paths:Lines() and ns.Paths:Has(self.liveMap) then
+		local w, h = C_Map.GetMapWorldSize(self.liveMap)
+		if w and sqrt(((lx - self.drawnX) * w) ^ 2 + ((ly - self.drawnY) * h) ^ 2) > 40 then return self:RefreshAllData() end
+	end
 	local canvas = map:GetCanvas()
 	line:SetStartPoint("TOPLEFT", canvas, lx * canvas:GetWidth(), -ly * canvas:GetHeight())
 end
@@ -764,6 +780,16 @@ function provider:RefreshAllData()
 		local canvas = map:GetCanvas()
 		local cw, ch = canvas:GetWidth(), canvas:GetHeight()
 		local lx, ly = ns.Nav.PlayerXY(mapID)
+		self.drawnX, self.drawnY = lx, ly
+		-- (the way to each stop on the line, for Paths.lua to work out)
+		do
+			local want = {}
+			for _, step in ipairs(ns.Guide.steps) do
+				if #want >= (ns.db.pins.routeSteps or 5) + 3 then break end
+				if step.m == mapID and step.x and not step.later then want[#want + 1] = step end
+			end
+			P.WantWays(mapID, want)
+		end
 		local thickness = (ns.db.pins.lineWidth or 3) / math.max(0.1, map:GetCanvasScale())
 		local n, lines = 0, 0
 		local fromYou = lx ~= nil
