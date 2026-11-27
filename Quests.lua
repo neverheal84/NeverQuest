@@ -67,7 +67,15 @@ local function ApplySpawn(e)
 	e.pos, e.spawn, e.dropMob = native, nil, nil
 	if e.complete or e.failed or not ns.Spawns then return end
 	local sp = ns.Spawns:NearestFor(e.questID)
-	if not sp then return end
+	if not sp then
+		-- Nothing learned, and the game marks nothing (or only the quest NPC): QuestieDB's place
+		-- for the mob, object or drop is a rough area to head for.
+		if (not native or native.npc) and ns.Spawns.RoughFor then
+			local r = ns.Spawns:RoughFor(e.questID)
+			if r then e.pos = { m = r.m, x = r.x, y = r.y, rough = true, label = r.label, drop = r.drop } end
+		end
+		return
+	end
 	e.spawn = sp
 	if not e.mob and sp.mob then e.dropMob = sp.mob end
 	local nd = native and not native.waypoint and ns.Nav.Distance(native.m, native.x, native.y)
@@ -75,6 +83,8 @@ local function ApplySpawn(e)
 		e.pos = { m = sp.m, x = sp.x, y = sp.y, spawn = true, label = sp.label }
 	end
 end
+
+Q.ApplySpawnFor = ApplySpawn  -- (for the tests)
 
 -- Positions of quest objectives/turn-ins drawn on a map.
 local function CollectPositions(mapID, out)
@@ -451,7 +461,7 @@ function Q:Inside(e)
 	if kind ~= "Dungeon" and kind ~= "Raid" then return false end
 	local pos = e.pos
 	if not pos or pos.npc then return true end
-	if pos.spawn then return false end  -- a spot you've learned out in the world
+	if pos.spawn or pos.rough then return false end  -- a spot out in the world: one you've learned, or QuestieDB's rough area
 	for _, at in ipairs({ self:TurnInSpot(e.questID) or false, ns.db.npcs.giverAt[e.questID] or false }) do
 		if at and at.m and at.x and at.source ~= "zone"
 			and (ns.Nav.DistanceBetween(pos.m, pos.x, pos.y, at.m, at.x, at.y) or 1e9) <= INSIDE_YARDS then return true end

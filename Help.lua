@@ -333,6 +333,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.7" .. E,
+		"  " .. Y .. "A rough area for quests the game doesn't mark" .. E .. ": some quests have no marker on the map at all (Test of Strength in Thousand Needles, for one: kill a named mob for an item). The route had nowhere to send you until you'd found the mob yourself. Now it heads for the place QuestieDB says the mob, object or drop is: the middle of its nearby spawn points. The guide says \"rough area\" and what you're looking for there. Once you've found it yourself, the spot you learned takes over.",
+		"",
 		Y .. "1.28.6" .. E,
 		"  " .. Y .. "Setup wizard brought up to date" .. E .. " (" .. Y .. "/nq setup" .. E .. "): the Leveling page now has measuring the route by the walk, picking up quests along the way and learning from your pace. Maps has the minimap route line and lines that follow the walkable way. Automation has which quests to accept. Reminders and travel has using your flight paths, with the tip to open a flight map once. Playing in a group has the alerts when your party makes progress. The last page lists " .. Y .. "/nq route" .. E .. ", " .. Y .. "/nq zones" .. E .. ", " .. Y .. "/nq missed" .. E .. " and " .. Y .. "/nq paths" .. E .. ". Nothing about your settings changes unless you change it there.",
 		"",

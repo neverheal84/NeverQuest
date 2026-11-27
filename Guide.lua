@@ -83,6 +83,9 @@ function G:MakeStep(kind, e)
 		table.insert(parts, e.objective or "Complete the objectives")
 		if e.pos and e.pos.spawn and e.pos.label then
 			table.insert(parts, "|cffffd070known spot: " .. e.pos.label .. "|r")
+		elseif e.pos and e.pos.rough then
+			-- (the game marks nothing for this one: QuestieDB says roughly where)
+			table.insert(parts, "|cffffd070rough area: " .. (e.pos.label or "from QuestieDB") .. (e.pos.drop and (" drops " .. e.pos.drop) or "") .. "|r")
 		elseif ns.Quests:Inside(e) then
 			-- Nothing to walk to: the marker (if any) is the NPC it's handed to. Not for the arrow.
 			s.npcOnly, s.inside, s.noAuto = true, true, true

@@ -614,6 +614,34 @@ function S:NearestFor(questID)
 		mob = (p.ent.kind == "npc") and p.ent.name or (p.mark and p.mark.k == "spawn" and p.mark.l) or nil }
 end
 
+-- A rough area for a quest's open objectives from QuestieDB, for when the game marks nothing and
+-- you haven't learned a spot yet (1.28.7): the nearest place it says the mob, object or drop is,
+-- averaged with its neighbours within ROUGH_YARDS so a patrol or a camp gives its middle.
+local ROUGH_YARDS = 250
+function S:RoughFor(questID)
+	local best, bestD, first
+	for _, p in ipairs(self:Index().lib) do
+		local mine = false
+		for _, r in ipairs(p.ent.refs) do if r.q == questID then mine = true break end end
+		if mine then
+			first = first or p
+			local d = ns.Nav.Distance(p.m, p.x, p.y)
+			if d and (not bestD or d < bestD) then best, bestD = p, d end
+		end
+	end
+	best = best or first
+	if not best then return nil end
+	local sx, sy, n = 0, 0, 0
+	for _, p in ipairs(self:Index().lib) do
+		if p.ent == best.ent and p.m == best.m then
+			local d = ns.Nav.DistanceBetween(p.m, p.x, p.y, best.m, best.x, best.y)
+			if d and d <= ROUGH_YARDS then sx, sy, n = sx + p.x, sy + p.y, n + 1 end
+		end
+	end
+	if n == 0 then sx, sy, n = best.x, best.y, 1 end
+	return { m = best.m, x = sx / n, y = sy / n, dist = bestD, label = best.ent.name, drop = best.ent.drop, n = n }
+end
+
 -- Nearest learned spot for any of a quest's objectives, finished or not (party catch-up uses
 -- this to send you back to help someone finish a quest you've already done).
 function S:AnySpotFor(questID)
