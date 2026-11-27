@@ -333,6 +333,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.6" .. E,
+		"  " .. Y .. "Setup wizard brought up to date" .. E .. " (" .. Y .. "/nq setup" .. E .. "): the Leveling page now has measuring the route by the walk, picking up quests along the way and learning from your pace. Maps has the minimap route line and lines that follow the walkable way. Automation has which quests to accept. Reminders and travel has using your flight paths, with the tip to open a flight map once. Playing in a group has the alerts when your party makes progress. The last page lists " .. Y .. "/nq route" .. E .. ", " .. Y .. "/nq zones" .. E .. ", " .. Y .. "/nq missed" .. E .. " and " .. Y .. "/nq paths" .. E .. ". Nothing about your settings changes unless you change it there.",
+		"",
 		Y .. "1.28.5" .. E,
 		"  " .. Y .. "Travel worked out on the new ground data" .. E .. ": the order of your stops, which quests are grouped into one trip and what a quest is worth for its time are measured by the walk over real ground again (off since 1.28.2 while the data was put right). Switch: Options > Guide & Routes > \"Plan the route by walking distance\", or " .. Y .. "/nq paths off" .. E .. ".",
 		"  " .. Y .. "Your flight paths count" .. E .. ": when two stops are far apart and you know a flight master near each, the route counts that trip as walk, fly, walk, so a quest across the continent by a flight you have ranks ahead of one half as far on foot. NeverQuest knows a flight master is yours once your flight map has shown it (open the map at any flight master) or when you discover a new one. The arrow says \"Fly from X to Y\" as before.",

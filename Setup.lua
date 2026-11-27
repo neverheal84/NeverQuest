@@ -27,13 +27,14 @@ Setup.PAGES = {
 			"What you'll see:\n" ..
 			"  |cffffd100Main window|r (|cffffd100/nq|r or the minimap button): your next steps, quest log, nearby quests, raid attunements and journal.\n" ..
 			"  |cffffd100Arrow|r: points at the guide's top step, a waypoint, or your corpse.\n" ..
+			"  |cffffd100Route line|r on the world map and the minimap: the way to your next stops, round cliffs and water.\n" ..
 			"  |cffffd100Tracker|r on the right: your quests in the order the guide will do them.\n" ..
 			"  |cffffd100XP panel|r: XP per hour and time to level.\n\n" ..
 			"Happy with the defaults? Click |cffffd100Use recommended|r and you're done.",
 	},
 	{
-		key = "leveling", title = "Leveling",
-		text = "|cffffd100Optimized 1-60|r goes where the XP per hour is best for you, worked out from the quest data, and suggests quests to drop. |cffffd100Zone by zone|r is the completionist way: every quest in a zone, gray ones too, before moving on.\n\nEither way, right-click a quest to skip it. Skipped, dropped and left-behind quests go on a list (Quests tab > Missed) you can go back to.",
+		key = "leveling", title = "Leveling and your route",
+		text = "|cffffd100Optimized 1-60|r goes where the XP per hour is best for you and suggests quests to drop. |cffffd100Zone by zone|r is the completionist way: every quest in a zone, gray ones too.\n\nRight-click a quest to skip it. Skipped and dropped quests go on a list (Quests tab > Missed) you can go back to.",
 		build = function(p, U, row)
 			local db = Cfg()
 			U.Cycle(p, 0, row(30), "Leveling style:", ns.Profiles.STYLES, function() return ns.Profiles:Style() end,
@@ -42,9 +43,16 @@ Setup.PAGES = {
 				"Quests in the zones your plan wants you in count for more, and the guide says when to move on.")
 			U.Check(p, 0, row(), "Plan one short route through my quests", function() return db.guide.planner end, function(v) db.guide.planner = v Guide() end,
 				"Orders objectives, turn-ins and pickups to save walking back and forth.")
+			U.Check(p, 0, row(), "Measure the route by the walk, not straight lines", function() return db.guide.walk ~= false end,
+				function(v) db.guide.walk = v and true or false if ns.Paths and not ns.Paths:On() then ns.Paths:Reset() end Guide() end,
+				"NeverQuest knows the ground in 43 zones: cliffs, deep water, hillsides, the way round a mountain. With this on, the order of your stops and which quests make one trip go by the walk you'd really make. Cities, caves and buildings use straight lines.")
+			U.Check(p, 0, row(), "Pick up quests along the way", function() return db.guide.planPickups end, function(v) db.guide.planPickups = v Guide() end,
+				"Quest givers worth the walk go on the route, and a quest you may do is picked up when you pass within about 100 yards of its giver. Five quest log slots stay free; slow quests are only suggested for dropping when the log is nearly full.")
+			U.Check(p, 0, row(), "Learn from my XP gain and pace", function() return db.guide.learnPace ~= false end,
+				function(v) db.guide.learnPace = v if ns.Advisor then ns.Advisor:Forget() end Guide() end,
+				"Measures how long your kills and pickups really take and how much XP your kills give, and plans with those instead of standard figures. /nq pace shows what it has learned.")
 			U.Check(p, 0, row(), "Guide steers the arrow", function() return db.guide.autoTrack end, function(v) db.guide.autoTrack = v Guide() end)
 			U.Check(p, 0, row(), "Include gray (low level) quests", function() return db.guide.showGray end, function(v) db.guide.showGray = v Guide() end)
-			U.Check(p, 0, row(), "Raid attunement reminders from level 50", function() return db.guide.attunements end, function(v) db.guide.attunements = v Guide() end)
 		end,
 	},
 	{
@@ -54,7 +62,7 @@ Setup.PAGES = {
 			local db = Cfg()
 			U.Check(p, 0, row(30), "Get dungeon quests and their pre-quests first", function() return db.guide.dungeonQuests ~= false end,
 				function(v) ns.Dungeons:SetOn(v) end,
-				"These count for a lot more on the route than ordinary quests. Dungeon quests in your log wait for the dungeon instead of sending you to its entrance alone. /nq dungeons lists them.")
+				"These count for a lot more on the route than ordinary quests. Dungeon quests in your log wait for the dungeon: they're off the route (and the arrow) until they're done, then handed in like any other. /nq dungeons lists them.")
 			local top = row(4)
 			local rows = ns.Dungeons:BuildChecks(p, U, top, 22)
 			for _ = 1, rows do row(22) end
@@ -62,12 +70,17 @@ Setup.PAGES = {
 	},
 	{
 		key = "maps", title = "Maps and navigation",
-		text = "Spawn spots are learned from your own play: where quest mobs died, what dropped quest items, and spots you mark yourself.",
+		text = "The route line runs from where you stand through your next stops. Spawn spots are learned from your own play: where quest mobs died, what dropped quest items, and spots you mark yourself.",
 		build = function(p, U, row)
 			local db = Cfg()
 			U.Check(p, 0, row(), "Waypoint arrow", function() return db.arrow.shown end, function(v) db.arrow.shown = v ns.Nav:Update() end)
 			U.Check(p, 0, row(), "Route lines on the world map", function() return db.pins.routeLine end, function(v) db.pins.routeLine = v Pins() end,
 				"Joins the guide's next steps on the world map. The numbered pins stay either way.")
+			U.Check(p, 0, row(), "Route line on the minimap", function() return db.pins.mmLine end, function(v) db.pins.mmLine = v Pins() end,
+				"The same line on the minimap, cut off at its edge. /nq mmline switches it too.")
+			U.Check(p, 0, row(), "Lines follow the walkable way", function() return db.pins.pathLine ~= false end,
+				function(v) db.pins.pathLine = v and true or false if ns.Paths and not ns.Paths:On() then ns.Paths:Reset() end ns:SendMessage("PATHS_READY") Pins() end,
+				"The lines bend round cliffs, deep water and mountains instead of running straight over them. A line is straight for a second or two after the route changes while the way is worked out.")
 			U.Check(p, 0, row(), "Quest givers on the world map", function() return db.givers.worldmap end, function(v) db.givers.worldmap = v Pins() Guide() end,
 				"Quests you can pick up, with their level in the quest's difficulty color.")
 			U.Check(p, 0, row(), "Learn spawn spots as I play", function() return db.spawns.learn end, function(v) db.spawns.learn = v end)
@@ -75,8 +88,6 @@ Setup.PAGES = {
 				"Where your quests' mobs and objects are, drawn small.")
 			U.Cycle(p, 0, row(30), "Hover tooltips:", { { "line", "One line" }, { "off", "Off" }, { "full", "Full" } },
 				function() return ns.TipMode() end, function(v) db.window.tips = v end)
-			U.Check(p, 0, row(), "NeverQuest button on the minimap", function() return db.minimapButton.shown end,
-				function(v) db.minimapButton.shown = v if ns.MinimapButton then ns.MinimapButton:Refresh() end end)
 		end,
 	},
 	{
@@ -99,6 +110,9 @@ Setup.PAGES = {
 		build = function(p, U, row)
 			local au = Cfg().auto
 			U.Check(p, 0, row(), "Accept quests automatically", function() return au.accept end, function(v) au.accept = v end)
+			U.Cycle(p, 16, row(30), "Which quests:", { { "all", "Every quest" }, { "route", "Only ones the route will do" } },
+				function() return au.acceptOnly or "all" end, function(v) au.acceptOnly = v end,
+				"Only ones the route will do: quests on your route (those picked up in passing too), class and profession quests, quests for your chosen dungeons and attunement, and others worth their time. Elite and group quests wait for a group. Anything else you can still accept by hand.")
 			U.Check(p, 0, row(), "Turn in finished quests automatically", function() return au.turnin end, function(v) au.turnin = v end)
 			U.Check(p, 0, row(), "Pick quests in NPC dialog windows", function() return au.gossip end, function(v) au.gossip = v end)
 			U.Check(p, 0, row(), "Skip gray quests", function() return au.skipGray end, function(v) au.skipGray = v end)
@@ -114,7 +128,7 @@ Setup.PAGES = {
 	},
 	{
 		key = "helpers", title = "Reminders and travel",
-		text = "Small things that cost leveling time. Reminders show up as rows in the guide.",
+		text = "Small things that cost leveling time. Reminders show up as rows in the guide.\n\nNeverQuest only flies you between flight masters your flight map has shown you can reach: open the flight map once at any flight master so it knows which you have.",
 		build = function(p, U, row)
 			local db = Cfg()
 			local function Re() if ns.Guide then ns.Guide:Refresh() end end
@@ -123,7 +137,11 @@ Setup.PAGES = {
 				function(v) db.upkeep.supplies, db.upkeep.bags = v, v Re() end)
 			U.Check(p, 0, row(), "Logging out with no rested XP", function() return db.upkeep.rested end, function(v) db.upkeep.rested = v end)
 			U.Check(p, 0, row(), "Flight paths you don't have yet", function() return db.travel.flightPaths end, function(v) db.travel.flightPaths = v Re() end)
+			U.Check(p, 0, row(), "Use my flight paths", function() return db.nav.flights end,
+				function(v) db.nav.flights = v if ns.Route and ns.Route.DropFlight then ns.Route:DropFlight() end Guide() end,
+				"The arrow says \"Fly from X to Y\" when that's clearly faster, and the route counts a long trip as walk, fly, walk when you know a flight master near both ends.")
 			U.Check(p, 0, row(), "Say when to hearth back to hand in quests", function() return db.travel.hearth end, function(v) db.travel.hearth = v Re() end)
+			U.Check(p, 0, row(), "Raid attunement reminders from level 50", function() return db.guide.attunements end, function(v) db.guide.attunements = v Guide() end)
 		end,
 	},
 	{
@@ -149,13 +167,15 @@ Setup.PAGES = {
 	},
 	{
 		key = "party", title = "Playing in a group",
-		text = "Party members who also run NeverQuest see each other's progress and learned spots. Catch-up and announcements only do anything while you're in a party.",
+		text = "In a party the tracker shows each member, the quests you share and who still needs what. Members don't need NeverQuest for that; those who run it also share their progress and learned spots.",
 		build = function(p, U, row)
 			local db = Cfg()
 			U.Check(p, 0, row(), "Share quest progress with my party", function() return db.party.enabled end,
 				function(v) db.party.enabled = v if v and ns.Party then ns.Party:SendSnapshot() end end)
 			U.Check(p, 0, row(), "Party catch-up", function() return db.party.catchUp end, function(v) db.party.catchUp = v Guide() end,
 				"The guide and route adapt so everyone keeps up: shared quests first, turn-ins wait for whoever still needs them.")
+			U.Check(p, 0, row(), "Tell me when my party makes progress", function() return db.party.alerts ~= false end, function(v) db.party.alerts = v and true or false end,
+				"A short line in your own chat, with a sound, when someone finishes an objective of a quest you share or everyone's ready to hand in. Nobody else sees it.")
 			U.Check(p, 0, row(), "Announce completions in party chat", function() return db.announce.enabled end, function(v) db.announce.enabled = v end,
 				"Finished objectives, quests ready to turn in and raid attunement steps. Each type can be switched off under Options.")
 		end,
@@ -168,6 +188,8 @@ Setup.PAGES = {
 			local St = ns.Style
 			U.Cycle(p, 0, row(30), "Text size:", St.TEXT_SIZES, function() return db.style.textScale end, function(v) db.style.textScale = v St:Apply() end)
 			U.Cycle(p, 0, row(30), "Main window size:", St.SCALES, function() return db.window.scale end, function(v) db.window.scale = v ns.UI:ApplyScale() end)
+			U.Check(p, 0, row(), "NeverQuest button on the minimap", function() return db.minimapButton.shown end,
+				function(v) db.minimapButton.shown = v if ns.MinimapButton then ns.MinimapButton:Refresh() end end)
 			U.Check(p, 0, row(), "Login message in chat", function() return not db.quietLogin end, function(v) db.quietLogin = not v end)
 		end,
 	},
@@ -178,11 +200,14 @@ Setup.PAGES = {
 			"  |cffffd100/nq help|r  how everything works, and every command\n" ..
 			"  |cffffd100/nq setup|r  this setup again\n" ..
 			"  |cffffd100/nq options|r  every setting\n" ..
+			"  |cffffd100/nq route|r  your planned route, stop by stop\n" ..
+			"  |cffffd100/nq zones|r  why the guide wants you in this zone\n" ..
+			"  |cffffd100/nq missed|r  quests you skipped, dropped or left behind\n" ..
+			"  |cffffd100/nq paths|r  walking paths and route lines (|cffffd100/nq mmline|r for the minimap line)\n" ..
 			"  |cffffd100/nq raids|r  raid attunement guides\n" ..
 			"  |cffffd100/nq db <name>|r  find a quest in the quest database\n" ..
-			"  |cffffd100/nq session|r  what this play session brought in\n" ..
 			"  |cffffd100/way 45 63|r  a waypoint in your zone\n\n" ..
-			"Hover almost anything in NeverQuest for a tooltip. Right-click the minimap button for quick settings.",
+			"Open the flight map once at a flight master so NeverQuest knows which flight paths you have. Hover almost anything in NeverQuest for a tooltip; right-click the minimap button for quick settings.",
 	},
 }
 
