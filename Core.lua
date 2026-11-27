@@ -47,7 +47,7 @@ local DEFAULTS = {
 	           classTab = true, profQuests = true, profMine = true,
 	           smartZones = true, dropAdvice = true, completionist = true, missedList = true },  -- Advisor.lua
 	nav    = { mapCoords = true, nativeWaypoint = true, adoptMapPins = true, paths = true, flights = true },
-	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, sources = false,
+	pins   = { minimap = true, mmGivers = true, mmQuests = true, mmWaypoints = true, mmLine = true, sources = false,
 	           worldmap = true, route = true, routeLine = true, routeTurnins = false, lineWidth = 3, routeSteps = 5, altClick = true, mmScale = 0.6, wmScale = 1 },
 	buttons = { items = true, target = false, locked = false, scale = 1 },  -- target: the TARGET pill (off by default; its key binding works either way)
 	party  = { enabled = true, catchUp = true, groupLevel = true, regroup = true, shareTips = true, autoShare = false,

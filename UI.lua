@@ -1704,6 +1704,8 @@ function UI:CreateOptions()
 	Check(d, R2.x, R2:Next(), "Objectives and turn-ins", function() return db.pins.mmQuests end, function(v) db.pins.mmQuests = v ns.Pins:Refresh(true) end,
 		"Turn this off if your minimap already shows quest areas.")
 	Check(d, R2.x, R2:Next(), "Waypoints", function() return db.pins.mmWaypoints end, function(v) db.pins.mmWaypoints = v ns.Pins:Refresh(true) end)
+	Check(d, R2.x, R2:Next(), "Route line on the minimap", function() return db.pins.mmLine end, function(v) db.pins.mmLine = v ns.Pins:Refresh(true) end,
+		"A line on the minimap from where you stand through the guide's next steps, the same ones the world map joins up. Also: /nq mmline.")
 
 	R2:Next(6)
 	Heading(d, R2.x, R2:Next(), "World map")

@@ -263,6 +263,7 @@ end
 
 -- The level label on a minimap pin: shown for quests (to pick up, to work on, to hand in) when
 -- quest levels are switched on, in the quest's difficulty color; known quests a little dimmer.
+function P.MinimapLines() return mm.lines end
 function P.ApplyMinimapLevel(pin, pt, on, scale)
 	local lv = pt and not pt.spawn and ns.Num(pt.level)
 	if not (on and lv and lv > 0) then
@@ -282,16 +283,120 @@ local function HideMinimapPins(from)
 	for i = from, #mm.pins do mm.pins[i]:Hide() end
 end
 
+-- The route line on the minimap (1.28.3): from where you stand through the guide's next steps,
+-- the same stops the world map joins up. Option: pins.mmLine.
+mm.lines, mm.route = {}, {}
+local function HideMinimapLines(from)
+	for i = from, #mm.lines do mm.lines[i]:Hide() end
+end
+local function MinimapLine(i)
+	local line = mm.lines[i]
+	if line then return line end
+	if not mm.lineFrame then
+		mm.lineFrame = CreateFrame("Frame", nil, Minimap)
+		mm.lineFrame:SetAllPoints(Minimap)
+		mm.lineFrame:SetFrameStrata(Minimap:GetFrameStrata())
+		mm.lineFrame:SetFrameLevel(Minimap:GetFrameLevel() + 4)  -- under the pins
+	end
+	line = mm.lineFrame:CreateLine(nil, "OVERLAY")
+	line:SetColorTexture(1, 0.82, 0.1, 0.8)
+	mm.lines[i] = line
+	return line
+end
+
+-- The stops the line runs through, on the map you're standing on: the active target's next leg,
+-- then the guide's steps (not the ones left for later), as many as the world map numbers.
+function P:MinimapRoute(ref)
+	local out = {}
+	if not ns.db.pins.mmLine then return out end
+	local function Add(m, x, y)
+		local rx, ry = ns.Nav.TranslatePoint(m, x, y, ref)
+		if rx then out[#out + 1] = { rx = rx, ry = ry, m = m, x = x, y = y } end
+		return rx ~= nil
+	end
+	local wp = ns.char.waypoints[1]
+	local active = ns.Nav:GetActive()
+	local leg = active and ns.Route:Leg(active)
+	if leg and leg.m then Add(leg.m, leg.x, leg.y) end
+	if wp then
+		-- Your own waypoint is where you're going: the line goes there and stops.
+		Add(wp.m, wp.x, wp.y)
+		return out
+	end
+	local n = 0
+	for _, step in ipairs(ns.Guide.steps) do
+		if n >= (ns.db.pins.routeSteps or 5) then break end
+		if step.m and step.x and not step.later then
+			if Add(step.m, step.x, step.y) and not (step.predicted or step.npcOnly) then n = n + 1 end
+		end
+	end
+	return out
+end
+
+-- Draws the line: each piece cut off at the minimap's edge.
+local function DrawMinimapRoute(px, py, pxPerYard, cf, sf, limit)
+	local route = mm.route
+	if #route == 0 then return HideMinimapLines(1) end
+	local thick = math.max(1.5, (ns.db.pins.lineWidth or 3) - 1)
+	local n = 0
+	local ax, ay = 0, 0     -- you, in the middle
+	-- The corners between the stops don't change as you walk, except (with walking paths on,
+	-- Paths.lua) the way round to the first one: worked out again every 15 yards, not every frame.
+	local pts = mm.pts
+	local moved = mm.ptsX and sqrt(((px - mm.ptsX) * mm.w) ^ 2 + ((py - mm.ptsY) * mm.h) ^ 2) or 1e9
+	if mm.ptsFor ~= route or (moved > 15 and ns.Paths and ns.Paths:On()) then
+		pts = {}
+		local lx, ly = px, py
+		for _, pt in ipairs(route) do
+			local way = ns.Paths and ns.Paths:Route(mm.refMap, lx, ly, pt.rx, pt.ry)
+			for i = 1, way and #way or 0, 2 do pts[#pts + 1] = way[i] pts[#pts + 1] = way[i + 1] end
+			pts[#pts + 1], pts[#pts + 2] = pt.rx, pt.ry
+			lx, ly = pt.rx, pt.ry
+		end
+		mm.pts, mm.ptsFor, mm.ptsX, mm.ptsY = pts, route, px, py
+	end
+	local r2 = limit * limit
+	for i = 1, #pts, 2 do
+		local ex = (pts[i] - px) * mm.w * pxPerYard
+		local ny = -(pts[i + 1] - py) * mm.h * pxPerYard
+		local bx, by = ex * cf + ny * sf, -ex * sf + ny * cf
+		-- The part of a-b inside the circle: |a + t(b - a)| <= limit.
+		local dx, dy = bx - ax, by - ay
+		local qa = dx * dx + dy * dy
+		if qa > 0.01 then
+			local qb = 2 * (ax * dx + ay * dy)
+			local qc = ax * ax + ay * ay - r2
+			local disc = qb * qb - 4 * qa * qc
+			if disc > 0 then
+				local s = sqrt(disc)
+				local t0, t1 = math.max(0, (-qb - s) / (2 * qa)), math.min(1, (-qb + s) / (2 * qa))
+				if t1 - t0 > 0.001 then
+					n = n + 1
+					local line = MinimapLine(n)
+					line:SetThickness(thick)
+					line:SetStartPoint("CENTER", Minimap, ax + dx * t0, ay + dy * t0)
+					line:SetEndPoint("CENTER", Minimap, ax + dx * t1, ay + dy * t1)
+					line:Show()
+				end
+			end
+		end
+		ax, ay = bx, by
+	end
+	HideMinimapLines(n + 1)
+end
+
 -- Points are converted once into the coordinates of the map you're standing on; each frame
 -- only the player's position changes.
 function P:RebuildMinimap()
 	wipe(mm.points)
+	mm.route = {}
 	mm.refMap = nil
-	if not ns.ready or not ns.db.pins.minimap or not Minimap then return HideMinimapPins(1) end
+	if not ns.ready or not ns.db.pins.minimap or not Minimap then HideMinimapLines(1) return HideMinimapPins(1) end
 	local ref = C_Map.GetBestMapForUnit("player")
-	if not ref then return HideMinimapPins(1) end
+	if not ref then HideMinimapLines(1) return HideMinimapPins(1) end
 	mm.refMap = ref
 	mm.w, mm.h = C_Map.GetMapWorldSize(ref)
+	mm.route = self:MinimapRoute(ref)
 	for _, pt in ipairs(self:MinimapPoints()) do
 		local x, y = ns.Nav.TranslatePoint(pt.m, pt.x, pt.y, ref)
 		if x then
@@ -303,11 +408,11 @@ function P:RebuildMinimap()
 end
 
 function P:UpdateMinimap()
-	if not mm.refMap or #mm.points == 0 then return HideMinimapPins(1) end
+	if not mm.refMap or (#mm.points == 0 and #mm.route == 0) then HideMinimapLines(1) return HideMinimapPins(1) end
 	if C_Map.GetBestMapForUnit("player") ~= mm.refMap then return self:RebuildMinimap() end
 	local px, py = ns.Nav.PlayerXY(mm.refMap)
 	local radius = C_Minimap.GetViewRadius()
-	if not px or not radius or radius <= 0 or not mm.w or mm.w <= 0 then return HideMinimapPins(1) end
+	if not px or not radius or radius <= 0 or not mm.w or mm.w <= 0 then HideMinimapLines(1) return HideMinimapPins(1) end
 
 	local half = Minimap:GetWidth() / 2
 	local pxPerYard = half / radius
@@ -317,6 +422,7 @@ function P:UpdateMinimap()
 		local facing = GetPlayerFacing()
 		if facing and not ns.IsSecret(facing) then cf, sf = cos(facing), sin(facing) end
 	end
+	DrawMinimapRoute(px, py, pxPerYard, cf, sf, half - 3)
 
 	local n = 0
 	for _, pt in ipairs(mm.points) do
@@ -831,3 +937,9 @@ ns:OnInit(function()
 		end
 	end))
 end)
+
+ns:AddSlash("mmline", function()
+	ns.db.pins.mmLine = not ns.db.pins.mmLine
+	P:Refresh(true)
+	ns.Print("route line on the minimap: " .. (ns.db.pins.mmLine and "on." or "off."))
+end, "/nq mmline - show or hide the route line on the minimap")
