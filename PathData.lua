@@ -11,7 +11,7 @@
 --   Since 1.28.4: before, a cell had one cost and any two neighbours were joined, which let a route
 --   cross a ridge that happened to run between two mostly open cells.
 -- Worked out from the game's own terrain (ground heights and liquids, read the way the OpenMap addon's
--- tools read them: github.com/Mapster-Addon/OpenMap, MIT) and checked against QuestieDB's creature
+-- tools read them: github.com/openmap-world/openmap, MIT) and checked against QuestieDB's creature
 -- positions. Only these derived grids are shipped, none of the game's art or data files.
 local ADDON, ns = ...
 ns.PathData = {
