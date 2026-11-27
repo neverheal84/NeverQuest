@@ -333,6 +333,11 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.11" .. E,
+		"  " .. Y .. "A smoother move into the 30s" .. E .. ": the 1-60 plans for some races sent you to Ashenvale at 28 for two levels, at the very top of a zone that ends at 30. Plans now only send you to a zone with at least three levels left in it when you arrive, and every race's plan has been searched again with that rule (around 28 to 30 that means zones like Thousand Needles, Desolace, Arathi Highlands or Stranglethorn Vale).",
+		"  " .. Y .. "The guide's own zone choice" .. E .. " uses the same three levels (it was two in 1.28.9), going by the lower of the game's top level for a zone and NeverQuest's, so a zone the game lists higher than its quests really go still counts as outgrown. The zone you're standing in is still yours to finish.",
+		"  " .. Y .. "Leftover quests" .. E .. ": an unfinished quest in a zone you've moved on from and nearly outgrown now counts for about a third as much on the route, so a few old quests no longer drag you back across the map. Finished ones still do, since handing them in is free XP. " .. Y .. "/nq drop" .. E .. " lists quests worth dropping.",
+		"",
 		Y .. "1.28.10" .. E,
 		"  " .. Y .. "Minimap route line off by default" .. E .. ": the line on the minimap is now off unless you want it. Everyone who had it from 1.28.5 has it switched off once; turn it back on with Options > Display & Maps > Minimap > \"Route line on the minimap\", or " .. Y .. "/nq mmline" .. E .. ". The world map's line is unchanged.",
 		"",

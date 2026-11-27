@@ -49,6 +49,7 @@ local MAX_STOPS = 30
 local FLIGHT_MIN = 1200      -- yards apart before a flight is thought of (Route.lua's MIN_FLIGHT_TRIP)
 local FLIGHT_GAIN = 0.75     -- ...and it has to take under three quarters of the walk
 local FLY_SPEED, FLY_OVERHEAD = 30, 25  -- yards a second in the air; seconds to talk, take off and land
+local LEFT_BEHIND = 0.35     -- an unfinished quest in a zone you've moved on from and nearly outgrown counts for this share more
 local NEAR_PICKUP = 100      -- yards: a quest you may do, given this close to you or to the last stop here, is picked up whatever it's worth
 local NEAR_ROUTE = 60        -- ...and one this small a detour off the route, likewise
 local LOG_ROOM = 5           -- free quest log slots kept: none of those "may do" pickups once it's this full
@@ -204,8 +205,17 @@ local function StyleWeight(questID, zoneName, focus, complete)
 	end
 	local prev = ns.Chains and ns.db.guide.chains and ns.Chains:Prev(questID)
 	if prev and ns.SafeCall(C_QuestLog.IsQuestFlaggedCompleted, prev) == true then w = w * CHAIN_STARTED end
+	-- (1.28.11) An unfinished quest in a zone you've moved on from and nearly outgrown: a trip
+	-- back for it is rarely worth it, so it counts for much less. Finished ones still pull you
+	-- back to hand in: that's XP in the bag.
+	if not complete and zoneName and not ns.Profiles.SameZone(zoneName, focus.here) then
+		local inFocus = false
+		for name in pairs(focus.zones or {}) do if ns.Profiles.SameZone(name, zoneName) then inFocus = true end end
+		if not inFocus and ns.Profiles.Outgrown(zoneName, UnitLevel("player") or 1) then w = w * LEFT_BEHIND end
+	end
 	return w
 end
+P._StyleWeight = StyleWeight
 
 function P:Bundles(cont)
 	local cfg = ns.db.guide

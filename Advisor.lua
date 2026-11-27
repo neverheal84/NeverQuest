@@ -34,7 +34,6 @@ local PLAN_BONUS = 1.1        -- zones your 1-60 plan names for now
 local CROSS_CONTINENT = 1200  -- seconds: a boat or a zeppelin, with the walking at both ends
 local FAR_SHARE = 0.7         -- a zone across the sea also counts for this share: you'd be cut off from the rest
 local MIN_QUESTS = 4          -- fewer known quests than this anywhere: keep to the plan
-local HEADROOM = 2            -- levels a zone must still have above you before the guide sends you to it from elsewhere
 local DROP_SHARE = 0.25       -- a quest under this share of the route's XP per hour is worth dropping
 local DROP_ROOM = 3           -- ...once the quest log has this few slots free beyond the planner's reserve (8 in all)
 
@@ -294,8 +293,9 @@ function A:ZoneScores(planZones)
 			-- 1.28.9: and one you'd have to travel to needs a couple of levels left in it. At 29
 			-- Ashenvale (18 to 30) still "fit", so its leftover quests could outscore everything and
 			-- send you back to a zone you were about to outgrow. Your plan's zones are the exception.
+			-- 1.28.11: three levels (P.HEADROOM), by the lower of the game's and NeverQuest's top level.
 			local inPlan = planZones and planZones[name]
-			local room = maxL and (maxL >= math.min(level + HEADROOM, 60) or (maxL >= level and (isHere or inPlan)))
+			local room = maxL and (not P.Outgrown(name, level) or (maxL >= level and (isHere or inPlan)))
 			if minL and maxL and minL <= level + 2 and (room or (isHere and maxL >= level - 4)) then
 				list[#list + 1] = self:ScoreZone(id, name, here, planZones)
 			end
