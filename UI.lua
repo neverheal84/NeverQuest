@@ -1418,6 +1418,9 @@ function UI:CreateOptions()
 	Check(p, R.x, R:Next(), "Scan zones for quests in the background", function() return qd.scan end,
 		function(v) qd.scan = v if not v then ns.QuestDB:StopScan() end end,
 		"Asks the game which quests each zone offers, one zone every couple of seconds, paused in combat. Every character adds to one shared database. /nq db searches it.")
+	Check(p, R.x + 16, R:Next(), "Say in chat when a scan finishes", function() return qd.notify == true end,
+		function(v) qd.notify = v and true or false end,
+		"Off by default: the background scan and what it learns from your quest chains stay out of your chat. A scan you start yourself with /nq db scan always says when it's done, and /nq db status tells you where things stand.")
 	Check(p, R.x, R:Next(), "Known quest starts on the world map", function() return qd.worldmap end,
 		function(v) qd.worldmap = v ns.QuestDB:ClearNearby() ns:SendMessage("MAP_OFFERS_UPDATED") end,
 		"Faded markers for quests you know about that aren't on offer to you yet, with the level they open at. This is where everything your alts, your party, your guild and the shipped data know shows up.")

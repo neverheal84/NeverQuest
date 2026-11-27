@@ -433,11 +433,13 @@ function D:Step()
 		-- Ask about your own zone again so its quest list is fresh after all that.
 		ns.Debounce("offers", 1, function() ns.Quests:RequestOffers() end)
 		ns:SendMessage("QUESTDB_UPDATED")
-		-- Always say so, not just for a manual scan: knowing the scan has finished is how you
-		-- know the map is as complete as it's going to get, and when it's safe to export.
+		-- A scan you asked for (/nq db scan) says when it's done. The ones NeverQuest runs by itself
+		-- are quiet from 1.28.9 unless you ask to be told (questdb.notify): /nq db status says
+		-- where things stand whenever you want to know.
 		local manual = self.manual
 		self.manual = nil
-		if manual or not ns.db.quietLogin then
+		self.sayDeep = manual or ns.db.questdb.notify or nil
+		if manual or ns.db.questdb.notify then
 			ns.Print(string.format("quest database scan done: %d zones, %d quests known.%s",
 				self.total or 0, self:Count(),
 				#self.loads > 0 and string.format(" Asking the game about %d more from your chains.", #self.loads) or ""))
@@ -527,7 +529,7 @@ function D:PumpLoads()
 			ns:SendMessage("QUESTDB_UPDATED")
 			ns:SendMessage("MAP_OFFERS_UPDATED")
 			-- Say so: this is the part that tells you the database is ready to export.
-			if (self.deepFound or 0) > 0 then
+			if (self.deepFound or 0) > 0 and (self.sayDeep or ns.db.questdb.notify) then
 				ns.Print(string.format("learned %d more quest%s from your chains. %d quests known in all.",
 					self.deepFound, self.deepFound == 1 and "" or "s", self:Count()))
 			end

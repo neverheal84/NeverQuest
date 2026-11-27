@@ -333,6 +333,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.9" .. E,
+		"  " .. Y .. "Quieter chat" .. E .. ": the quest database's background scan no longer announces itself. \"quest database scan done\" and \"learned N more quests from your chains\" are off unless you tick Options > NeverQuest > \"Say in chat when a scan finishes\". A scan you start yourself with " .. Y .. "/nq db scan" .. E .. " still says when it's done, and " .. Y .. "/nq db status" .. E .. " tells you where things stand.",
+		"  " .. Y .. "No more trips back to a zone you've nearly outgrown" .. E .. ": in the Optimized style the guide could send a level 29 back to Ashenvale (18 to 30), because the zone still counted as fitting your level and its leftover quests scored well. Now a zone you'd have to travel to needs at least two levels left in it. The zone you're standing in and the zones your 1-60 plan names for now are not affected. " .. Y .. "/nq zones" .. E .. " shows the scores.",
+		"",
 		Y .. "1.28.8" .. E,
 		"  " .. Y .. "Quest chests and named mobs you can see on the map" .. E .. ": where QuestieDB knows only a few places for something a quest needs (the three Document Chests holding the Secret Notes for Grimtotem Spying, a named mob like Rok'Alim the Pounder), each was drawn as one faint dot that was easy to miss. They're now clear gold-ringed markers on the world map and the minimap. With 1.28.7's rough areas the route goes to the nearest one still needed.",
 		"",
