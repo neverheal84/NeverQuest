@@ -50,7 +50,7 @@ local stamp, count, round = 0, 0, 0
 -- paused: set by the test harness, whose older sections were written against straight lines.
 -- Two uses, two switches: the route planner measuring by the walk (guide.walk, off unless you
 -- switch it on) and the map lines following it (pins.pathLine, on).
-function P:Planning() return not self.paused and ns.db.guide.walk == true and ns.PathData ~= nil end
+function P:Planning() return not self.paused and ns.db.guide.walk ~= false and ns.PathData ~= nil end
 function P:Lines() return not self.paused and ns.db.pins.pathLine ~= false and ns.PathData ~= nil end
 function P:On() return self:Planning() or self:Lines() end
 
@@ -235,6 +235,7 @@ function P:Work()
 		if #queue == 0 then
 			-- What the route was guessing at, it now knows.
 			if ns.Planner and P:Planning() then ns.Planner.dirty = true end
+			P.epoch = (P.epoch or 0) + 1   -- (what was measured straight for want of these can be measured again)
 			ns:SendMessage("PATHS_READY")
 		end
 	end

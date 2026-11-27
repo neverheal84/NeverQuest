@@ -35,6 +35,7 @@ local CROSS_CONTINENT = 1200  -- seconds: a boat or a zeppelin, with the walking
 local FAR_SHARE = 0.7         -- a zone across the sea also counts for this share: you'd be cut off from the rest
 local MIN_QUESTS = 4          -- fewer known quests than this anywhere: keep to the plan
 local DROP_SHARE = 0.25       -- a quest under this share of the route's XP per hour is worth dropping
+local DROP_ROOM = 3           -- ...once the quest log has this few slots free beyond the planner's reserve (8 in all)
 
 local BUDGET = 4              -- milliseconds per frame for working out where quests' work is
 local SCORE_TTL = 20          -- seconds zone scores are reused
@@ -87,6 +88,12 @@ local function Dist(a, b)
 	if not (a and b and a.m and b.m) then return NO_SPOT_YARDS end
 	local d = ns.Nav.DistanceBetween(a.m, a.x, a.y, b.m, b.x, b.y)
 	if not d or d == math.huge then return LEG_CAP end
+	-- The walk over real ground, where Paths.lua has it for either end (1.28.5): a quest whose
+	-- work is the other side of a ridge takes longer than the straight line says.
+	if a.m == b.m and ns.Paths then
+		local walk = ns.Paths:Yards(a.m, a.x, a.y, b.x, b.y)
+		if walk and walk / DETOUR > d then d = walk / DETOUR end
+	end
 	return math.min(d, LEG_CAP)
 end
 
@@ -116,7 +123,7 @@ function A:Estimate(qid, q)
 	-- What Pace.lua has learned about you: your pace against the standard, and XP per kill.
 	local Pc = ns.Pace
 	local scale, killXP = Pc and Pc:Scale() or 1, Pc and Pc:KillXP() or nil
-	local pace = math.floor(scale * 20 + 0.5) * 100000 + math.floor((killXP or 0) / 10)
+	local pace = math.floor(scale * 20 + 0.5) * 100000 + math.floor((killXP or 0) / 10) + ((ns.Paths and ns.Paths:Planning() and ns.Paths.epoch or 0) % 1000) * 1e7
 	local c = est[qid]
 	if c and c.level == level and c.objs == objs and c.key == key and c.pace == pace then return c end
 	q = q or (ns.QuestDB and ns.QuestDB:Get(qid))
@@ -550,6 +557,7 @@ function A:DropCandidates(limit)
 	local dplan = ns.Dungeons and ns.Dungeons:On() and ns.Dungeons:Plan() or nil
 	local followed = ns.Attune and ns.Attune:Following()
 	local level = UnitLevel("player") or 1
+	local tight = not (ns.Planner and ns.Planner.LogRoom) or ns.Planner.LogRoom() <= DROP_ROOM
 	local out = {}
 	for _, e in ipairs(ns.Quests.log) do
 		if not e.complete and not Protected(e, dplan, followed) then
@@ -563,7 +571,9 @@ function A:DropCandidates(limit)
 				if not onRoute then
 					local x = self:Estimate(e.questID)
 					local r = x.rate * 3600
-					if planRate > 0 and r < planRate * DROP_SHARE then
+					-- (a slow quest costs nothing sitting in the log: it's only worth dropping for
+					-- being slow once the log is filling up. 1.28.5: quests are picked up in passing.)
+					if planRate > 0 and r < planRate * DROP_SHARE and tight then
 						why[#why + 1] = string.format("about %s XP/hour against %s on your route", ns.Comma(math.floor(r / 100) * 100), ns.Comma(math.floor(planRate / 100) * 100))
 						score = score + 100
 					end

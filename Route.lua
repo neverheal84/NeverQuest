@@ -18,6 +18,7 @@ local MIN_FLIGHT_TRIP = 1200  -- straight-line yards before flights are consider
 local SAME_SPOT = 8           -- a "waypoint" this close to the target is the target itself
 
 R.speed = 7                   -- best ground speed seen this session (yards per second)
+R.FLY_SPEED, R.FLY_OVERHEAD, R.MIN_FLIGHT_TRIP = FLY_SPEED, FLY_OVERHEAD, MIN_FLIGHT_TRIP  -- (the planner counts flights the same way)
 
 local function Num(v) return ns.Num(v) end
 local function Text(v)

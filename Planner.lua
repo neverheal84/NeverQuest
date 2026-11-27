@@ -46,6 +46,12 @@ local WORKING_YARDS = 60    -- this close to the current objective, you're worki
 local REPLAN_MOVE = 120     -- yards moved before planning again
 local REPLAN_EVERY = 8      -- seconds between plans
 local MAX_STOPS = 30
+local FLIGHT_MIN = 1200      -- yards apart before a flight is thought of (Route.lua's MIN_FLIGHT_TRIP)
+local FLIGHT_GAIN = 0.75     -- ...and it has to take under three quarters of the walk
+local FLY_SPEED, FLY_OVERHEAD = 30, 25  -- yards a second in the air; seconds to talk, take off and land
+local NEAR_PICKUP = 100      -- yards: a quest you may do, given this close to you or to the last stop here, is picked up whatever it's worth
+local NEAR_ROUTE = 60        -- ...and one this small a detour off the route, likewise
+local LOG_ROOM = 5           -- free quest log slots kept: none of those "may do" pickups once it's this full
 local WALK_STOPS = 24        -- the nearest stops whose walking distances are asked for (Paths.lua keeps that many)
 local WALK_READY = 0.9       -- walking distances are used once this share of them is known
 local TOO_HIGH = 3          -- quests more than this many levels above you wait until you're within it (finished ones are handed in whatever their level)
@@ -97,17 +103,49 @@ end
 -- Yards between two stops (or you and a stop). Where Paths.lua knows the walk over real ground
 -- (PathData.lua: cliffs, water, the way round a mountain), that counts when it's longer than the
 -- straight line's usual allowance; otherwise the straight line, as ever.
+--
+-- 1.28.5: and where two spots are far apart and there are flight masters you know near both
+-- (Route.lua remembers the ones your flight map has shown you can fly to), the trip counts as
+-- walk, fly, walk, by the same sums the arrow uses before it says "Fly from X to Y". So a stop
+-- across the continent by a flight path you have is nearer than one half as far with no way but
+-- your feet. flights: your flight masters on this continent, in continent yards (Make sets it).
 local walkOK = false
+local flights, flightSpeed
+local function NearNode(s)
+	if s.fnFor ~= flights then
+		local best, bestD
+		for _, n in ipairs(flights) do
+			local dx, dy = s.cx - n.cx, s.cy - n.cy
+			local d = dx * dx + dy * dy
+			if not bestD or d < bestD then best, bestD = n, d end
+		end
+		s.fnFor, s.fn, s.fd = flights, best, bestD and sqrt(bestD) or nil
+	end
+	return s.fn, s.fd
+end
 local function D(a, b)
 	local dx, dy = a.cx - b.cx, a.cy - b.cy
 	local d = sqrt(dx * dx + dy * dy)
+	local fly
+	if flights and d >= FLIGHT_MIN then
+		local na, da = NearNode(a)
+		local nb, db = NearNode(b)
+		if na and nb and na ~= nb then
+			local hx, hy = na.cx - nb.cx, na.cy - nb.cy
+			-- (in yards of walking: the planner turns yards into seconds with DETOUR / speed)
+			fly = da + db + (FLY_OVERHEAD + sqrt(hx * hx + hy * hy) / FLY_SPEED) * flightSpeed / DETOUR
+			if fly >= d * FLIGHT_GAIN then fly = nil end
+		end
+	end
 	if walkOK and a.m and a.m == b.m and a.x and b.x then
 		if b.key == "start" then a, b = b, a end
 		local walk = ns.Paths:Yards(a.m, a.x, a.y, b.x, b.y)
-		if walk and walk / DETOUR > d then return walk / DETOUR end
+		if walk and walk / DETOUR > d then d = walk / DETOUR end
 	end
+	if fly and fly < d then return fly end
 	return d
 end
+P._D = D
 
 ---------------------------------------------------------------------------
 -- Bundles
@@ -291,6 +329,11 @@ function P:Bundles(cont)
 					local fit = AD and AD:PickupFactor(o.questID) or 1
 					local b = { questID = o.questID, e = o, value = (xp + chain) * PICKUP_SHARE * fit, xp = xp, chainCount = ups,
 						stops = { s }, work = STOP_WORK, pickup = true }
+					-- A quest you may do: your level, not gray, not one that needs a group you
+					-- haven't got. Passing its giver, you take it; it can be dropped later.
+					local kind = ns.Quests:Kind(o.questID)
+					b.mayDo = not (o.trivial or o.difficulty == 0 or o.difficulty == 4)
+						and (not kind or kind == "PvP" or (IsInGroup and IsInGroup()) or false) and true or false
 					if Back(o.questID) then b.value = b.value * GOBACK end
 					b.value = b.value * StyleWeight(o.questID, ns.Quests:ZoneOf(o), focus, false)
 					if ns.Catchup then b.value = b.value * ns.Catchup:Weight(o.questID, false, true) end
@@ -670,7 +713,7 @@ end
 -- from you; further in a town or city, where you're resting and the NPCs are spread out. None
 -- while you're working on an objective: one still to do is close by and closer than any of
 -- these turn-ins.
-local function HereFirst(bundles, start, bar, speed)
+local function HereFirst(bundles, start, bar, speed, room)
 	local town = IsResting and ns.SafeCall(IsResting) == true
 	local step, reach = town and HERE_TOWN or HERE, town and HERE_TOWN_MAX or HERE_MAX
 	local work, turnin = math.huge, math.huge
@@ -684,21 +727,24 @@ local function HereFirst(bundles, start, bar, speed)
 	if work <= NEAR_WORK and work < turnin then return nil end
 	local list, taken, at = {}, {}, start
 	while true do
-		local best, bestD
+		local best, bestD, bestNear
 		for _, b in ipairs(bundles) do
 			local s = b.stops[1]
 			local ok = not taken[b] and #b.stops == 1 and (s.kind == "turnin" or (s.kind == "pickup" and bar and b.value / (D(at, s) * DETOUR / speed + b.work) >= bar))
-			if ok then
+			-- Right here and one you may do: taken while you're passing, worth the bar or not.
+			local near = not ok and not taken[b] and b.mayDo and room > 0 and D(at, s) <= NEAR_PICKUP
+			if ok or near then
 				local d = D(at, s)
-				if d <= step and D(start, s) <= reach and (not bestD or d < bestD) then best, bestD = b, d end
+				if d <= step and D(start, s) <= reach and (not bestD or d < bestD) then best, bestD, bestNear = b, d, near end
 			end
 		end
 		if not best then break end
+		if bestNear then room = room - 1 best.passing = true end
 		taken[best] = true
 		list[#list + 1] = best
 		at = best.stops[1]
 	end
-	return list
+	return list, room
 end
 
 local function Rates(plan)
@@ -728,7 +774,11 @@ local function Build(bundles, start, forced)
 	if P.completionist and style == "zone" then bar = 0 end
 
 	-- Hand in what's ready right here before going anywhere, a forced first stop included.
-	for _, b in ipairs(HereFirst(bundles, start, bar, speed) or {}) do
+	-- Room in the quest log for quests taken just because you're passing (LOG_ROOM slots are kept).
+	local room = P.LogRoom()
+	local hereList, roomLeft = HereFirst(bundles, start, bar, speed, room)
+	room = roomLeft or room
+	for _, b in ipairs(hereList or {}) do
 		Apply(route, b, #route + 1)
 		used[b] = true
 		value, work = value + b.value, work + b.work
@@ -783,7 +833,10 @@ local function Build(bundles, start, forced)
 		if not used[b] and #b.stops > 0 and #route + #b.stops <= MAX_STOPS then
 			local d, i, j = Insertion(route, start, b, false, from)
 			local rate = b.value / max(5, d * DETOUR / speed + b.work)
-			if d <= ONTHEWAY and rate >= bar * ONTHEWAY_BAR then
+			-- (and a quest giver you walk right past, for a quest you may do: taken as you go)
+			local passing = b.pickup and b.mayDo and room > 0 and d <= NEAR_ROUTE
+			if (d <= ONTHEWAY and rate >= bar * ONTHEWAY_BAR) or passing then
+				if passing and not (rate >= bar * ONTHEWAY_BAR) then room = room - 1 b.passing = true end
 				Apply(route, b, i, j)
 				used[b] = true
 				value, work = value + b.value, work + b.work
@@ -815,12 +868,29 @@ local function Build(bundles, start, forced)
 	})
 end
 
+-- Free quest log slots beyond the ones kept back.
+function P.LogRoom()
+	local cap = ns.Num(C_QuestLog.GetMaxNumQuestsCanAccept and ns.SafeCall(C_QuestLog.GetMaxNumQuestsCanAccept)) or 25
+	local _, n = C_QuestLog.GetNumQuestLogEntries()
+	return max(0, cap - (ns.Num(n) or 0) - LOG_ROOM)
+end
+
 function P:Make()
 	local m, x, y = ns.Nav.GetPlayerPosition()
 	local cont, cx, cy = Locate(m, x, y)
 	if not cont then return nil end
 	local start = { cx = cx, cy = cy, key = "start", m = m, x = x, y = y }
 	walkOK = false
+	-- Flight masters you can fly to on this continent (none until a flight map has shown them).
+	flights = nil
+	if ns.db.nav.flights and ns.Route and ns.Route.KnownNodes then
+		local size = sizeCache[cont]
+		local list = {}
+		for _, n in ipairs(ns.Route.KnownNodes(cont) or {}) do
+			list[#list + 1] = { cx = n.x * size[1], cy = n.y * size[2], name = n.name }
+		end
+		if #list >= 2 then flights, flightSpeed = list, Speed() end
+	end
 	local bundles = self:Bundles(cont)
 	-- Walking distances (Paths.lua): say which stops matter, nearest first. They're used once
 	-- nearly all of them are known; until then every distance is a straight line, so the route

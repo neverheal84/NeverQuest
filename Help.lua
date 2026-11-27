@@ -333,6 +333,12 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.5" .. E,
+		"  " .. Y .. "Travel worked out on the new ground data" .. E .. ": the order of your stops, which quests are grouped into one trip and what a quest is worth for its time are measured by the walk over real ground again (off since 1.28.2 while the data was put right). Switch: Options > Guide & Routes > \"Plan the route by walking distance\", or " .. Y .. "/nq paths off" .. E .. ".",
+		"  " .. Y .. "Your flight paths count" .. E .. ": when two stops are far apart and you know a flight master near each, the route counts that trip as walk, fly, walk, so a quest across the continent by a flight you have ranks ahead of one half as far on foot. NeverQuest knows a flight master is yours once your flight map has shown it (open the map at any flight master) or when you discover a new one. The arrow says \"Fly from X to Y\" as before.",
+		"  " .. Y .. "Picked up in passing" .. E .. ": a quest you may do (your level, not gray, no group needed) is picked up when its giver is within about 100 yards of you or 60 yards of the way you're going, whether or not it looks worth its time yet. Five quest log slots are always kept free. A slow quest is only suggested for dropping once the log is nearly full.",
+		"  " .. Y .. "1-60 plans re-run" .. E .. " on the corrected ground data, for every race.",
+		"",
 		Y .. "1.28.4" .. E,
 		"  " .. Y .. "Route lines that go round the mountain" .. E .. ": the lines on the world map and the minimap follow the walkable way again, by default, and that way is worked out properly now. Before, each 33-yard square of a zone had one number for how rough it was, and a square that was mostly cliff with a patch of open ground counted as open, so a line could run straight up a mountainside (the hills above the Dragonmaw camp in the Wetlands, for one). Now the walk from each square to each of its neighbours is measured on a map four times finer, so a ridge between two squares blocks the way whatever the squares look like.",
 		"  " .. Y .. "Valleys before hillsides" .. E .. ": a slope you can walk up is no longer as good as flat ground. Gentle ground is free, a hillside costs up to two and a half times as much and a scramble up to ten, so the way goes by the valley or the road when there is one.",

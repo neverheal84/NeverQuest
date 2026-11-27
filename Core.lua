@@ -41,7 +41,7 @@ local DEFAULTS = {
 	guide  = { autoTrack = true, showGray = false, nearbyYards = 200, maxOffers = 4,
 	           profile = true, milestones = true, dungeonTips = true,
 	           dungeonQuests = true, dungeonSkip = {},   -- Dungeons.lua: gather dungeon quests and pre-quests; dungeons left out
-	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true, learnPace = true, walk = false,
+	           style = "optimized", planner = true, chains = true, planPickups = true, showPredicted = true, routeSummary = true, learnPace = true, walk = true,
 	           nearbyFirst = true, zoneAdvice = true, outleveledTip = true, restedTip = true,
 	           partyInSteps = true, xpInSteps = true, viaInSteps = true, attunements = true, attuneAt = 50,
 	           classTab = true, profQuests = true, profMine = true,
@@ -348,6 +348,12 @@ ns:RegisterEvent("PLAYER_LOGIN", function()
 	if not ns.db.quietLogin then
 		ns.Print(ns.version .. " by " .. ns.AUTHOR .. " loaded. /nq opens it, /nq help explains everything."
 			.. ((ns.db.questdb.bundled ~= false and ns.Library and ns.Library:Installed()) and " Quest data by the Questie team (QuestieDB): /nq credits." or ""))
+	end
+	-- Planning by walking distance: off for everyone in 1.28.2 to 1.28.4 while the path data was
+	-- put right, on from 1.28.5. Switched on once; a choice made after that is kept.
+	if not ns.db.guide.walkOn then
+		ns.db.guide.walkOn = true
+		ns.db.guide.walk = true
 	end
 	-- Known quest starts near you show on the minimap by default (1.26). 1.21 had switched them
 	-- off for everyone; they are switched back on once, and a choice made after that is kept.
