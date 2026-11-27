@@ -30,6 +30,9 @@ local function ApplySpawnLook(f, p, scale)
 		atlas, size, alpha = ATLAS.note, 13, 1
 	elseif p.kind == "mark" then
 		size, alpha, ring = 8, 1, { 1, 0.95, 0.7, 1 }
+	elseif p.lib and p.few then
+		-- One of a handful of places for a quest's chest or named mob (QuestieDB): a clear marker.
+		size, alpha, ring = 9, 1, { 1, 0.85, 0.2, 1 }
 	else
 		local w = p.w or 1
 		size = 5 + min(3, (w - 1) * 0.5)

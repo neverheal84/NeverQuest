@@ -333,6 +333,9 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.8" .. E,
+		"  " .. Y .. "Quest chests and named mobs you can see on the map" .. E .. ": where QuestieDB knows only a few places for something a quest needs (the three Document Chests holding the Secret Notes for Grimtotem Spying, a named mob like Rok'Alim the Pounder), each was drawn as one faint dot that was easy to miss. They're now clear gold-ringed markers on the world map and the minimap. With 1.28.7's rough areas the route goes to the nearest one still needed.",
+		"",
 		Y .. "1.28.7" .. E,
 		"  " .. Y .. "A rough area for quests the game doesn't mark" .. E .. ": some quests have no marker on the map at all (Test of Strength in Thousand Needles, for one: kill a named mob for an item). The route had nowhere to send you until you'd found the mob yourself. Now it heads for the place QuestieDB says the mob, object or drop is: the middle of its nearby spawn points. The guide says \"rough area\" and what you're looking for there. Once you've found it yourself, the spot you learned takes over.",
 		"",

@@ -449,6 +449,7 @@ function S.MatchObjective(q, name)
 	return nil, false
 end
 
+local FEW_POINTS = 4          -- QuestieDB places this few for one thing (a chest, a named mob) are drawn as markers, not faint dots
 function S:Index()
 	if self.index then return self.index end
 	local idx = { quests = {}, entries = {}, points = {}, byQuest = {}, lib = {} }
@@ -536,7 +537,8 @@ function S:Index()
 						ent = { kind = o.kind, name = o.name, drop = o.drop, lib = true, refs = {} }
 						libEnts[k] = ent
 						for _, s in ipairs(o.pts) do
-							table.insert(idx.lib, { m = s.m, x = s.x, y = s.y, w = 0, ent = ent, lib = true })
+							-- (few: a chest, a named mob. One faint dot is easy to miss, so these are drawn as markers.)
+							table.insert(idx.lib, { m = s.m, x = s.x, y = s.y, w = 0, ent = ent, lib = true, few = #o.pts <= FEW_POINTS })
 						end
 					end
 					AddRef(idx, ent, qid, i)
