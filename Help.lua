@@ -333,6 +333,10 @@ Help.TOPICS = {
 		"  Mark a spawn where I stand")
 	end },
 	{ key = "news", title = "What's new", text = function() return Lines(
+		Y .. "1.28.12" .. E,
+		"  " .. Y .. "The guide follows your own path, not your race" .. E .. ": in the Optimized style the zone it picks now goes by where you've actually been questing. Once you've handed in 10 quests over your last few levels, your race's 1-60 plan stops counting, and if most of them were on one continent, zones there count for 30% more. A human who went to Darkshore, or anyone who stayed in the Eastern Kingdoms through their 20s, is guided on from there instead of being pulled back to the plan. Until then the plan still helps, fading as your own path builds up.",
+		"  In the simulator this means two to five fewer trips across the sea for most players on the way to 60, and leveling about as fast or faster. " .. Y .. "/nq zones" .. E .. " says what it's going by.",
+		"",
 		Y .. "1.28.11" .. E,
 		"  " .. Y .. "A smoother move into the 30s" .. E .. ": the 1-60 plans for some races sent you to Ashenvale at 28 for two levels, at the very top of a zone that ends at 30. Plans now only send you to a zone with at least three levels left in it when you arrive, and every race's plan has been searched again with that rule (around 28 to 30 that means zones like Thousand Needles, Desolace, Arathi Highlands or Stranglethorn Vale).",
 		"  " .. Y .. "The guide's own zone choice" .. E .. " uses the same three levels (it was two in 1.28.9), going by the lower of the game's top level for a zone and NeverQuest's, so a zone the game lists higher than its quests really go still counts as outgrown. The zone you're standing in is still yours to finish.",

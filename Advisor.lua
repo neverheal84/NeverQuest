@@ -30,7 +30,11 @@ local BETWEEN = 1.15          -- getting from one quest to the next
 -- elf): staying until another zone is twice as good, and counting the other continent at 0.7, levels
 -- about 10% faster than the plan alone and changes zone the least.
 local STAY = 2                -- another zone must be this much better to leave the one you're in
-local PLAN_BONUS = 1.1        -- zones your 1-60 plan names for now
+local PLAN_BONUS = 1.1        -- zones your 1-60 plan names for now (only while there's little of your own path to go on)
+local PATTERN_MIN = 10        -- quests handed in within your last few levels before your own path outweighs the race plan
+local PATTERN_LEVELS = 8      -- ...counting back this many levels
+local SIDE_SHARE = 0.6        -- this share of them on one continent makes it "where you've been questing"
+local SIDE_BONUS = 1.3        -- ...and zones on it count for this much more (fewer trips across the sea)
 local CROSS_CONTINENT = 1200  -- seconds: a boat or a zeppelin, with the walking at both ends
 local FAR_SHARE = 0.7         -- a zone across the sea also counts for this share: you'd be cut off from the rest
 local MIN_QUESTS = 4          -- fewer known quests than this anywhere: keep to the plan
@@ -227,7 +231,43 @@ end
 
 -- One zone's score: its best 45 minutes of quests for you, as XP per hour, with the trip there
 -- counted and thin zones marked down (you'd only have to move again soon).
-function A:ScoreZone(id, name, here, planZones)
+-- Where you've been questing: the quests you handed in over your last few levels (Journal.lua),
+-- by continent. The guide follows that more than your race's 1-60 plan (1.28.12): a human who
+-- went to Darkshore, or anyone who stayed in the Eastern Kingdoms through their 20s, is guided on
+-- from there. Reused until you hand in another quest or level up.
+function A:Pattern()
+	local log = ns.char and ns.char.journal or {}
+	local level = UnitLevel("player") or 1
+	local p = self.pattern
+	if p and p.len == #log and p.level == level then return p end
+	local per, n = {}, 0
+	for i = #log, math.max(1, #log - 29), -1 do
+		local e = log[i]
+		if e.level and e.level >= level - PATTERN_LEVELS and e.zone then
+			local id = ns.Profiles.ZoneID(e.zone)
+			local c = id and ns.Nav.GetContinentMap(id)
+			if c then n = n + 1 per[c] = (per[c] or 0) + 1 end
+		end
+	end
+	local side, top = nil, 0
+	for c, k in pairs(per) do if k > top then side, top = c, k end end
+	p = { len = #log, level = level, n = n, side = (n >= PATTERN_MIN and top / n >= SIDE_SHARE) and side or nil,
+		share = n > 0 and top / n or 0, strong = n >= PATTERN_MIN }
+	p.planShare = math.max(0, 1 - n / PATTERN_MIN)  -- how much the race plan still counts: all of it with no path, none with a full one
+	self.pattern = p
+	return p
+end
+
+-- What a zone's score is multiplied by for your plan and your path.
+local function Factor(id, name, planZones, pat)
+	local f = 1
+	if planZones and planZones[name] then f = f * (1 + (PLAN_BONUS - 1) * (pat and pat.planShare or 1)) end
+	if pat and pat.side and id and ns.Nav.GetContinentMap(id) == pat.side then f = f * SIDE_BONUS end
+	return f
+end
+A._Factor = Factor
+
+function A:ScoreZone(id, name, here, planZones, pat)
 	local list = {}
 	for _, k in ipairs(ns.QuestDB and ns.QuestDB:OpenIn(id) or {}) do
 		if not self:IsSkipped(k.qid) then list[#list + 1] = self:Estimate(k.qid, k.q) end
@@ -257,7 +297,7 @@ function A:ScoreZone(id, name, here, planZones)
 	end
 	local score = n > 0 and (xp / math.max(60, secs + travel) * 3600) or 0
 	if secs < THIN then score = score * (0.5 + 0.5 * secs / THIN) end
-	if planZones and planZones[name] then score = score * PLAN_BONUS end
+	score = score * Factor(id, name, planZones, pat)
 	if far then score = score * FAR_SHARE end
 	return { id = id, name = name, score = score, xp = xp, secs = secs, n = n, travel = travel, here = id == here, far = far }
 end
@@ -266,7 +306,8 @@ end
 function A:ZoneScores(planZones)
 	local level = UnitLevel("player") or 1
 	local here = HereZone()
-	local key = table.concat({ level, here or 0, ns.QuestDB and ns.QuestDB:OpenTick() or 0, #ns.Quests.log,
+	local pat = self:Pattern()
+	local key = table.concat({ level, here or 0, ns.QuestDB and ns.QuestDB:OpenTick() or 0, #ns.Quests.log, pat.len,
 		(ns.Library and ns.Library:Get()) and 1 or 0 }, ":")
 	local s = self.scores
 	if s and s.key == key and GetTime() - s.at < SCORE_TTL then return s.list end
@@ -294,10 +335,11 @@ function A:ZoneScores(planZones)
 			-- Ashenvale (18 to 30) still "fit", so its leftover quests could outscore everything and
 			-- send you back to a zone you were about to outgrow. Your plan's zones are the exception.
 			-- 1.28.11: three levels (P.HEADROOM), by the lower of the game's and NeverQuest's top level.
-			local inPlan = planZones and planZones[name]
+			-- (the plan's zones only get this pass while your own path is too short to go on)
+			local inPlan = planZones and planZones[name] and not pat.strong
 			local room = maxL and (not P.Outgrown(name, level) or (maxL >= level and (isHere or inPlan)))
 			if minL and maxL and minL <= level + 2 and (room or (isHere and maxL >= level - 4)) then
-				list[#list + 1] = self:ScoreZone(id, name, here, planZones)
+				list[#list + 1] = self:ScoreZone(id, name, here, planZones, pat)
 			end
 		end
 	end
@@ -357,6 +399,10 @@ function A:ApplyZones(f, level)
 	f.zoneDone = pick.here and pick.n == 0 or false
 	f.reason = string.format("Most XP per hour for you now: about %s XP/hour from %d %s here.",
 		ns.Comma(math.floor(pick.score / 100 + 0.5) * 100), pick.n, pick.n == 1 and "quest" or "quests")
+	local pat = self:Pattern()
+	if pat.side and ns.Nav.GetContinentMap(pick.id) == pat.side then
+		f.reason = f.reason .. " You've been questing in " .. (ns.Nav.MapName(pat.side) or "this part of the world") .. ", so zones there count for more."
+	end
 	if planZone and not ns.Profiles.SameZone(planZone, pick.name) then
 		f.reason = f.reason .. " Your 1-60 plan has " .. planZone .. "."
 	end
@@ -865,6 +911,15 @@ ns:AddSlash("zones", function()
 			z.n, z.n == 1 and "quest" or "quests", z.here and " (you're here)" or "", z.travel > 0 and string.format(", %s to get there%s", ns.Duration(z.travel), z.far and " by boat or zeppelin" or "") or ""))
 	end
 	if A:Pending() > 0 then ns.Print("still working out where " .. A:Pending() .. " quests' objectives are; these firm up in a moment.") end
+	local pat = A:Pattern()
+	if pat.side then
+		ns.Print(string.format("you've handed in %d quests over your last few levels, %d%% of them in %s: zones there count for more, and your race's 1-60 plan no longer does.",
+			pat.n, math.floor(pat.share * 100 + 0.5), ns.Nav.MapName(pat.side) or "one place"))
+	elseif pat.strong then
+		ns.Print("you've handed in " .. pat.n .. " quests over your last few levels, spread across the world: the guide goes by them, not your race's 1-60 plan.")
+	else
+		ns.Print("with " .. pat.n .. " quests handed in over your last few levels, your race's 1-60 plan still helps choose; your own path takes over from " .. PATTERN_MIN .. ".")
+	end
 	if not A:SmartOn() then ns.Print("the guide isn't choosing zones this way right now: turn on \"Choose zones from the quest data\" (and following your 1-60 plan) under Options > Guide & Routes.") end
 end, "/nq zones - every zone that fits your level, by XP per hour")
 
